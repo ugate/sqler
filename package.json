@@ -1,0 +1,32 @@
+{
+  "name": "sqler",
+  "version": "1.0.0",
+  "description": "Turn SQL files into executable functions",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "jsdocp": "jsdocp ./jsdocp/jsdoc.json",
+    "jsdocp-deploy": "jsdocp -D ./jsdocp/jsdoc.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ugate/sqler.git"
+  },
+  "keywords": [
+    "SQL",
+    "DB",
+    "Database"
+  ],
+  "author": "ugate",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ugate/sqler/issues"
+  },
+  "homepage": "https://github.com/ugate/sqler#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "jsdoc": "^3.6.3",
+    "jsdocp": "^1.0.3",
+    "minami": "^1.2.3"
+  }
+}
