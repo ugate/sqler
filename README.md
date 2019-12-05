@@ -9,125 +9,82 @@
 
 </b>
 
-Skip the ORM and simplify your SQL execution plans using plain 💯% SQL systax.<br/><br/>
-A Node.js manager for [RDBMS](https://en.wikipedia.org/wiki/Relational_database) systems that autogenerates/manages SQL execution functions from underlying SQL statement files. Features include:
+`npm install sqler`
 
-* Debugging options that allow for near real time updates to SQL files without restarting an application
-* Autogeneration of object paths that coincide with SQL file paths
-* [Expanded SQL substitutions](#ps), [fragment substitutions](#fs), [dialect specific substitutions](#ds) and [version specific substitutions](#vs)
-* Unlike strict ORM/API based solutions, models are generated on the fly- lending itself to a more function centric design with minimal overhead and maximum/optimal utilization of SQL syntax and DBA interaction
+Skip the ORM and simplify your SQL execution plans using plain 💯% SQL systax.<br/>
+`sqler` is a Node.js manager for [RDBMS](https://en.wikipedia.org/wiki/Relational_database) systems that autogenerates/manages SQL execution functions from underlying SQL statement files. Features include:
 
-### SQL Prepared Statements &amp; Variable Substitutions <sub id="ps"></sub>:
-Most RDMS drivers support [prepared statement variable substitutions](https://en.wikipedia.org/wiki/Prepared_statement) in some form or fashion. Each SQL file can define multiple encapsulators that indicates what portions of an SQL statement will be present before execution takes place. The simplest of which is the typical syntax commonly associated with named parameters within prepared statements.
+- [Autogeneration of object paths and prepared statement functions](https://ugate.github.io/sqler/tutorial-1-manual.html) that coincide with SQL file paths
+- Debugging options that allow for near real time updates to [SQL files](https://ugate.github.io/sqler/tutorial-1-manual.html#sqlf) without restarting an application
+- [Expanded SQL substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#es), [fragment substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#fs), [dialect specific substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#ds) and [version specific substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#vs)
+- Using SQL vs ORM/API solutions minimizes overhead and maximizes optimal utilization of SQL syntax and DBA interaction and reduces over-fetching that is commonly assocaited with ORM
+- Unlike strict ORM/API based solutions, models are generated on the fly- lending itself to a more function centric design
 
-Depending on the underlying dialect support, named parameters follow the format `:someParam` where `someParam` is a parameter passed in to the `sqler` generated SQL function as `params`. An alternative and sometimes more universal format would be to use an array of values. For instance, passing the following `params` JSON into the subsequently generated SQL statement function:
-<br/><br/>__params__
-```json
-{
-  "someParam": ["one","two","three"]
-}
-```
-__some.query.sql__
+For more details check out the tutorials and API docs!
+
+- [Tutorials](https://ugate.github.io/sqler/tutorial-1-manual.html)
+- [API Docs](https://ugate.github.io/sqler/module-sqler-Manager.html)
+
+#### Usage <sub id="usage"></sub>:
+In order to use `sqler` a simple implementation of [Dialect](https://ugate.github.io/sqler/Dialect.html) should be supplied. There are a few that have already been written for a few enteprise level applications that make use of `sqler`<sub id="dialects"></sub>:
+
+- [SQL Server](https://github.com/ugate/sqler-mssql)
+- [Oracle](https://github.com/ugate/sqler-oracle)
+- [Intersystems Caché](https://github.com/ugate/sqler-icache)
+
+Example<sub id="example"></sub>:
 ```sql
-SELECT SOME_COL
-FROM SOME_TABLE
-WHERE SOME_COL IN (:someParam)
-```
-Would result in the following parameters and SQL execution
-<br/><br/>__params passed into the driver impl:__
-```json
-{
-  "someParam": "one",
-  "someParam1": "two",
-  "someParam2": "three"
-}
-```
-__some.query.sql ---> some.query(params)__
-```sql
-SELECT SOME_COL
-FROM SOME_TABLE
-WHERE SOME_COL IN (:someParam, :someParam1, :someParam2)
+-- db/finance/ap.list.companies.sql
+SELECT CO.COMPANY AS "company", CO.R_NAME AS "name", CO.PAY_GROUP AS "payGroup", CO.TAX_ACCOUNT AS "taxAccount", CO.TAX_ACCT_UNIT AS "taxAcctUnit",
+CO.TAX_SUB_ACCT AS "taxSubAcct"
+FROM APCOMPANY CO
+WHERE CO.INVOICE_AUDIT = :invoiceAudit
+ORDER BY CO.COMPANY ASC
 ```
 
-The normal driver driven variable substitutions would then be handled/applied external to `sqler`.
+```js
+// replace xxxx with one of the prexisiting vendor implementations
+// or roll your own Dialect
+const dialect = 'xxxx', dialectModule = `sqler-${dialect}`;
+const { Manager } = require('sqler');
+const conf = {
+  "univ": {
+    "db": {
+      "myId": {
+        "host": "myhost.example.com",
+        "username": "myusername",
+        "password": "mypassword"
+      }
+    }
+  },
+  "db": {
+    "dialects": {
+      [dialect]: dialectModule
+    },
+    "connections": [
+      {
+        "id": "myId",
+        "name": "fin",
+        "dir": "db/finance",
+        "service": "MYSRV",
+        "sql": {
+          "dialect": dialect
+        }
+      }
+    ]
+  }
+};
+const mgr = new Manager(conf);
+// initialize connections and set SQL functions
+await mgr.init();
 
-#### Fragment Substitutions <sub id="fs"></sub>:
-The second type of replacement involves SQL statement segments that are fragmented by use case. An example would be where only a portion of the SQL statement will be included when `frags` is passed into the generated DB managed SQL function that matches a key found in the SQL statement that's surrounded by an open (e.g. `[[? someKey]]`) and closing (i.e. `[[?]]`) fragment definition. For instance if `frags` is passed into a DB managed SQL function that contains `['someKey']` for a SQL statement:
-```sql
-SELECT SOME_COL
-FROM SOME_TABLE
-WHERE SOME_COL = 'test'
-[[? someKey]] AND SOME_COL2 IS NOT NULL [[?]]
-```
-the resulting SQL statement will become:
-```sql
-SELECT SOME_COL
-FROM SOME_TABLE
-WHERE SOME_COL = 'test'
-AND SOME_COL2 IS NOT NULL
-```
-When `frags` is omitted or `frags` contains an array that does not contain a `somekey` value, then the resulting SQL statement would become:
-```sql
-SELECT SOME_COL
-FROM SOME_TABLE
-WHERE SOME_COL = 'test'
-```
+// execute the SQL statement and capture the results
+const rslts = await mgr.fin.ap.list.companies({ invoiceAudit: 'Y' }, 'en-US');
 
-> __NOTE: Fragment substitutions cannot be nested__
-
-#### Dialect Substitutions <sub id="ds"></sub>:
-A third type of replacement is dialect specific and allows for SQL files that, for the most part are ANSI compliant, but may have slight deviations in syntax that's specific to an individual DB vendor. SQL files can coexist between DB vendors, but segments of the SQL statement will only be included when executed under a DB within a defined dialect. An example would be the use of `SUBSTR` in Oracle versus the ANSI* use of `SUBSTRING`. A SQL file may contain:
-```sql
-SELECT SOME_COL
-FROM SOME_TABLE
-WHERE
-[[! oracle]]
-SOME_COL = SUBSTR(SOME_COL, 1, 1)
-[[!]]
-[[! mssql]]
-SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1)
-[[!]]
+// after we're done using the manager we should close it
+process.on('SIGINT', async function sigintDB() {
+  await mrg.close();
+  console.log('Manager has been closed');
+});
+console.log('Manager is ready for use');
 ```
-If an `oracle` dialect were to be used the resulting SQL would become:
-```sql
-SELECT SOME_COL
-FROM SOME_TABLE
-WHERE
-SOME_COL = SUBSTR(SOME_COL, 1, 1)
-```
-If a `mssql` dialect were to be used the resulting SQL would become:
-```sql
-SELECT SOME_COL
-FROM SOME_TABLE
-WHERE
-SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1)
-```
-
-> __NOTE: Dialect substitutions cannot be nested__
-
-#### Version Susbstitutions <sub id="vs"></sub>:
-Sometimes programs connect to DBs that are shared accross one or more applications. Some portions of a program may need to execute SQL statements that are similar in nature, but have some versioning discrepancies between DB instances. Say we have a DB instance for an up-and-coming version that has some modifications made to it's structure, but is not enough to warrent two separate copies of the same SQL statement file. It may make more sense to maintain one copy of a SQL file/statement and account for the discrepancies within the SQL file. We can do so by encapsulating the SQL segment by surrounding it with an opening `[[version = 1]]` and closing `[[version]]` key (valid version quantifiers can be `=`, `<`, `>`, `<=`, `>=` or `<>`). So, if there were a SQL file that contained:
-```sql
-SELECT
-[[version <= 1]]
-SOME_OLD_COL
-[[version]]
-[[version > 1]]
-SOME_NEW_COL
-[[version]]
-FROM SOME_TABLE
-```
-When the `sqler` managed connection configuration contained `version` with a value of `1` (or any value less than one) then the resulting SQL would become:
-```sql
-SELECT
-SOME_OLD_COL
-FROM SOME_TABLE
-```
-Likewise, a `version` of `1.5` would result in the following SQL:
-```sql
-SELECT
-SOME_NEW_COL
-FROM SOME_TABLE
-```
-
-> __NOTE: Version substitutions cannot be nested__
