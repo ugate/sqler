@@ -1,5 +1,8 @@
 'use strict';
 
+const Dialect = require('./lib/dialect');
+const Cache = require('./lib/cache');
+
 const Fs = require('fs');
 const { promisify } = require('util');
 const readdir = promisify(Fs.readdir);
@@ -13,49 +16,6 @@ const compare = Object.freeze({
   '>=': function gteq(x, y) { return x >= y; },
   '<>': function noteq(x, y) { return x !== y; }
 });
-
-/**
- * The cache manager responsible for regulating the frequency in which a SQL file is read and used in generated SQL functions set on a given {@link Manager}. An internal mechanism should be in place that ensures that
- * determines how often SQL file reads are made using the supplied `conf.db.connections[].preparedSql.caching` set on an underlying {@link Manager}.
- * @typedef {Object} Cache
- * @property {Function} method an `async function(generatedSqlId, execFn, cachingOptions)` that reads a corresponding SQL file and updates the `methods` content. Once the SQL file read operation completes, the passed
- * `async execFn(rawSqlContent)` is executed to notify a {@link Manager} recipient of the change.
- * @property {Object} [methods={}] read-only method container that holds internally used functions set by a {@link Manager} for executing SQL statements. Each method function is set via `Cache.method` and is
- * accessible via `Cache.methods[name][ext]` where `name` is the generated/assigned name of the method, `ext` is the original SQL file extension and the _value_ is the internal method set by the {@link Manager}.
- * @example
- * // simple interval cache for illustration purposes only
- * const cache = {
- *  method: async (id, func, opts) => {
- *    const cache = this;
- *    if (!cache.handles) cache.handles = {};
- *    else if (cache.handles[id]) clearInterval(cache.handles[id]);
- *    cache.handles[id] = setInterval(async () => {
- *      cache.methods[id];
- *      await func();
- *    }, opts.expiresIn);
- *  }
- * };
- * const conf = {
- *  // other required conf options here
- *  "db": {
- *    "connections": [
- *      {
- *        // other required connection conf options here
- *        "preparedSql": {
- *          "caching": {
- *            "cache": {
- *              "expiresIn": 60000
- *            }
- *          }
- *        }
- *      }
- *    ]
- *  }
- * };
- * const mgr = new Manager(conf, cache);
- * await mgr.init();
- * // ... use the manager
- */
 
 /**
  * The database(s) manager entry point that autogenerates/manages SQL execution functions from underlying SQL statement files.
@@ -122,13 +82,15 @@ class Manager {
       if (!def) throw new Error(`Connection at index ${i} has invalid "id": ${conn.id}`);
       conn.sql.host = conn.sql.host || def.host;
       dlct = conn.sql.dialect.toLowerCase();
+      if (conn.sql.log !== false && !conn.sql.log) conn.sql.log = [];
+      if (conn.sql.logError !== false && !conn.sql.logError) conn.sql.logError = [];
       conn.sql.logging = conn.sql.log === false ? false : logging && logging([...conn.sql.log, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`]); // override dbx non-error logging
       conn.sql.errorLogging = conn.sql.logError === false ? false : logging && logging([...conn.sql.logError, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`]); // override dbx error logging
       if (!conf.db.dialects.hasOwnProperty(dlct)) {
         throw new Error(`Database configuration.db.dialects does not contain an implementation definition/module for ${dlct} at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
       }
       if (typeof conf.db.dialects[dlct] === 'string') conf.db.dialects[dlct] = require(conf.db.dialects[dlct]);
-      if (!(conf.db.dialects[dlct] instanceof Dialect)) throw new Error(`Database dialect for ${dlct} is not an instance of a sqler "${Dialect.constructor.name}" at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
+      //if (!(conf.db.dialects[dlct] instanceof Dialect)) throw new Error(`Database dialect for ${dlct} is not an instance of a sqler "${Dialect.constructor.name}" at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
       dbx = new conf.db.dialects[dlct](def.username, def.password, conn.sql, conn.service, conn.sid, privatePath, track, conn.sql.errorLogging, conn.sql.logging, conf.debug);
       /*if (dlct === 'oracle') {
         dbx = new OracleDB(def.username, def.password, conn.sql, conn.service, conn.sid, privatePath, track, conn.sql.errorLogging, conn.sql.logging, conf.debug);
@@ -178,68 +140,6 @@ class Manager {
 }
 
 /**
- * Abstract class that each database vendor/driver should `extend` from
- */
-class Dialect {
-
-  /**
-   * Abstract constructor that sets each passed parameter on the current instance (except for `password`). Extending classes should override the constructor using the same parameters
-   * @param {String} username the username that will be used to connect to the dialect implementation
-   * @param {String} password the password that will be used to connect to the diatect implementation
-   * @param {Object} sqlConf the individual SQL __connection__ configuration for the given dialect that was passed into the originating {@link Manager}
-   * @param {String} name the database name used by the implementing dialect
-   * @param {String} [type] the type of database used by the implementing dialect (if supported)
-   * @param {String} privatePath the private path used by the originating {@link Manager}
-   * @param {Object} [track] an object used to share configuration between dialect implementations
-   * @param {Function} [errorLogger] a function that takes one or more arguments and logs the results as an error (similar to `console.error`)
-   * @param {Function} [logger] a function that takes one or more arguments and logs the results (similar to `console.log`)
-   * @param {Boolean} [debug] a flag that indicates the dialect should be rena in debug mode (if supported)
-   */
-  constructor(username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug) {
-    this.username = username;
-    this.sqlConf = sqlConf;
-    this.name = name;
-    this.type = type;
-    this.privatePath = privatePath;
-    this.track = track;
-    this.errorLogger = errorLogger;
-    this.logger = logger;
-    this.debug = debug;
-  }
-
-  /**
-   * Initializes the {@link Dialect} implementation
-   * @returns {*} Any truthy value that indicates the initialization was successfull
-   */
-  async init() {
-    const dialect = this;
-    return new Promise((resolve, reject) => {
-      setImmediate(() => {
-        reject(new Error(`${dialect.constructor.name}.init not implemented`));
-      });
-    });
-  }
-
-  /**
-   * Executes a SQL statement
-   * @async
-   * @param {String} sql the SQL to execute 
-   * @param {Object} [opts] the options that control SQL execution
-   * @param {Object} [opts.replacements] the key/value pair of replacement parameters that will be used in the SQL
-   * @param {String[]} frags the frament keys within the SQL that will be retained
-   * @returns {Object[]} the result set (if any)
-   */
-  exec(sql, opts, frags) {
-    const dialect = this;
-    return new Promise((resolve, reject) => {
-      setImmediate(() => {
-        reject(new Error(`${dialect.constructor.name}.exec not implemented (failed on SQL:\n${sql}\nUsing options:\n${JSON.stringify(opts)}\nFragments: ${frags})`));
-      });
-    });
-  }
-}
-
-/**
  * Reads all the perpared SQL definition files for a specified name directory and adds a function to execute the SQL file contents
  * @private
  */
@@ -260,15 +160,18 @@ class SQLS {
    * @param {Object} conn the connection configuration
    */
   constructor(sqlBasePth, cache, psopts, db, dbs, conn) {
-    if (!cache) throw new Error('Options required');
-    if (typeof cache.method !== 'function') throw new Error('Options "cache method" must be a function(cacheFuncName, funcToCache, cacheOptions)');
-    if (typeof cache.methods !== 'object') throw new Error('Options "cache methods" must be an object where cached functions will be accessed');
-    if (!conn.name) throw new Error('Connection ' + conn.id + ' must have a name');
+    const noCacheOpts = !psopts || !psopts.caching || !psopts.caching.cache;
+    if (!noCacheOpts) {
+      if (!cache) throw new Error('Cache is required when caching configuration options are set');
+      if (typeof cache.method !== 'function') throw new Error('Cache must contain a "method" function(cacheFuncName, funcToCache, cacheOptions)');
+      if (!cache.methods || typeof cache.methods !== 'object') throw new Error('Cache must contain a "methods" object container where cached functions will be accessed');
+    }
+    if (!conn.name) throw new Error(`Connection ${conn.id} must have a name`);
 
     const sqls = internal(this);
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
     sqls.at.cache = cache;
-    sqls.at.noCache = !psopts || !psopts.caching || !psopts.caching.cache || !cache;
+    sqls.at.noCache = noCacheOpts || !cache;
     sqls.at.copt = psopts && psopts.caching;
     sqls.at.subs = psopts && psopts.substitutes;
     sqls.at.subrxs = sqls.at.subs && [];
@@ -485,7 +388,7 @@ class DBS {
   }
 }
 
-module.exports = Object.freeze({ Manager, Dialect });
+module.exports = Object.freeze({ Manager, Dialect, Cache });
 
 // private mapping
 let map = new WeakMap();
