@@ -193,4 +193,4 @@ FROM SOME_TABLE
 > __NOTE: Version substitutions cannot be nested__
 
 #### Caching SQL <sub id="cache"></sub>:
-By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache](global.html#Cache) container into the [Manager constructor](Manager.html#Manager). Cache options can also be passed into `conf.db.connections[].preparedSql.caching`. See [Manager constructor](Manager.html#Manager) more details about available options.
+By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache](global.html#Cache) container into the [Manager constructor](Manager.html#Manager).
