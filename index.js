@@ -75,7 +75,7 @@ class Manager {
   /**
   * Creates a new database manager. Vendor-specific implementations should have constructors that accept properties defined by {@link Dialect}.
   * @param {Object} conf the configuration
-  * @param {String} [conf.mainPath=require.main] root directory starting point to look for SQL files (defaults to `require.main` path)
+  * @param {String} [conf.mainPath=require.main] root directory starting point to look for SQL files (defaults to `require.main` path or `process.cwd()`)
   * @param {String} [conf.privatePath=process.cwd()] current working directory where generated files will be located (if any)
   * @param {Object} conf.univ the universal configuration that, for security and sharing puposes, remains external to an application
   * @param {Object} conf.univ.db the database configuration that contains connection ID objects that match the connection IDs of each of the conf.db.connections - each connection object should contain a
@@ -87,10 +87,12 @@ class Manager {
   * @param {String} conf.db.connections[].id identifies the connection within the passed `conf.univ.db`
   * @param {String} conf.db.connections[].name the name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
   * connection container `manager.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
-  * @param {String} [conf.db.connections[].dir] the alternative dir where `*.sql` files will be found and will be accessible in the manager by name followed by an object for each name separated by period(s)
-  * within the file name with the last entry as the executable function(params, locale, frags, cb) that executes the SQL where "params" is the Object that contains the parameter replacements that will be matched
-  * within the SQL, the "locale" String representing the locale that will be used for date parameter replacements, "frags" is an optional String[] of (see replacements section for more details) and a "cb"
-  * function(error, results). For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager as "db.conn1.user.team.details(params, locale, frags, cb)".
+  * @param {String} [conf.db.connections[].dir=connection.name] the alternative dir where `*.sql` files will be found relative to `mainPath`. The directory path will be used as the basis for generating SQL statements
+  * from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
+  * within the file name with the last entry as the executable `async function(params, locale, frags)`. The function executes the SQL where "params" is the Object that contains the parameter replacements that will be matched
+  * within the SQL, the "locale" String representing the locale that will be used for date parameter replacements and "frags" is an optional String[] of (see replacements section for more details). For example, a connection
+  * named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager as "db.conn1.user.team.details(params, locale, frags, cb)". But when `dir` is set to "myDir" the SQL files will be loaded
+  * from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection name "conn1".
   * @param {Float} [conf.db.connections[].version] a version that can be used for replacement selection within the SQL (see replacements section for more details)
   * @param {String} [conf.db.connections[].service] the service name defined by the underlying database (must define if SID is not defined)
   * @param {String} [conf.db.connections[].sid] the SID defined by the underlying database (use only when supported, but service is preferred)
@@ -240,6 +242,7 @@ class SQLS {
       }
       return await sqls.at.dbs.init({ numOfPreparedStmts: sqls.at.numOfPreparedStmts });
     } catch (err) {
+      if (sqls.at.conn.sql.erroLogging) sqls.at.conn.sql.erroLogging(`Failed to build SQL statements from files in directory ${sqls.at.basePath}`, err);
       throw err;
     }
   }
@@ -254,24 +257,23 @@ class SQLS {
   async prepared(name, fpth, ext) {
     const sqls = internal(this);
     // cache the SQL statement capture in order to accommodate dynamic file updates on expiration
-    var sql;
     sqls.at.stms = sqls.at.stms || { methods: {} };
     sqls.at.stms.methods[name] = {};
     if (sqls.at.cache) {
-      let cached;
       const id = `${name}:${ext}`;
       sqls.at.stms.methods[name][ext] = async function cachedSql(opts, execFn) { // execute the SQL statement with cached statements
-        cached = await sqls.at.cache.get(id);
+        let sql;
+        const cached = await sqls.at.cache.get(id);
         if (!cached || !cached.item) {
           if (sqls.at.conn.sql.logging) sqls.at.conn.sql.logging(`Refreshing cached ${fpth} at ID ${id}`);
           sql = await readSqlFile();
           sqls.at.cache.set(id, sql); // no need to await set
         } else sql = cached.item;
-        return await execFn(sql); 
+        return await execFn(sql);
       };
     } else {
       if (sqls.at.conn.sql.logging) sqls.at.conn.sql.logging(`Setting static ${fpth} at "${name}"`);
-      sql = await readSqlFile();
+      const sql = await readSqlFile();
       sqls.at.stms.methods[name][ext] = async function staticSql(opts, execFn) { // execute the SQL statement with static statements
         return await execFn(sql);
       };

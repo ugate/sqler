@@ -25,6 +25,9 @@
   "homepage": "https://github.com/ugate/sqler#readme",
   "dependencies": {},
   "devDependencies": {
+    "@hapi/code": "^7.0.0",
+    "@hapi/lab": "^21.0.0",
+    "@ugate/labrat": "^1.0.0",
     "jsdoc": "^3.6.3",
     "jsdocp": "^1.0.3",
     "minami": "^1.2.3"
