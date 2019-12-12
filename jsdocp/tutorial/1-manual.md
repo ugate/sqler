@@ -11,7 +11,7 @@ The [Manager](Manager.html) is the entry point for one or more databases/connect
   - [5️⃣ Caching SQL](#cache)
 
 #### ⚙️ Setup &amp; Configuration <sub id="conf"></sub>:
-There are two types of configuration, _public_ and _private_. Public configurations contain one or more `connections` that will be established during initialization and typically vary depending upon the environment being used (e.g. development, test, ci, production, etc.). See the [db.connections in the database manager constructor](Manager.html) for a complete listing of public configuration options. Private or _universal_ (`univ`) configuration, on the other hand, is intended to carry sensitive information like connection credentials. Each public connection should contain a `conf.db.connections[].id` that matches a property name in the private configuration `conf.univ.db `. __Both public and private configurations are combined when passed into the [Manager](Manager.html), but shoud be loaded from separate sources__. The following example illustrates this using a matching `myId`:
+There are two types of configuration, _public_ and _private_. Public configurations contain one or more `connections` that will be established during initialization and typically vary depending upon the environment being used (e.g. development, test, ci, production, etc.). See the [manager.connections in the database manager constructor](Manager.html) for a complete listing of public configuration options. Private or _universal_ (`univ`) configuration, on the other hand, is intended to carry sensitive information like connection credentials. Each public connection should contain a `conf.db.connections[].id` that matches a property name in the private configuration `conf.univ.db `. __Both public and private configurations are combined when passed into the [Manager](Manager.html), but shoud be loaded from separate sources__. The following example illustrates this using a matching `myId`:
 ```sql
 -- db/finance/ap.list.companies.sql
 SELECT CO.COMPANY AS "company", CO.R_NAME AS "name", CO.PAY_GROUP AS "payGroup", CO.TAX_ACCOUNT AS "taxAccount", CO.TAX_ACCT_UNIT AS "taxAcctUnit",
@@ -58,7 +58,7 @@ const mgr = new Manager(conf);
 await mgr.init();
 
 // execute the SQL statement and capture the results
-const rslts = await mgr.fin.ap.list.companies({ invoiceAudit: 'Y' }, 'en-US');
+const rslts = await mgr.db.fin.ap.list.companies({ invoiceAudit: 'Y' }, 'en-US');
 
 // after we're done using the manager we should close it
 process.on('SIGINT', async function sigintDB() {
@@ -67,7 +67,7 @@ process.on('SIGINT', async function sigintDB() {
 });
 console.log('Manager is ready for use');
 ```
-Each `conf.db.dialect` property should contain all of the [Dialect](Dialect.html) vendor/driver implmentations used by the manager and can be set to either an extending Dialect class or a _path_ to an extended Dialect module. Many Dialects have already been implemented in separate modules that [listed in the README.md](index.html#dialects). Notice how the genrated SQL function `mgr.fin.ap.list.companies` uses the `conf.db.connections[].name` as the property namespace on the manager instance. Every generated SQL function accepts the following arguments:
+Each `conf.db.dialect` property should contain all of the [Dialect](Dialect.html) vendor/driver implmentations used by the manager and can be set to either an extending Dialect class or a _path_ to an extended Dialect module. Many Dialects have already been implemented in separate modules that [listed in the README.md](index.html#dialects). Notice how the genrated SQL function `mgr.db.fin.ap.list.companies` uses the `conf.db.connections[].name` as the property namespace under `db` on the manager instance. Every generated SQL function accepts the following arguments:
 
 - `params` - the named bind parameter names/values to pass into the SQL driver
 - `[locale]` - the [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for date formatting

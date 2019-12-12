@@ -78,7 +78,7 @@ class Manager {
   * @param {String} [conf.mainPath=require.main] root directory starting point to look for SQL files (defaults to `require.main` path or `process.cwd()`)
   * @param {String} [conf.privatePath=process.cwd()] current working directory where generated files will be located (if any)
   * @param {Object} conf.univ the universal configuration that, for security and sharing puposes, remains external to an application
-  * @param {Object} conf.univ.db the database configuration that contains connection ID objects that match the connection IDs of each of the conf.db.connections - each connection object should contain a
+  * @param {Object} conf.univ.db the database configuration that contains connection ID objects that match the connection IDs of each of the `conf.db.connections` - each connection object should contain a
   * "host", "username" and "password" property that will be used to connect to the underlying database (e.g. { db: myConnId: { host: "someDbhost.example.com", username: 'someUser', password: 'somePass' } })
   * @param {Object} conf.db the database configuration
   * @param {Object} conf.dialects an object that contains dialect implementation details where each property name matches a dialect name and the value contains either the module class or a string that points to the
@@ -89,14 +89,14 @@ class Manager {
   * connection container `manager.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
   * @param {String} [conf.db.connections[].dir=connection.name] the alternative dir where `*.sql` files will be found relative to `mainPath`. The directory path will be used as the basis for generating SQL statements
   * from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
-  * within the file name with the last entry as the executable `async function(params, locale, frags)`. The function executes the SQL where "params" is the Object that contains the parameter replacements that will be matched
-  * within the SQL, the "locale" String representing the locale that will be used for date parameter replacements and "frags" is an optional String[] of (see replacements section for more details). For example, a connection
-  * named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager as "db.conn1.user.team.details(params, locale, frags, cb)". But when `dir` is set to "myDir" the SQL files will be loaded
+  * within the file name with the last entry as the executable `async function(params, locale, frags)`. The function executes the SQL where "params" is the Object that contains the `bindVariables` that will be matched
+  * within the SQL, the "locale" String representing the locale that will be used for date `bindVariables`s and "frags" is an optional String[] of (see `bindVariables` section for more details). For example, a connection
+  * named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager as "mgr.db.conn1.user.team.details(params, locale, frags, cb)". But when `dir` is set to "myDir" the SQL files will be loaded
   * from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection name "conn1".
-  * @param {Float} [conf.db.connections[].version] a version that can be used for replacement selection within the SQL (see replacements section for more details)
+  * @param {Float} [conf.db.connections[].version] a version that can be used for replacement selection within the SQL (see `bindVariables` section for more details)
   * @param {String} [conf.db.connections[].service] the service name defined by the underlying database (must define if SID is not defined)
   * @param {String} [conf.db.connections[].sid] the SID defined by the underlying database (use only when supported, but service is preferred)
-  * @param {Object} [conf.db.connections[].params] global object that contains parameter values that will be included in all SQL calls made under the connection for parameter replacements if not overridden
+  * @param {Object} [conf.db.connections[].params] global object that contains parameter values that will be included in all SQL calls made under the connection for parameter `bindVariables` if not overridden
   * by individual "params" passed into the SQL function
   * @param {Object} [conf.db.connections[].preparedSql] the object that contains options for prepared SQL
   * @param {Object} [conf.db.connections[].preparedSql.substitutes] key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
@@ -116,12 +116,14 @@ class Manager {
   constructor(conf, cache, logging) {
     if (!conf) throw new Error('Database configuration is required');
     if (!conf.db.dialects) throw new Error('Database configuration.dialects are required');
-    const db = internal(this), connCnt = conf.db.connections.length, mainPath = conf.mainPath || (require.main && require.main.filename.replace(/([^\\\/]*)$/, '')) || process.cwd();
+    const mgr = internal(this), connCnt = conf.db.connections.length, mainPath = conf.mainPath || (require.main && require.main.filename.replace(/([^\\\/]*)$/, '')) || process.cwd();
     const privatePath = conf.privatePath || process.cwd();
-    db.at.sqls = new Array(connCnt);
-    db.at.logError = logging === true ? generateLogger(console.error, ['db','error']) : (logging && logging(['db','error'])) || console.error;
-    db.at.log = logging === true ? generateLogger(console.log, ['db']) : (logging && logging(['db'])) || console.log;
-    const reserved = Object.getOwnPropertyNames(Manager.prototype);
+    const ns = 'db';
+    mgr.this[ns] = {};
+    mgr.at.sqls = new Array(connCnt);
+    mgr.at.logError = logging === true ? generateLogger(console.error, ['db', 'error']) : (logging && logging(['db', 'error'])) || console.error;
+    mgr.at.log = logging === true ? generateLogger(console.log, ['db']) : (logging && logging(['db'])) || console.log;
+    //const reserved = Object.getOwnPropertyNames(Manager.prototype);
     for (let i = 0, conn, def, dbx, dlct, track = {}; i < connCnt; ++i) {
       conn = conf.db.connections[i];
       if (!conn.id) throw new Error(`Connection at index ${i} must have and "id"`);
@@ -156,9 +158,9 @@ class Manager {
       } else throw new Error(`Unsupported database dialect for ${dlct} at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
       */
       // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
-      if (db.this[conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
-      if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
-      db.at.sqls[i] = new SQLS(mainPath, cache, conn.preparedSql, (db.this[conn.name] = {}), new DBS(dbx, conf, conn), conn);
+      if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
+      //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
+      mgr.at.sqls[i] = new SQLS(mainPath, cache, conn.preparedSql, (mgr.this[ns][conn.name] = {}), new DBS(dbx, conf, conn), conn);
     }
   }
 
@@ -167,18 +169,20 @@ class Manager {
    * @returns {Integer} the database count of all the connections/pools that are ready for use
    */
   async init() {
-    const db = internal(this);
-    if (db.at.sqlsCount) throw new Error(`${db.at.sqlsCount} database(s) already initialized`);
-    var ccnt = 0, promises = new Array(db.at.sqls.length);
-    for (let i = 0, il = db.at.sqls.length; i < il; ++i) promises[i] = db.at.sqls[i].init(); // run initializations in parallel
+    const mgr = internal(this);
+    if (mgr.at.sqlsCount) throw new Error(`${mgr.at.sqlsCount} database(s) already initialized`);
+    var ccnt = 0, promises = new Array(mgr.at.sqls.length);
+    for (let i = 0, il = mgr.at.sqls.length; i < il; ++i) promises[i] = mgr.at.sqls[i].init(); // run initializations in parallel
     try {
-      for (let promise of promises) ((await promise) && ++ccnt);
+      for (let prom of promises) {
+        ((await prom) && ++ccnt);
+      }
     } catch (err) {
-      db.at.logError(err);
+      mgr.at.logError(err);
       throw err;
     }
-    db.at.sqlsCount = ccnt;
-    db.at.log(`${ccnt} database(s) are ready for use`);
+    mgr.at.sqlsCount = ccnt;
+    mgr.at.log(`${ccnt} database(s) are ready for use`);
     return ccnt;
   }
 
@@ -186,8 +190,8 @@ class Manager {
    * Closes all database pools/connections/etc.
    */
   async close() {
-    const db = internal(this), prms = new Array(db.at.sqls.length);
-    for (let i = 0, l = db.at.sqls.length; i < l; ++i) prms[i] = db.at.sqls[i].close(); // call close in parallel
+    const mgr = internal(this), prms = new Array(mgr.at.sqls.length);
+    for (let i = 0, l = mgr.at.sqls.length; i < l; ++i) prms[i] = mgr.at.sqls[i].close(); // call close in parallel
     for (let i = 0, l = prms.length; i < l; ++i) await prms[i]; // wait for promises
   }
 }
@@ -291,7 +295,7 @@ class SQLS {
 
     /**
     * Sets/formats SQL parameters and executes an SQL statement
-    * @param {Object} params the parameter names/values to pass into the SQL
+    * @param {Object} params the bind variable names/values to pass into the SQL
     * @param {String} [locale] the locale that will be used for date formatting
     * @param {Object} [frags] the SQL fragments being used (if any)
     * @param {Boolean} [ctch] `true` to catch and return errors instead of throwing them
@@ -307,11 +311,11 @@ class SQLS {
     };
   }
 
-  genExecSqlFromFileFunction(fpth, params, frags, jopt, ctch) {
+  genExecSqlFromFileFunction(fpth, params, frags, sopt, ctch) {
     const sqls = internal(this);
     return async function execSqlFromFile(sql) {
-      var qopt = { query: jopt.query || {}, replacements: params };
-      return await sqls.at.dbs.exec(fpth, sql, qopt, frags, ctch);
+      var opts = { statementOptions: sopt || {}, bindVariables: params };
+      return await sqls.at.dbs.exec(fpth, sql, opts, frags, ctch);
     };
   }
 
@@ -375,11 +379,10 @@ class DBS {
   */
   async exec(fpth, sql, opts, frags, ctch) {
     const dbs = internal(this);
-    const sqlf = dbs.this.frag(sql, frags, opts.replacements);
-    opts.type = opts.type || (dbs.at.dbx.QueryTypes && dbs.at.dbx.QueryTypes.SELECT) || 'SELECT';
+    const sqlf = dbs.this.frag(sql, frags, opts.bindVariables);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
     if (dbs.at.logging) {
-      dbs.at.logging(`Executing SQL ${fpth}${opts && opts.replacements ? ` with replacements ${JSON.stringify(opts.replacements)}` : ''}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
+      dbs.at.logging(`Executing SQL ${fpth}${opts && opts.bindVariables ? ` with bindVariables ${JSON.stringify(opts.bindVariables)}` : ''}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
     }
     var rslt;
     try {
@@ -399,10 +402,10 @@ class DBS {
 
   /**
   * Removes any SQL fragments that are wrapped around [[? someKey]] and [[?]] when the specified keys does not contain the discovered key (same for dialect and version keys)
-  * Replaces any SQL parameters that are wrapped around :someParam with the indexed parameter names (i.e. :someParam :someParam1 ...) and adds the replacement value to the supplied replacements
+  * Replaces any SQL parameters that are wrapped around :someParam with the indexed parameter names (i.e. :someParam :someParam1 ...) and adds the replacement value to the supplied `bindVariables`
   * @param {String} sql the SQL to defragement
   * @param {String[]} [keys] fragment keys which will remain intact within the SQL
-  * @param {Object} [rplmts] an object that contains the SQL parameterized replacements that will be used for parameterized array composition
+  * @param {Object} [rplmts] an object that contains the SQL parameterized `bindVariables` that will be used for parameterized array composition
   * @returns {String} the defragmented SQL
   */
   frag(sql, keys, rplmts) {
@@ -454,7 +457,7 @@ module.exports = Object.freeze({ Manager, Dialect });
 
 // private mapping
 let map = new WeakMap();
-let internal = function(object) {
+let internal = function (object) {
   if (!map.has(object)) {
     map.set(object, {});
   }

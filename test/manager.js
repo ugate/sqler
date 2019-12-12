@@ -19,5 +19,6 @@ const plan = `DB Manager`;
 
 lab.experiment(plan, () => {
 
-  lab.test(`${plan}: Basic`, { timeout: TEST_TKO }, Tester.basic);
+  lab.test(`${plan}: No Cache`, { timeout: TEST_TKO }, Tester.noCache);
+  lab.test(`${plan}: Interval Cache`, { timeout: TEST_TKO }, Tester.intervalCache);
 });

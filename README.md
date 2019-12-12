@@ -79,7 +79,7 @@ const mgr = new Manager(conf);
 await mgr.init();
 
 // execute the SQL statement and capture the results
-const rslts = await mgr.fin.ap.list.companies({ invoiceAudit: 'Y' }, 'en-US');
+const rslts = await mgr.db.fin.ap.list.companies({ invoiceAudit: 'Y' }, 'en-US');
 
 // after we're done using the manager we should close it
 process.on('SIGINT', async function sigintDB() {
