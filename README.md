@@ -34,7 +34,7 @@ In order to use `sqler` a simple implementation of [Dialect](https://ugate.githu
 
 Example<sub id="example"></sub>:
 ```sql
--- db/finance/ap.list.companies.sql
+-- db/finance/read.ap.companies.sql
 SELECT CO.COMPANY AS "company", CO.R_NAME AS "name", CO.PAY_GROUP AS "payGroup", CO.TAX_ACCOUNT AS "taxAccount", CO.TAX_ACCT_UNIT AS "taxAcctUnit",
 CO.TAX_SUB_ACCT AS "taxSubAcct"
 FROM APCOMPANY CO
@@ -79,7 +79,7 @@ const mgr = new Manager(conf);
 await mgr.init();
 
 // execute the SQL statement and capture the results
-const rslts = await mgr.db.fin.ap.list.companies({ invoiceAudit: 'Y' }, 'en-US');
+const rslts = await mgr.db.fin.read.ap.companies({ invoiceAudit: 'Y' }, 'en-US');
 
 // after we're done using the manager we should close it
 process.on('SIGINT', async function sigintDB() {

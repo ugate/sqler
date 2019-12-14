@@ -3,9 +3,7 @@
 const Dialect = require('./lib/dialect');
 
 const Fs = require('fs');
-const { promisify, format } = require('util');
-const readdir = promisify(Fs.readdir);
-const readFile = promisify(Fs.readFile);
+const { format } = require('util');
 const Path = require('path');
 const compare = Object.freeze({
   '=': function eq(x, y) { return x === y; },
@@ -232,23 +230,39 @@ class SQLS {
    */
   async init() {
     const sqls = internal(this);
-    try {
-      const files = await readdir(sqls.at.basePath);
-      sqls.at.numOfPreparedStmts = files.length;
-      for (let fi = 0, nm, ns, ext, jso; fi < sqls.at.numOfPreparedStmts; ++fi) {
-        ns = files[fi].split('.');
-        ext = ns.pop();
-        nm = 'sql_' + sqls.at.conn.name + '_' + sqls.at.conn.sql.dialect + '_' + ns.join('_');
-        for (var ni = 0, nl = ns.length, so = sqls.at.db; ni < nl; ++ni) {
-          so[ns[ni]] = so[ns[ni]] || (ni < nl - 1 ? {} : await sqls.this.prepared(nm, Path.join(sqls.at.basePath, files[fi]), ext));
-          so = so[ns[ni]];
+    sqls.at.numOfPreparedStmts = 0;
+    const proms = [];
+    const prepare = async (cont, pnm, pdir) => {
+      let pth, proms = [];
+      try {
+        cont = cont || sqls.at.db;
+        pdir = pdir || sqls.at.basePath;
+        const files = await Fs.promises.readdir(pdir);
+        for (let fi = 0, stat, nm, ns, ext; fi < files.length; ++fi) {
+          pth = Path.resolve(pdir, files[fi]);
+          stat = await Fs.promises.stat(pth);
+          if (stat && stat.isDirectory()) {
+            nm = files[fi].replace(/[^0-9a-zA-Z]/g, '_');
+            proms.push(prepare(cont[nm] = {}, `${pnm ? `${pnm}_` : ''}${nm}`, pth));
+            continue;
+          }
+          nm = files[fi].replace(/[^0-9a-zA-Z\.]/g, '_');
+          ns = nm.split('.');
+          ext = ns.length > 1 ? ns.pop() : '';
+          nm = `${sqls.at.conn.sql.dialect}_${sqls.at.conn.name}_${pnm ? `${pnm}_` : ''}${ns.join('_')}`;
+          for (let ni = 0, nl = ns.length, so = cont; ni < nl; ++ni) {
+            so[ns[ni]] = so[ns[ni]] || (ni < nl - 1 ? {} : await sqls.this.prepared(nm, pth, ext));
+            so = so[ns[ni]];
+          }
         }
+        await Promise.all(proms);
+      } catch (err) {
+        if (sqls.at.conn.sql.erroLogging) sqls.at.conn.sql.erroLogging(`Failed to build SQL statements from files in directory ${pth || pdir}`, err);
+        throw err;
       }
-      return await sqls.at.dbs.init({ numOfPreparedStmts: sqls.at.numOfPreparedStmts });
-    } catch (err) {
-      if (sqls.at.conn.sql.erroLogging) sqls.at.conn.sql.erroLogging(`Failed to build SQL statements from files in directory ${sqls.at.basePath}`, err);
-      throw err;
-    }
+    };
+    await prepare();
+    return sqls.at.dbs.init({ numOfPreparedStmts: sqls.at.numOfPreparedStmts });
   }
 
   /**
@@ -260,11 +274,12 @@ class SQLS {
    */
   async prepared(name, fpth, ext) {
     const sqls = internal(this);
+    if (sqls.at.conn.sql.logging) sqls.at.conn.sql.logging(`Generating prepared statement for ${fpth} at name ${name}`);
     // cache the SQL statement capture in order to accommodate dynamic file updates on expiration
     sqls.at.stms = sqls.at.stms || { methods: {} };
     sqls.at.stms.methods[name] = {};
     if (sqls.at.cache) {
-      const id = `${name}:${ext}`;
+      const id = `sqler:db:${name}${ext ? `:${ext}` : ''}`;
       sqls.at.stms.methods[name][ext] = async function cachedSql(opts, execFn) { // execute the SQL statement with cached statements
         let sql;
         const cached = await sqls.at.cache.get(id);
@@ -282,12 +297,13 @@ class SQLS {
         return await execFn(sql);
       };
     }
+    sqls.at.numOfPreparedStmts++;
 
     /**
      * @returns {String} the SQL contents from the SQL file
      */
     async function readSqlFile() {
-      var data = await readFile(fpth, { encoding: 'utf8' });
+      var data = await Fs.promises.readFile(fpth, { encoding: 'utf8' });
       if (data && sqls.at.subrxs) for (let i = 0, l = sqls.at.subrxs.length; i < l; ++i) data = data.replace(sqls.at.subrxs[i].from, sqls.at.subrxs[i].to); // substitutions
       const dt = ext === 'json' ? JSON.parse(data.toString('utf8').replace(/^\uFEFF/, '')) : data; // when present, replace BOM before parsing JSON result
       return dt || data;
@@ -313,8 +329,12 @@ class SQLS {
 
   genExecSqlFromFileFunction(fpth, params, frags, sopt, ctch) {
     const sqls = internal(this);
+    let crud = Path.parse(fpth).name.match(/[^\.]*/)[0].toUpperCase();
+    if (!['CREATE', 'READ', 'UPDATE', 'DELETE'].includes(crud)) crud = null;
+    if (!sopt) sopt = {};
+    sopt.type = crud;
     return async function execSqlFromFile(sql) {
-      var opts = { statementOptions: sopt || {}, bindVariables: params };
+      var opts = { statementOptions: sopt, bindVariables: params };
       return await sqls.at.dbs.exec(fpth, sql, opts, frags, ctch);
     };
   }

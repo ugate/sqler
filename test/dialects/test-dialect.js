@@ -1,6 +1,7 @@
 'use strict';
 
 const { Dialect } = require('../../index');
+const { expect } = require('@hapi/code');
 
 /**
  * Static test {@link Dialect} implementation
@@ -17,15 +18,28 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  async init() {
-    return Promise.resolve(true);
+  async init(opts) {
+    expect(opts, 'Options').to.be.object();
+    //expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(7);
+    return true;
   }
 
   /**
    * @inheritdoc
    */
   async exec(sql, opts, frags) {
-    let key = TestDialect.testSqlSingleRecordKey;
+    expect(opts, 'opts').to.be.object();
+    expect(opts.statementOptions, 'opts.statementOptions').to.be.object();
+    expect(['CREATE', 'READ', 'UPDATE', 'DELETE'], 'opts.statementOptions.type').to.have.part.include(opts.statementOptions.type);
+    expect(opts.bindVariables, 'opts.bindVariables').to.be.object();
+    expect(opts.bindVariables, 'opts.bindVariables').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
+
+    const isSingleRecord = sql.includes(TestDialect.testSqlSingleRecordKey);
+    if (isSingleRecord) { // only test for frags when returning a single record
+      expect(frags, 'frags').to.be.array();
+      expect(frags[0], 'frags[0]').to.equal(TestDialect.testMultiRecordFragKey);
+    }
+
     const cols = sql.match(/SELECT([\s\S]*?)FROM/i)[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
     const rcrd = {};
     let ci = 0;
@@ -33,8 +47,7 @@ class TestDialect extends Dialect {
       rcrd[col.substr(col.lastIndexOf('.') + 1)] = ++ci;
     }
     // simple test output when the 
-    if (sql.includes(key)) return Promise.resolve([rcrd]);
-    return Promise.resolve([rcrd, rcrd]);
+    return isSingleRecord ? [rcrd] : [rcrd, rcrd];
   }
 
   /**
@@ -49,6 +62,13 @@ class TestDialect extends Dialect {
    */
   static get testSqlSingleRecordKey() {
     return 'ORDER BY';
+  }
+
+  /**
+   * @returns {String} a SQL fragment that will be checked for when returning multiple records in a test
+   */
+  static get testMultiRecordFragKey() {
+    return 'test-frag';
   }
 }
 

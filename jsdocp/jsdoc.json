@@ -1,6 +1,6 @@
 {
   "source": {
-    "include": ["index.js", "README.md"],
+    "include": ["index.js", "README.md", "lib"],
     "includePattern": ".js$",
     "excludePattern": "(node_modules/|docs)"
   },

@@ -1,0 +1,2 @@
+UPDATE SOME_TABLE
+SET SOME_COL = :someCol1, SOME_COL2 = :someCol2, SOME_COL3 = :someCol3

@@ -13,7 +13,7 @@ The [Manager](Manager.html) is the entry point for one or more databases/connect
 #### ⚙️ Setup &amp; Configuration <sub id="conf"></sub>:
 There are two types of configuration, _public_ and _private_. Public configurations contain one or more `connections` that will be established during initialization and typically vary depending upon the environment being used (e.g. development, test, ci, production, etc.). See the [manager.connections in the database manager constructor](Manager.html) for a complete listing of public configuration options. Private or _universal_ (`univ`) configuration, on the other hand, is intended to carry sensitive information like connection credentials. Each public connection should contain a `conf.db.connections[].id` that matches a property name in the private configuration `conf.univ.db `. __Both public and private configurations are combined when passed into the [Manager](Manager.html), but shoud be loaded from separate sources__. The following example illustrates this using a matching `myId`:
 ```sql
--- db/finance/ap.list.companies.sql
+-- db/finance/read.ap.companies.sql
 SELECT CO.COMPANY AS "company", CO.R_NAME AS "name", CO.PAY_GROUP AS "payGroup", CO.TAX_ACCOUNT AS "taxAccount", CO.TAX_ACCT_UNIT AS "taxAcctUnit",
 CO.TAX_SUB_ACCT AS "taxSubAcct"
 FROM APCOMPANY CO
@@ -58,7 +58,7 @@ const mgr = new Manager(conf);
 await mgr.init();
 
 // execute the SQL statement and capture the results
-const rslts = await mgr.db.fin.ap.list.companies({ invoiceAudit: 'Y' }, 'en-US');
+const rslts = await mgr.db.fin.read.ap.companies({ invoiceAudit: 'Y' }, 'en-US');
 
 // after we're done using the manager we should close it
 process.on('SIGINT', async function sigintDB() {
@@ -75,7 +75,32 @@ Each `conf.db.dialect` property should contain all of the [Dialect](Dialect.html
 - `[ctch]` - _true_ to catch and return errors instead of throwing them
 
 #### 🗃️ <u>SQL Files</u> <sub id="sqlf"></sub>:
-Every SQL file used by `sqler` should be organized in a directory under `conf.mainPath` (defaults to `process.main` or `process.cwd()`). Each subdirectory used should be _unique_ to an individual `conf.db.connections[].name` (default) or `conf.db.connections[].dir`. When the [Manager](Manager.html) is initialized (i.e. [Manager.init](Manager.html#init)) the directory is scanned for SQL files and generates a [Prepared Statement](https://en.wikipedia.org/wiki/Prepared_statement)/`async Function` for each file that is found. Each generated async function will be accessible as a property path of the manager. For instance, a `mainPath` of `/some/sql/path` and a connection with a `conf.db.connections[].name` of `conn1` would look for SQL files under `/some/sql/path/conn1`. If `conf.db.connections[].dir` was set to `otherDir` then SQL files would be prepared from `some/sql/path/otherDir` instead. In either case the generated prepared statement function would be accessible via `manager.conn1.some.file()`, assuming that `some.file.sql` resides in the forementioned directory path.
+Every SQL file used by `sqler` should be organized in a directory under the directory assigned to `conf.mainPath` (defaults to `process.main` or `process.cwd()`). Each subdirectory used should be _unique_ to an individual `conf.db.connections[].name` (default) or `conf.db.connections[].dir`. When the [Manager](Manager.html) is initialized (i.e. [Manager.init](Manager.html#init)) the directory is scanned for SQL files and generates a [Prepared Statement](https://en.wikipedia.org/wiki/Prepared_statement)/`async Function` for each file that is found. Each generated async function will be accessible as a property path of the manager. For instance, a `mainPath` of `/some/sql/path` and a connection with a `conf.db.connections[].name` of `conn1` would look for SQL files under `/some/sql/path/conn1`. If `conf.db.connections[].dir` was set to `otherDir` then SQL files would be prepared from `some/sql/path/otherDir` instead. In either case the generated prepared statement function would be accessible via `manager.db.conn1.read.something()`, assuming that `read.something.sql` resides in the forementioned directory path. To better visualize path computation, consider the following directory structure and the configuration from the previous example:
+
+```
+.
++ -- db
+|    + -- finance
+|    |    + -- ap
+|    |    |    + -- delete.audits.sql
+|    |    |    + -- update.audits.sql
+|    |    + -- ar
+|    |    |    + -- delete.audits.sql
+|    |    |    + -- update.audits.sql
+|    |    + -- create.annual.report.sql
+|    |    + -- read.annual.report.sql
+```
+
+The subsequent SQL prepared statement functions would be gernerated on the manager instance:
+
+- `mgr.db.fin.ap.delete.audits()`
+- `mgr.db.fin.ap.update.audits()`
+- `mgr.db.fin.ar.delete.audits()`
+- `mgr.db.fin.ar.update.audits()`
+- `mgr.db.fin.create.annual.report()`
+- `mgr.db.fin.read.annual.report()`
+
+Functions are always added to the `db` object within the manager instance. One _optional_ convention that has been used in the previous examples SQL file names is the use of file prefixes that designate the type of SQL [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) operation that is being performed (i.e. `create`, `read`, `update` or `delete`). The use of this nomenclature helps assist implementing [Dialect](Dialect.html) to determine any supplemental processing that may be desired. 
 
 Most RDMS drivers support [prepared statement variable substitutions](https://en.wikipedia.org/wiki/Prepared_statement) in some form or fashion. The most common of which is the typical syntax commonly associated with unamed or named bind parameters within prepared statements. However, `sqler` provides a few substitutional encapsulators that help with SQL statement composition. Each SQL file can define multiple encapsulators that indicates what portions of an SQL statement will be present before execution takes place. Substitutions use an openening `[[` and closing `]]` that can also be optionally prefixed with a SQL line comment `--[[`. The following sections discuss the differnt type of substitutions in more detail.
 

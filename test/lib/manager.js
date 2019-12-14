@@ -89,7 +89,7 @@ async function testSql(cache, cacheOpts) {
   await priv.mgr.init();
   
   const binds = { someCol1: 1, someCol2: 2, someCol3: 3 };
-  const rslt1 = await priv.mgr.db.tst.some.query(binds, 'en-US');
+  const rslt1 = await priv.mgr.db.tst.read.some.tables(binds, 'en-US', ['test-frag']);
   
   expect(rslt1).to.be.array();
   expect(rslt1).to.be.length(2); // two records should be returned w/o order by
@@ -105,7 +105,8 @@ async function testSql(cache, cacheOpts) {
     // wait for the the SQL statement to expire
     await Labrat.wait(cacheOpts && cacheOpts.hasOwnProperty('expiresIn') ? cacheOpts.expiresIn : 1000);
 
-    const rslt2 = await priv.mgr.db.tst.some.query(binds, 'en-US');
+    const frags = cache ? ['test-frag'] : null;
+    const rslt2 = await priv.mgr.db.tst.read.some.tables(binds, 'en-US', frags);
 
     expect(rslt2).to.be.array();
     expect(rslt2).to.be.length(cache ? 1 : 2); // one record w/order by and updated by cache
@@ -121,7 +122,7 @@ async function testSql(cache, cacheOpts) {
  * @param {String} [sql] The SQL to write to the test file (omit to just read file)
  */
 async function sqlFile(sql) {
-  const sqlPath = './test/db/some.query.sql';
+  const sqlPath = './test/db/read.some.tables.sql';
   if (typeof sql === 'string') {
     return Fs.promises.writeFile(sqlPath, sql);
   } else {
