@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Manager - Documentation</title>
+
+    <script src="scripts/prettify/prettify.js"></script>
+    <script src="scripts/prettify/lang-css.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+  <!-- https://realfavicongenerator.net/ -->
+  
+    <link
+      
+      rel="apple-touch-icon" 
+      
+      sizes="180x180" 
+      
+      href="apple-touch-icon.png" 
+      
+    >
+  
+    <link
+      
+      rel="icon" 
+      
+      type="image/png" 
+      
+      sizes="32x32" 
+      
+      href="favicon-32x32.png" 
+      
+    >
+  
+    <link
+      
+      rel="icon" 
+      
+      type="image/png" 
+      
+      sizes="16x16" 
+      
+      href="favicon-16x16.png" 
+      
+    >
+  
+    <link
+      
+      rel="manifest" 
+      
+      href="site.webmanifest" 
+      
+    >
+  
+    <link
+      
+      rel="mask-icon" 
+      
+      type="image/png" 
+      
+      sizes="16x16" 
+      
+      href="safari-pinned-tab.svg" 
+      
+      color="#ffab40" 
+      
+    >
+  
+    <link
+      
+      type="text/css" 
+      
+      rel="stylesheet" 
+      
+      href="pkg-styles/pkg-style.css" 
+      
+    >
+  
+
+  
+    <meta
+      
+      name="msapplication-TileColor" 
+      
+      content="#ffab40" 
+      
+    >
+  
+    <meta
+      
+      name="theme-color" 
+      
+      content="#bdbdbd" 
+      
+    >
+  
+    <meta
+      
+      name="viewport" 
+      
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" 
+      
+    >
+  
+
+  <link type="text/css" rel="stylesheet" href="jsdocp/styles/index.css"></head>
+<body><div id="jsdocpNav" class="jsdocp-remove-me pkg-menu"
+  data-jsdocp-sm-position="bottom"
+  data-jsdocp-md-position="bottom"
+  data-jsdocp-lg-position="top"
+  data-jsdocp-sm-match-media="(max-width: 480px)"
+  data-jsdocp-md-match-media="(min-width: 481px) and (max-width: 839px)"
+  data-jsdocp-lg-match-media="(min-width: 840px)"
+  data-jsdocp-sm-auto-hide="true"
+  data-jsdocp-md-auto-hide="true"
+  data-jsdocp-lg-auto-hide="false">
+  <a href="index.html" id="jsdocpLogo"
+    title="sqler"
+    class="jsdocp-logo ">
+    <b class="pkg-logo">
+    
+      <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg viewBox="0 0 29.26 29.26" y="0px" x="0px" version="1.1">
+<g>
+	<path
+   d="M 3.2714844 12.164062 C 3.0504844 12.547062 2.921875 12.944422 2.921875 13.357422 L 2.921875 16.919922 C 2.921875 19.670922 8.1639531 21.902344 14.626953 21.902344 C 21.093953 21.902344 26.337891 19.670922 26.337891 16.919922 L 26.337891 13.357422 C 26.337891 12.944422 26.207375 12.547062 25.984375 12.164062 C 25.170706 13.571962 22.944745 14.736211 19.992188 15.388672 C 19.990472 16.830619 19.968304 18.235467 19.923828 18.3125 C 19.831308 18.472746 14.767068 21.396484 14.582031 21.396484 C 14.396995 21.396484 9.3327528 18.472746 9.2402344 18.3125 C 9.1955638 18.235128 9.175362 16.819813 9.1738281 15.371094 C 6.2660228 14.715075 4.0769893 13.558477 3.2714844 12.164062 z "
+   />
+	<path
+   d="M14.627,23.31c-5.494,0-10.098-1.616-11.355-3.788c-0.221,0.381-0.35,0.779-0.35,1.191v3.564   c0,2.752,5.242,4.983,11.705,4.983c6.467,0,11.711-2.23,11.711-4.983v-3.564c0-0.412-0.131-0.81-0.354-1.19   C24.727,21.694,20.127,23.31,14.627,23.31z"
+   />
+	<path
+   d="M 3.2402344 5.0429688 C 3.0392344 5.4089688 2.921875 5.7905937 2.921875 6.1835938 L 2.921875 9.7441406 C 2.921875 11.658469 5.4621005 13.319742 9.1816406 14.154297 C 9.1905174 13.111949 9.205954 12.203907 9.2402344 12.144531 C 9.3327524 11.984284 14.396995 9.0605469 14.582031 9.0605469 C 14.767068 9.0605469 19.83131 11.984284 19.923828 12.144531 C 19.958305 12.204246 19.975593 13.121262 19.984375 14.171875 C 23.754868 13.344294 26.337891 11.674559 26.337891 9.7441406 L 26.337891 6.1835938 C 26.337891 5.7905938 26.218578 5.4099687 26.017578 5.0429688 C 25.787578 7.0589688 20.785953 8.671875 14.626953 8.671875 C 8.4709531 8.671875 3.4692344 7.0579688 3.2402344 5.0429688 z "
+   />
+	<path
+   d="M14.627,7.541c6.303,0,11.41-1.687,11.41-3.771c0-2.082-5.107-3.77-11.41-3.77   C8.328,0.001,3.219,1.689,3.219,3.771C3.219,5.854,8.328,7.541,14.627,7.541z"
+   />
+</g>
+</svg>
+
+    
+    </b>
+    <b id="jsdocpPkgName">sqler</b>
+    <b>|</b>
+    <hr/>
+  </a>
+  <a href="https://www.npmjs.com/package/sqler" id="jsdocpModule"
+    title="npm"
+    class="jsdocp-icon ">
+    
+    <svg version="1.1" preserveAspectRatio="xMidYMid meet" viewBox="0 0 24 24" height="24" width="24" xmlns="http://www.w3.org/2000/svg">
+      <g class="jsdocp-icon-svg-el pkg-icons" stroke="none" transform="translate(0,24) scale(0.1,-0.1)">
+        <path d="M 0,120 0,0 l 120,0 120,0 0,120 0,120 -120,0 -120,0 z m 200,0 c 0,-73 0.23256,-80 0.23256,-80 0,0 -27.97435,0.741211 -40.61273,0.707427 C 159.61983,67.551504 160,70.949947 160,100 c 0,53 -2,60 -20,60 -18,0 -20,-7 -20,-60 l 0,-60 -40,0 -40,0 0,80 0,80 80,0 80,0 z"/>
+      </g>
+    </svg>
+    
+  </a>
+  <a href="CHANGELOG.html" id="jsdocpChangelog" data-jsdocp-root-href="https://github.com/ugate/sqler/CHANGELOG.html"
+    title="Changelog"
+    class="jsdocp-icon ">
+    
+    <svg version="1.1" viewBox="0 0 64 64" height="64" width="64" xmlns="http://www.w3.org/2000/svg">
+      <path class="jsdocp-icon-svg-el pkg-icons" stroke="none" fill-rule="nonzero"
+        d="M 29.896194,0.97873581 C 13.435048,0.97873581 1.1072664e-7,15.139296 0,32.489368 0,49.839439 13.435048,64 29.896194,64 46.357339,64 59.792385,49.839438 59.792388,32.489368 a 4.2273908,4.4556761 0 1 0 -8.453721,0 c -10e-7,12.534501 -9.550175,22.600399 -21.442473,22.600399 -11.892299,0 -21.4424739,-10.065899 -21.4424739,-22.600399 0,-12.5345 9.5501749,-22.6003988 21.4424739,-22.6003988 a 4.2273908,4.4556761 0 1 0 0,-8.91023339 z" />
+      <path class="jsdocp-icon-svg-el pkg-icons" stroke="none" fill-rule="nonzero"
+        d="m 55.529412,24.680907 -8.470588,10.142582 16.941176,0 z"/>
+      <rect class="jsdocp-icon-svg-el pkg-icons" stroke="none" fill-rule="nonzero"
+        transform="matrix(0.6882785,0.72544656,-0.6882785,0.72544656,0,0)" y="-38.592953" x="38.592953" height="39.814472" width="11.375563" />
+      <path class="jsdocp-icon-svg-el pkg-icons" stroke="none" fill-rule="nonzero"
+        d="m 23.705056,39.295314 8.338477,-1.11407 -7.281487,-7.674698 z"/>
+    </svg>
+    
+  </a>
+  <a href="https://github.com/ugate/sqler#readme" id="jsdocpSourceCode"
+    title="Source Code"
+    class="jsdocp-icon ">
+    
+    <svg version="1.1" viewBox="0 0 10 16" width="24" height="24" xmlns="http://www.w3.org/2000/svg" id="jsdocpSourceIcon">
+      <path class="jsdocp-icon-svg-el pkg-icons" stroke="none" fill-rule="evenodd"
+        d="M8 1a1.993 1.993 0 0 0-1 3.72V6L5 8 3 6V4.72A1.993 1.993 0 0 0 2 1a1.993 1.993 0 0 0-1 3.72V6.5l3 3v1.78A1.993 1.993 0 0 0 5 15a1.993 1.993 0 0 0 1-3.72V9.5l3-3V4.72A1.993 1.993 0 0 0 8 1zM2 4.2C1.34 4.2.8 3.65.8 3c0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm3 10c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2zm3-10c-.66 0-1.2-.55-1.2-1.2 0-.65.55-1.2 1.2-1.2.65 0 1.2.55 1.2 1.2 0 .65-.55 1.2-1.2 1.2z"></path>
+    </svg>
+    <!-- GitHub icon -->
+    <svg version="1.1" viewBox="0 0 16 16" height="24" width="24" xmlns="http://www.w3.org/2000/svg" class="jsdocp-remove-me" id="jsdocpGithubIcon">
+      <path class="jsdocp-icon-svg-el pkg-icons" stroke="none"  fill-rule="evenodd"
+        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/>
+    </svg>
+    
+  </a>
+  <!-- versions.json should point to the latest list -->
+  <a id="jsdocpVersionsIcon"
+    class="jsdocp-icon ">
+    
+    <svg version="1.1" viewBox="0 0 64 64" height="24" width="24" xmlns="http://www.w3.org/2000/svg">
+      <path class="jsdocp-icon-svg-el pkg-icons" stroke="none" fill-rule="nonzero"
+        d="m 63.999999,25.315556 -24.108295,0 9.74288,-10.026667 C 39.927261,5.6888885 24.210644,5.3333335 14.503322,14.933333 c -9.7073234,9.635555 -9.7073234,25.173334 0,34.808888 9.707322,9.635556 25.423939,9.635556 35.131262,0 4.835883,-4.764443 7.253823,-10.346666 7.253823,-17.386666 l 7.111592,0 c 0,7.039999 -3.1291,16.177777 -9.387301,22.364444 -12.480844,12.373334 -32.748879,12.373334 -45.2297224,0 -12.445286,-12.337778 -12.55196,-32.39111 -0.071116,-44.7288881 12.4808434,-12.3377774 32.4999734,-12.3377774 44.9808174,0 L 64,-5e-7 64,25.315556 Z" />
+      <path class="jsdocp-icon-svg-el pkg-icons" stroke="none" fill-rule="nonzero"
+        d="m 33.775734,17.777777 0,15.111111 12.445286,7.395556 -2.560173,4.302222 -15.218806,-9.031112 0,-17.777777 5.333693,0 z" />
+    </svg>
+    
+  </a>
+  <select id="jsdocpVersions"
+    title="v0.1.0"
+    data-jsdocp-version-base="/sqler"
+    data-jsdocp-json-url="/sqler/versions.json"
+    data-jsdocp-type=""
+    data-jsdocp-from="1.0.0"
+    data-jsdocp-version="0.1.0">
+  </select>
+</div>
+
+<input type="checkbox" id="nav-trigger" class="nav-trigger" />
+<label for="nav-trigger" class="navicon-button x">
+  <div class="navicon"></div>
+</label>
+
+<label for="nav-trigger" class="overlay"></label>
+
+<nav>
+    <li class="nav-link nav-home-link"><a href="index.html">Home</a></li><li class="nav-heading">Tutorials</li><li class="nav-item"><a href="tutorial-1-manual.html">Manual</a></li><li class="nav-heading">Classes</li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="Dialect.html">Dialect</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="Dialect.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="Dialect.html#exec">exec</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="Dialect.html#init">init</a></span></li><li class="nav-heading"><span class="nav-item-type type-class">C</span><span class="nav-item-name"><a href="Manager.html">Manager</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="Manager.html#close">close</a></span></li><li class="nav-item"><span class="nav-item-type type-function">F</span><span class="nav-item-name"><a href="Manager.html#init">init</a></span></li><li class="nav-heading"><a href="global.html">Globals</a></li>
+</nav>
+
+<div id="main">
+    
+    <h1 class="page-title">Manager</h1>
+    
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>
+        Manager
+        </h2>
+        
+            <div class="class-description"><p>The database(s) manager entry point that autogenerates/manages SQL execution functions from underlying SQL statement files.
+Vendor-specific implementations should implement <a href="Dialect.html"><code>Dialect</code></a> and pass the class or module path into the constructor as <code>conf.db.dialects.myDialectClassOrModulePath</code>.
+See <a href="index.html">README.md</a> for more details about SQL related features.</p></div>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+<div class="section-method">
+
+    
+    <h2>Constructor</h2>
+    
+
+    <h4 class="name" id="Manager"><span class="type-signature"></span>new Manager<span class="signature">(conf, cache<span class="signature-attributes">opt</span>, logging<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    <p>Creates a new database manager. Vendor-specific implementations should have constructors that accept properties defined by <a href="Dialect.html"><code>Dialect</code></a>.</p>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line140">line 140</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>conf</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the configuration</p>
+                
+                    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>mainPath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    require.main
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>root directory starting point to look for SQL files (defaults to <code>require.main</code> path or <code>process.cwd()</code>)</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>privatePath</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    process.cwd()
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>current working directory where generated files will be located (if any)</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>univ</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the universal configuration that, for security and sharing puposes, remains external to an application</p>
+                
+                    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>db</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">
+                <p>the database configuration that contains connection ID objects that match the connection IDs of each of the <code>conf.db.connections</code> - each connection object should contain a
+&quot;host&quot;, &quot;username&quot; and &quot;password&quot; property that will be used to connect to the underlying database (e.g. { db: myConnId: { host: &quot;someDbhost.example.com&quot;, username: 'someUser', password: 'somePass' } })</p>
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>db</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the database configuration</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>dialects</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>an object that contains dialect implementation details where each property name matches a dialect name and the value contains either the module class or a string that points to the
+a <a href="Dialect.html"><code>Dialect</code></a> implementation for the given dialect (e.g. <code>{ dialects: { 'oracle': 'sqler-oracle' } }</code>)</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>db.connections</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Array.&lt;Object></code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the connections that will be configured</p>
+                
+                    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>id</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>identifies the connection within the passed <code>conf.univ.db</code></p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>name</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the name given to the database used as the property name on the <a href="Manager.html"><code>Manager</code></a> to access generated SQL functions (e.g. <code>name = 'example'</code> would result in a SQL function
+connection container <code>manager.example</code>). The <em>name</em> will also be used as the <em>cwd</em> relative directory used when no dir is defined</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>dir</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    connection.name
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the alternative dir where <code>*.sql</code> files will be found relative to <code>mainPath</code>. The directory path will be used as the basis for generating SQL statements
+from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
+within the file name with the last entry as the executable <code>async function(params, locale, frags)</code>. The function executes the SQL where &quot;params&quot; is the Object that contains the <code>bindVariables</code> that will be matched
+within the SQL, the &quot;locale&quot; String representing the locale that will be used for date <code>bindVariables</code>s and &quot;frags&quot; is an optional String[] of (see <code>bindVariables</code> section for more details). For example, a connection
+named &quot;conn1&quot; and a SQL file named &quot;user.team.details.sql&quot; will be accessible within the manager as &quot;mgr.db.conn1.user.team.details(params, locale, frags, cb)&quot;. But when <code>dir</code> is set to &quot;myDir&quot; the SQL files will be loaded
+from the &quot;myDir&quot; directory (relative to <code>mainPath</code>) instead of the default directory that matches the connection name &quot;conn1&quot;.</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>version</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Float</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>a version that can be used for replacement selection within the SQL (see <code>bindVariables</code> section for more details)</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>service</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the service name defined by the underlying database (must define if SID is not defined)</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>sid</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the SID defined by the underlying database (use only when supported, but service is preferred)</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>params</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>global object that contains parameter values that will be included in all SQL calls made under the connection for parameter <code>bindVariables</code> if not overridden
+by individual &quot;params&quot; passed into the SQL function</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>preparedSql</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the object that contains options for prepared SQL</p>
+                
+                    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>substitutes</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values</p>
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>sql</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>the object that contains the SQL connection options (excluding username/password)</p>
+                
+                    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>host</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the database host override from conf.univ.db</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>dialect</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>String</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the database dialect (e.g. mysql, mssql, oracle, etc.)</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>dialectOptions</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>options for the specified dialect passed directly into the <a href="Dialect.html"><code>Dialect</code></a> driver</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>pool</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Object</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the connection pool options</p>
+                
+                    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>max</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Integer</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the maximum number of connections in the pool</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>min</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Integer</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the minumum number of connections in the pool</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>idle</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Integer</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the maximum time, in milliseconds, that a connection can be idle before being released</p>
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>log</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>Array.&lt;String></code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">
+                <p>additional logging parameters passed to the <code>infoLogger</code>/<code>errorLogger</code> function log activity (will also append additional names that identify the connection)</p>
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>cache</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code><a href="global.html#Cache">Cache</a></code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the <a href="global.html#Cache"><code>Cache</code></a> <strong>like</strong> instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file</p>
+                
+            </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>logging</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><code>function</code></span>
+|
+
+<span class="param-type"><code>Boolean</code></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <p>the <code>function(dbNames)</code> that will return a name/dialect specific <code>function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))</code> that will handle database logging
+(pass <code>true</code> to use the console)</p>
+                
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+    
+    </div>
+
+    
+
+    
+
+    
+
+     
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+<div class="section-method">
+
+    
+
+    <h4 class="name" id="close"><span class="type-signature">(async) </span>close<span class="signature">()</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    <p>Closes all database pools/connections/etc.</p>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line216">line 216</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</div>
+        
+            
+<div class="section-method">
+
+    
+
+    <h4 class="name" id="init"><span class="type-signature">(async) </span>init<span class="signature">()</span><span class="type-signature"> &rarr; {Integer}</span></h4>
+
+    
+
+
+
+<div class="description">
+    <p>Initializes the defined database connections</p>
+</div>
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line195">line 195</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="section-returns">
+<h5>Returns:</h5>
+
+        
+
+<dl class="param-type">
+    <dt>
+        Type:
+    </dt>
+    <dd>
+        
+<span class="param-type"><code>Integer</code></span>
+
+
+    </dd>
+</dl>
+
+
+<div class="param-desc">
+    <p>the database count of all the connections/pools that are ready for use</p>
+</div>
+
+    
+</div>
+
+
+
+</div>
+        
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<br class="clear">
+
+<footer>
+    Generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.6.3</a> using the Minami theme.
+</footer>
+
+<script>prettyPrint();</script>
+<script src="scripts/linenumber.js"></script>
+<div id="jsdocpChangelogContent" data-title="CHANGELOG v0.1.0">
+  <svg class="jsdocp-close" id="jsdocpChangelogClose" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+    <path d="M0 0h24v24H0z" fill="none"/>
+  </svg>
+  <h2><a href="https://github.com/ugate/sqler/tree/v0.1.0">0.1.0</a> (2019-12-16)</h2>
+<p><a href="https://github.com/ugate/sqler/compare/v0.1.0...v0.1.0">Full Changelog</a></p>
+</div>
+
+
+
+<script src="jsdocp/scripts/index.js"></script></body>
+</html>
