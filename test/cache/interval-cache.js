@@ -19,15 +19,39 @@ class IntervalCache {
   }
 
   /**
+   * Starts the interval cache
+   */
+  async start() {
+    const cch = internal(this), handles = cch.at.handles;
+    let cached, calTtl;
+    for (let key in handles) {
+      clearInterval(handles[key]);
+      cached = store.hasOwnProperty(key) ? store[key] : null;
+      calTtl = !cached|| isNaN(cached.ttl) ? opts.expiresIn : cached.ttl;
+      handles[key] = setInterval(() => delete store[key], calTtl);
+    }
+  }
+
+  /**
+   * Stops the interval cache
+   */
+  async stop() {
+    const cch = internal(this), handles = cch.at.handles;
+    for (let key in handles) {
+      clearInterval(handles[key]);
+    }
+  }
+
+  /**
    * @see Cache
    * @param {String} key The SQL statement key
    * @returns {Object} The return object described in {@link Cache}
    */
-  get(key) {
+  async get(key) {
     const cch = internal(this), store = cch.at.store;
     const cached = store.hasOwnProperty(key) ? store[key] : null;
     if (cached) cached.ttl = Date.now() - cached.stored;
-    return Promise.resolve(cached ? JSON.parse(JSON.stringify(cached)) : cached);
+    return cached ? JSON.parse(JSON.stringify(cached)) : cached;
   }
 
   /**
@@ -36,23 +60,25 @@ class IntervalCache {
    * @param {*} val The value to cache
    * @param {Integer} [ttl] The time-to-live overrride for the option value set on {@link IntervalCache}
    */
-  set(key, val, ttl) {
+  async set(key, val, ttl) {
     const cch = internal(this), store = cch.at.store, handles = cch.at.handles, opts = cch.at.opts;
     if (handles[key]) clearInterval(handles[key]);
     const calTtl = !ttl || isNaN(ttl) ? opts.expiresIn : ttl;
     store[key] = { item: val, stored: Date.now(), ttl: calTtl };
-    handles[key] = setInterval(sql => delete store[key], calTtl);
-    return Promise.resolve();
+    handles[key] = setInterval(() => delete store[key], calTtl);
   }
 
   /**
-   * Stops the interval cache
+   * @see Cache
+   * @param {String} key The SQL statement key
    */
-  stop() {
-    const cch = internal(this), handles = cch.at.handles;
-    for (let key in handles) {
+  async drop(key) {
+    const cch = internal(this), store = cch.at.store, handles = cch.at.handles;
+    if (handles[key]) {
       clearInterval(handles[key]);
+      delete handles[key];
     }
+    if (store[key]) delete store[key];
   }
 }
 
