@@ -106,7 +106,7 @@ class Manager {
   * "host", "username" and "password" property that will be used to connect to the underlying database (e.g. { db: myConnId: { host: "someDbhost.example.com", username: 'someUser', password: 'somePass' } })
   * @param {Object} conf.db the database configuration
   * @param {Object} conf.dialects an object that contains dialect implementation details where each property name matches a dialect name and the value contains either the module class or a string that points to the
-  * a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`)
+  * a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`). When using a directory path the dialect path will be prefixed with `process.cwd()` before loading.
   * @param {Object[]} conf.db.connections the connections that will be configured
   * @param {String} conf.db.connections[].id identifies the connection within the passed `conf.univ.db`
   * @param {String} conf.db.connections[].name the name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
@@ -158,7 +158,10 @@ class Manager {
       if (!conf.db.dialects.hasOwnProperty(dlct)) {
         throw new Error(`Database configuration.db.dialects does not contain an implementation definition/module for ${dlct} at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
       }
-      if (typeof conf.db.dialects[dlct] === 'string') conf.db.dialects[dlct] = require(conf.db.dialects[dlct]);
+      if (typeof conf.db.dialects[dlct] === 'string') {
+        if (/^[a-z@]/i.test(conf.db.dialects[dlct])) conf.db.dialects[dlct] = require(conf.db.dialects[dlct]);
+        else conf.db.dialects[dlct] = require(Path.join(process.cwd(), conf.db.dialects[dlct]));
+      }
       //if (!(conf.db.dialects[dlct] instanceof Dialect)) throw new Error(`Database dialect for ${dlct} is not an instance of a sqler "${Dialect.constructor.name}" at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
       if (conn.sql.log !== false && !conn.sql.log) conn.sql.log = [];
       if (conn.sql.logError !== false && !conn.sql.logError) conn.sql.logError = [];
