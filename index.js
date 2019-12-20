@@ -340,15 +340,14 @@ class SQLS {
 
     /**
     * Sets/formats SQL parameters and executes an SQL statement
-    * @param {Object} params the bind variable names/values to pass into the SQL
+    * @param {Object} [params] the bind variable names/values to pass into the SQL
     * @param {String} [locale] the locale that will be used for date formatting
     * @param {Object} [frags] the SQL fragments being used (if any)
     * @param {Boolean} [ctch] `true` to catch and return errors instead of throwing them
     */
     return async function execSqlPublic(params, locale, frags, ctch) {
-      params = params || {};
       var mopt = { params: params, opts: frags };
-      if (sqls.at.conn.params) for (var i in sqls.at.conn.params) {
+      if (params && sqls.at.conn.params) for (var i in sqls.at.conn.params) {
         if (typeof params[i] === 'undefined') params[i] = sqls.at.conn.params[i]; // add per connection static parameters when not overridden
       }
       if (params && locale) for (var i in params) params[i] = (params[i] instanceof Date && params[i].toISOString()) || params[i]; // convert dates to ANSI format for use in SQL
@@ -431,20 +430,20 @@ class DBS {
     const sqlf = dbs.this.frag(sql, frags, opts.bindVariables);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
     if (dbs.at.logging) {
-      dbs.at.logging(`Executing SQL ${fpth}${opts && opts.bindVariables ? ` with bindVariables ${JSON.stringify(opts.bindVariables)}` : ''}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
+      dbs.at.logging(`Executing SQL ${fpth}${opts && opts.bindVariables ? ` with options ${JSON.stringify(opts)}` : ''}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
     }
     var rslt;
     try {
       rslt = await dbs.at.dbx.exec(sqlf, opts, frags); // execute the prepared SQL statement
     } catch (err) {
       if (dbs.at.errorLogging) {
-        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
+        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
       }
       if (ctch) return err;
       else throw err;
     }
     if (dbs.at.logging) {
-      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.length) || 0} records (connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
+      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.length) || 0} records (options ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
     }
     return rslt;
   }
