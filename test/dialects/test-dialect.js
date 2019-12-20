@@ -1,6 +1,6 @@
 'use strict';
 
-const { Dialect } = require('../../index');
+const { Manager, Dialect } = require('../../index');
 const { expect } = require('@hapi/code');
 
 /**
@@ -30,7 +30,7 @@ class TestDialect extends Dialect {
   async exec(sql, opts, frags) {
     expect(opts, 'opts').to.be.object();
     expect(opts.statementOptions, 'opts.statementOptions').to.be.object();
-    expect(['CREATE', 'READ', 'UPDATE', 'DELETE'], 'opts.statementOptions.type').to.have.part.include(opts.statementOptions.type);
+    expect(Manager.OPERATION_TYPES, 'opts.statementOptions.type').to.have.part.include(opts.statementOptions.type);
     expect(opts.bindVariables, 'opts.bindVariables').to.be.object();
     expect(opts.bindVariables, 'opts.bindVariables').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
 
@@ -46,6 +46,8 @@ class TestDialect extends Dialect {
     for (let col of cols) {
       rcrd[col.substr(col.lastIndexOf('.') + 1)] = ++ci;
     }
+    this.pending = this.pending || 0;
+    if (opts.statementOptions.type !== 'READ') this.pending++;
     // simple test output when the 
     return isSingleRecord ? [rcrd] : [rcrd, rcrd];
   }
@@ -53,8 +55,22 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
+  async commit() {
+    return this.pending;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  async rollback() {
+    return this.pending;
+  }
+
+  /**
+   * @inheritdoc
+   */
   async close() {
-    Promise.resolve();
+    return 1;
   }
 
   /**

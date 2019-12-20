@@ -87,33 +87,49 @@ async function testSql(cache, cacheOpts) {
   priv.cache = cache;
   priv.mgr = new Manager(conf, priv.cache, !!LOGGER.info);
   await priv.mgr.init();
-  
-  const binds = { someCol1: 1, someCol2: 2, someCol3: 3 };
-  const rslt1 = await priv.mgr.db.tst.read.some.tables(binds, 'en-US', ['test-frag']);
-  
-  expect(rslt1).to.be.array();
-  expect(rslt1).to.be.length(2); // two records should be returned w/o order by
-  if (LOGGER.info) LOGGER.info('BEFORE Cache Update:', rslt1);
-  
-  
-  // change the SQL file
-  const sql = (await sqlFile()).toString();
+
+  let error;
   try {
-    // update the file
-    await sqlFile(`${sql}\nORDER BY SOME_COL1`);
+    const binds = { someCol1: 1, someCol2: 2, someCol3: 3 };
+    const rslt1 = await priv.mgr.db.tst.read.some.tables(binds, 'en-US', ['test-frag']);
+    
+    expect(rslt1).to.be.array();
+    expect(rslt1).to.be.length(2); // two records should be returned w/o order by
+    if (LOGGER.info) LOGGER.info('BEFORE Cache Update:', rslt1);
+    
+    
+    // change the SQL file
+    const sql = (await sqlFile()).toString();
+    try {
+      // update the file
+      await sqlFile(`${sql}\nORDER BY SOME_COL1`);
 
-    // wait for the the SQL statement to expire
-    await Labrat.wait(cacheOpts && cacheOpts.hasOwnProperty('expiresIn') ? cacheOpts.expiresIn : 1000);
+      // wait for the the SQL statement to expire
+      await Labrat.wait(cacheOpts && cacheOpts.hasOwnProperty('expiresIn') ? cacheOpts.expiresIn : 1000);
 
-    const frags = cache ? ['test-frag'] : null;
-    const rslt2 = await priv.mgr.db.tst.read.some.tables(binds, 'en-US', frags);
+      const frags = cache ? ['test-frag'] : null;
+      const rslt2 = await priv.mgr.db.tst.read.some.tables(binds, 'en-US', frags);
 
-    expect(rslt2).to.be.array();
-    expect(rslt2).to.be.length(cache ? 1 : 2); // one record w/order by and updated by cache
-    if (LOGGER.info) LOGGER.info('AFTER Cahce Update:', rslt2);
+      expect(rslt2).to.be.array();
+      expect(rslt2).to.be.length(cache ? 1 : 2); // one record w/order by and updated by cache
+      if (LOGGER.info) LOGGER.info('AFTER Cahce Update:', rslt2);
 
+      const commitRslt = await priv.mgr.commit();
+      expect(commitRslt, 'DB commit result').to.be.object();
+      expect(commitRslt.tst, 'DB commit count').to.equal(0);
+
+    } finally {
+      await sqlFile(sql);
+    }
+  } catch (err) {
+    error = err;
+    throw err;
   } finally {
-    await sqlFile(sql);
+    if (!error) {
+      const closeRslt = await priv.mgr.close();
+      expect(closeRslt, 'DB close result').to.be.object();
+      expect(closeRslt.tst, 'DB close count').to.equal(1);
+    }
   }
 }
 

@@ -23,7 +23,9 @@
     "url": "https://github.com/ugate/sqler/issues"
   },
   "homepage": "https://github.com/ugate/sqler#readme",
-  "dependencies": {},
+  "dependencies": {
+    "asynchro": "^4.0.0"
+  },
   "devDependencies": {
     "@hapi/code": "^7.0.0",
     "@hapi/lab": "^21.0.0",

@@ -2,10 +2,12 @@
 
 const Dialect = require('./lib/dialect');
 
+const Asynchro = require('asynchro');
 const Fs = require('fs');
 const { format } = require('util');
 const Path = require('path');
-const compare = Object.freeze({
+const CRUD_TYPES = Object.freeze(['CREATE', 'READ', 'UPDATE', 'DELETE']);
+const COMPARE = Object.freeze({
   '=': function eq(x, y) { return x === y; },
   '<': function lt(x, y) { return x < y; },
   '>': function gt(x, y) { return x > y; },
@@ -193,34 +195,93 @@ class Manager {
 
   /**
    * Initializes the defined database connections
-   * @returns {Integer} the database count of all the connections/pools that are ready for use
+   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
    */
   async init() {
     const mgr = internal(this);
     if (mgr.at.sqlsCount) throw new Error(`${mgr.at.sqlsCount} database(s) already initialized`);
-    var ccnt = 0, promises = new Array(mgr.at.sqls.length);
-    for (let i = 0, il = mgr.at.sqls.length; i < il; ++i) promises[i] = mgr.at.sqls[i].init(); // run initializations in parallel
-    try {
-      for (let prom of promises) {
-        ((await prom) && ++ccnt);
-      }
-    } catch (err) {
-      mgr.at.logError(err);
-      throw err;
-    }
-    mgr.at.sqlsCount = ccnt;
-    mgr.at.log(`${ccnt} database(s) are ready for use`);
-    return ccnt;
+    const rslt = await operation(mgr, 'init');
+    mgr.at.sqlsCount = Object.getOwnPropertyNames(rslt).length;
+    mgr.at.log(`${mgr.at.sqlsCount} database(s) are ready for use`);
+    return mgr.at.sqlsCount;
+  }
+
+  /**
+   * Commit the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
+   * @param {Object} [opts={}] The operational options
+   * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
+   * `opts.executeInSeries`
+   * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
+   * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
+   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
+   */
+  async commit(opts, ...connNames) {
+    return operation(internal(this), 'commit', opts, connNames);
+  }
+
+  /**
+   * Rollback the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
+   * @param {Object} [opts={}] The operational options
+   * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
+   * `opts.executeInSeries`
+   * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
+   * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
+   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
+   */
+  async rollback(opts, ...connNames) {
+    return operation(internal(this), 'rollback', opts, connNames);
   }
 
   /**
    * Closes all database pools/connections/etc.
+   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
    */
   async close() {
-    const mgr = internal(this), prms = new Array(mgr.at.sqls.length);
-    for (let i = 0, l = mgr.at.sqls.length; i < l; ++i) prms[i] = mgr.at.sqls[i].close(); // call close in parallel
-    for (let i = 0, l = prms.length; i < l; ++i) await prms[i]; // wait for promises
+    return operation(internal(this), 'close');
   }
+
+  /**
+   * @returns {String[]} The operation types
+   */
+  static get OPERATION_TYPES() {
+    return CRUD_TYPES;
+  }
+}
+
+/**
+ * Executes one or more {@link SQLS} functions
+ * @private
+ * @param {Manager} mgr The _internal_/private {@link Manager} store
+ * @param {String} funcName The async function name to call on each {@link SQLS} instance
+ * @param {Object} [opts={}] The operational options
+ * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
+ * `opts.executeInSeries`
+ * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
+ * @param {String[]} [connNames] The connection names to perform the commit on (defaults to all connections)
+ * @returns {Object} The result from Asynchro
+ */
+async function operation(mgr, funcName, opts, connNames) {
+  opts = opts || {};
+  const cnl = (connNames && connNames.length) || 0;
+  const ax = new Asynchro({}, true);
+  const queue = sqli => {
+    const func = () => {
+      return sqli[funcName]();
+    };
+    const hasOverride = opts.connections && opts.connections[name] && typeof opts.connections[name] === 'object' && opts.connections[name].hasOwnProperty('executeInSeries');
+    if (hasOverride ? opts.connections[name].executeInSeries : opts.executeInSeries) {
+      ax.series(sqli.connectionName, func);
+    } else {
+      ax.parallel(sqli.connectionName, func);
+    }
+  }
+  for (let i = 0, l = mgr.at.sqls.length; i < l; ++i) {
+    if (cnl) {
+      if (!connNames.includes(mgr.at.sqls[i].connectionName)) continue;
+      queue(mgr.at.sqls[i]);
+    } else queue(mgr.at.sqls[i]);
+  }
+  return ax.run();
 }
 
 /**
@@ -244,6 +305,7 @@ class SQLS {
     if (!conn.name) throw new Error(`Connection ${conn.id} must have a name`);
 
     const sqls = internal(this);
+    sqls.at.connectionName = conn.name;
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
     sqls.at.cache = cache;
     sqls.at.subs = psopts && psopts.substitutes;
@@ -260,7 +322,6 @@ class SQLS {
   async init() {
     const sqls = internal(this);
     sqls.at.numOfPreparedStmts = 0;
-    const proms = [];
     const prepare = async (cont, pnm, pdir) => {
       let pth, proms = [];
       try {
@@ -304,6 +365,10 @@ class SQLS {
   async prepared(name, fpth, ext) {
     const sqls = internal(this);
     if (sqls.at.conn.sql.logging) sqls.at.conn.sql.logging(`Generating prepared statement for ${fpth} at name ${name}`);
+    const crud = Path.parse(fpth).name.match(/[^\.]*/)[0].toUpperCase();
+    if (!CRUD_TYPES.includes(crud)) {
+      throw new Error(`Prepared statement must be prefixed with one of ${CRUD_TYPES.join(',')} followed by a "." for ${fpth} at name ${name}`)
+    }
     // cache the SQL statement capture in order to accommodate dynamic file updates on expiration
     sqls.at.stms = sqls.at.stms || { methods: {} };
     sqls.at.stms.methods[name] = {};
@@ -351,16 +416,12 @@ class SQLS {
         if (typeof params[i] === 'undefined') params[i] = sqls.at.conn.params[i]; // add per connection static parameters when not overridden
       }
       if (params && locale) for (var i in params) params[i] = (params[i] instanceof Date && params[i].toISOString()) || params[i]; // convert dates to ANSI format for use in SQL
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, params, frags, {}, ctch));
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, params, frags, { type: crud }, ctch));
     };
   }
 
   genExecSqlFromFileFunction(fpth, params, frags, sopt, ctch) {
     const sqls = internal(this);
-    let crud = Path.parse(fpth).name.match(/[^\.]*/)[0].toUpperCase();
-    if (!['CREATE', 'READ', 'UPDATE', 'DELETE'].includes(crud)) crud = null;
-    if (!sopt) sopt = {};
-    sopt.type = crud;
     return async function execSqlFromFile(sql) {
       var opts = { statementOptions: sopt, bindVariables: params };
       return await sqls.at.dbs.exec(fpth, sql, opts, frags, ctch);
@@ -368,10 +429,24 @@ class SQLS {
   }
 
   /**
+   * Iterates through and commits the different database connection transactions
+   */
+  async commit() {
+    return internal(this).at.dbs.commit();
+  }
+
+  /**
+   * Iterates through and rollback the different database connection transactions
+   */
+  async rollback() {
+    return internal(this).at.dbs.rollback();
+  }
+
+  /**
    * Iterates through and terminates the different database connection pools
    */
   async close() {
-    return await internal(this).at.dbs.close();
+    return internal(this).at.dbs.close();
   }
 
   /**
@@ -379,6 +454,13 @@ class SQLS {
    */
   get numOfPreparedStmts() {
     return internal(this).at.numOfPreparedStmts || 0;
+  }
+
+  /**
+   * @returns {String} the connection name associated with the {@link SQLS} instance
+   */
+  get connectionName() {
+    return internal(this).at.connectionName;
   }
 }
 
@@ -471,7 +553,7 @@ class DBS {
       return (key && key.toLowerCase() === dbs.at.dialect && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });
     sql = sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[version(?!\[\[version)\s*(=|<=?|>=?|<>)\s*[+-]?(\d+\.?\d*)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[version\]\]((?:\r?\n|\n)*)/gi, function sqlVerRpl(match, lb1, key, ver, fsql, lb2) {
-      return (key && ver && !isNaN(ver = parseFloat(ver)) && compare[key](dbs.at.version, ver) && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
+      return (key && ver && !isNaN(ver = parseFloat(ver)) && COMPARE[key](dbs.at.version, ver) && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });
     return sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[\?(?!\[\[\?)\s*(\w+)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[\?\]\]((?:\r?\n|\n)*)/g, function sqlFragRpl(match, lb1, key, fsql, lb2) {
       return (key && keys && keys.indexOf(key) >= 0 && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
@@ -479,10 +561,24 @@ class DBS {
   }
 
   /**
+   * Iterates through and commits the different database connection transactions
+   */
+  async commit() {
+    return internal(this).at.dbx.commit();
+  }
+
+  /**
+   * Iterates through and rollback the different database connection transactions
+   */
+  async rollback() {
+    return internal(this).at.dbx.rollback();
+  }
+
+  /**
    * Iterates through and terminates the different database connection pools
    */
   async close() {
-    return await internal(this).at.dbx.close();
+    return internal(this).at.dbx.close();
   }
 }
 
