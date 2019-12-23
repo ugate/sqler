@@ -13,6 +13,7 @@ class TestDialect extends Dialect {
    */
   constructor(username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug) {
     super(username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug);
+    this.testPending = 0;
   }
 
   /**
@@ -28,9 +29,7 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async exec(sql, opts, frags) {
-    expect(opts, 'opts').to.be.object();
-    expect(opts.statementOptions, 'opts.statementOptions').to.be.object();
-    expect(Manager.OPERATION_TYPES, 'opts.statementOptions.type').to.have.part.include(opts.statementOptions.type);
+    expectOpts(this, opts, true);
     expect(opts.bindVariables, 'opts.bindVariables').to.be.object();
     expect(opts.bindVariables, 'opts.bindVariables').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
 
@@ -46,8 +45,6 @@ class TestDialect extends Dialect {
     for (let col of cols) {
       rcrd[col.substr(col.lastIndexOf('.') + 1)] = ++ci;
     }
-    this.pending = this.pending || 0;
-    if (opts.statementOptions.type !== 'READ') this.pending++;
     // simple test output when the 
     return isSingleRecord ? [rcrd] : [rcrd, rcrd];
   }
@@ -55,21 +52,25 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  async commit() {
-    return this.pending;
+  async commit(opts) {
+    expectOpts(this, opts);
+    return this.testPending = 0;
   }
 
   /**
    * @inheritdoc
    */
-  async rollback() {
-    return this.pending;
+  async rollback(opts) {
+    expectOpts(this, opts);
+    return this.testPending = 0;
   }
 
   /**
    * @inheritdoc
    */
-  async close() {
+  async close(opts) {
+    expectOpts(this, opts);
+    this.testPending = 0;
     return 1;
   }
 
@@ -86,6 +87,25 @@ class TestDialect extends Dialect {
   static get testMultiRecordFragKey() {
     return 'test-frag';
   }
+}
+
+/**
+ * Expects options
+ * @param {TestDialect} dialect The dialect instance being tested
+ * @param {(DialectOptions | DialectExecOptions)} opts The expected options
+ * @param {Boolean} isExec Flag indicating if the options are coming from {@link Dialect.exec}
+ */
+function expectOpts(dialect, opts, isExec) {
+  expect(opts, 'opts').to.be.object();
+
+  if (isExec) {
+    expect(opts.statementOptions, 'opts.statementOptions').to.be.object();
+    expect(Manager.OPERATION_TYPES, 'opts.statementOptions.type').to.have.part.include(opts.statementOptions.type);
+    dialect.testPending += opts.statementOptions.type === 'READ' ? 0 : 1;
+  }
+
+  expect(opts.tx, 'opts.tx').to.be.object();
+  expect(opts.tx.pending, 'opts.tx.pending').to.equal(dialect.testPending);
 }
 
 module.exports = TestDialect;

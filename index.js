@@ -486,6 +486,7 @@ class DBS {
     dbs.at.logging = conn.sql.logging;
     dbs.at.dialect = conn.sql.dialect.toLowerCase();
     dbs.at.version = conn.version || 0;
+    dbs.at.pending = 0;
   }
 
   /**
@@ -512,20 +513,21 @@ class DBS {
     const sqlf = dbs.this.frag(sql, frags, opts.bindVariables);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
     if (dbs.at.logging) {
-      dbs.at.logging(`Executing SQL ${fpth}${opts && opts.bindVariables ? ` with options ${JSON.stringify(opts)}` : ''}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
+      dbs.at.logging(`Executing SQL ${fpth} with options ${JSON.stringify(opts)}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
     }
-    var rslt;
+    let rslt;
     try {
-      rslt = await dbs.at.dbx.exec(sqlf, opts, frags); // execute the prepared SQL statement
+      dbs.at.pending += opts.statementOptions.type === 'READ' ? 0 : 1;
+      rslt = await dbs.at.dbx.exec(sqlf, generateDbsOpts(dbs, opts), frags); // execute the prepared SQL statement
     } catch (err) {
       if (dbs.at.errorLogging) {
-        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
+        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
       }
       if (ctch) return err;
       else throw err;
     }
     if (dbs.at.logging) {
-      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.length) || 0} records (options ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
+      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.length) || 0} records (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
     }
     return rslt;
   }
@@ -541,7 +543,6 @@ class DBS {
   frag(sql, keys, rplmts) {
     if (!sql) return sql;
     const dbs = internal(this);
-
     sql = sql.replace(/(:)([a-z]+[0-9]*?)/gi, function sqlArrayRpl(match, pkey, key) {
       for (var i = 0, vals = key && rplmts && Array.isArray(rplmts[key]) && rplmts[key], keys = '', l = vals && vals.length; i < l; ++i) {
         keys += ((keys && ', ') || '') + pkey + key + (i || '');
@@ -564,22 +565,38 @@ class DBS {
    * Iterates through and commits the different database connection transactions
    */
   async commit() {
-    return internal(this).at.dbx.commit();
+    const dbs = internal(this);
+    return dbs.at.dbx.commit(generateDbsOpts(dbs));
   }
 
   /**
    * Iterates through and rollback the different database connection transactions
    */
   async rollback() {
-    return internal(this).at.dbx.rollback();
+    const dbs = internal(this);
+    return dbs.at.dbx.rollback(generateDbsOpts(dbs));
   }
 
   /**
    * Iterates through and terminates the different database connection pools
    */
   async close() {
-    return internal(this).at.dbx.close();
+    const dbs = internal(this);
+    return dbs.at.dbx.close(generateDbsOpts(dbs));
   }
+}
+
+/**
+ * Generates options for {@link DBS}
+ * @private
+ * @param {DBS} dbs The {@link DBS} state instance
+ * @param {DialectOptions} [opts] Optional options where options are added
+ * @returns {DialectOptions} The {@link Dialect} options
+ */
+function generateDbsOpts(dbs, opts) {
+  const ropts = opts || {};
+  ropts.tx = { pending: dbs.at.pending };
+  return ropts;
 }
 
 /**
