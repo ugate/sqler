@@ -90,8 +90,8 @@ async function testSql(cache, cacheOpts) {
 
   let error;
   try {
-    const binds = { someCol1: 1, someCol2: 2, someCol3: 3 };
-    const rslt1 = await priv.mgr.db.tst.read.some.tables(binds, 'en-US', ['test-frag']);
+    const opts = { binds: { someCol1: 1, someCol2: 2, someCol3: 3 } };
+    const rslt1 = await priv.mgr.db.tst.read.some.tables(opts, ['test-frag']);
     
     expect(rslt1).to.be.array();
     expect(rslt1).to.be.length(2); // two records should be returned w/o order by
@@ -108,7 +108,7 @@ async function testSql(cache, cacheOpts) {
       await Labrat.wait(cacheOpts && cacheOpts.hasOwnProperty('expiresIn') ? cacheOpts.expiresIn : 1000);
 
       const frags = cache ? ['test-frag'] : null;
-      const rslt2 = await priv.mgr.db.tst.read.some.tables(binds, 'en-US', frags);
+      const rslt2 = await priv.mgr.db.tst.read.some.tables(opts, frags);
 
       expect(rslt2).to.be.array();
       expect(rslt2).to.be.length(cache ? 1 : 2); // one record w/order by and updated by cache

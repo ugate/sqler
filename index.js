@@ -91,6 +91,29 @@ const COMPARE = Object.freeze({
  * // be refreshed/re-read every 60 seconds
  */
 
+ /**
+  * Options that are passed to generated/prepared SQL functions
+  * @typedef {Object} Manager~ExecOptions
+  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
+  * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
+  * @property {Object} [binds] The key/value pair of replacement parameters that will be bound in the SQL statement
+  * @property {Integer} [numOfIterations] The number of times the SQL should be executed. When supported, should take less round-trips back to the DB
+  * rather than calling generated SQL functions multiple times.
+  * @property {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned rather then thrown
+  */
+ // TODO : @param {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
+
+ /**
+  * Generated/prepared SQL function
+  * @async
+  * @callback {Function} Manager~PreparedFunction
+  * @param {Manager~ExecOptions} [opts] The SQL execution options
+  * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
+  * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
+  * @returns {(Object[] | undefined | Error)} The result set of dynamically generated result models, undefined when executing a non-read SQL statement or an `Error` when
+  * `opts.returnErrors` is _true_.
+  */
+
 /**
  * The database(s) manager entry point that autogenerates/manages SQL execution functions from underlying SQL statement files.
  * Vendor-specific implementations should implement {@link Dialect} and pass the class or module path into the constructor as `conf.db.dialects.myDialectClassOrModulePath`.
@@ -115,17 +138,15 @@ class Manager {
   * connection container `manager.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
   * @param {String} [conf.db.connections[].dir=connection.name] the alternative dir where `*.sql` files will be found relative to `mainPath`. The directory path will be used as the basis for generating SQL statements
   * from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
-  * within the file name with the last entry as the executable `async function(params, locale, frags)`. The function executes the SQL where "params" is the Object that contains the `bindVariables` that will be matched
-  * within the SQL, the "locale" String representing the locale that will be used for date `bindVariables`s and "frags" is an optional String[] of (see `bindVariables` section for more details). For example, a connection
-  * named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager as "mgr.db.conn1.user.team.details(params, locale, frags, cb)". But when `dir` is set to "myDir" the SQL files will be loaded
-  * from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection name "conn1".
-  * @param {Float} [conf.db.connections[].version] a version that can be used for replacement selection within the SQL (see `bindVariables` section for more details)
+  * within the file name with the last entry as the executable {@link Manager~PreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
+  * as "mgr.db.conn1.user.team.details()". But when `dir` is set to "myDir" the SQL files will be loaded from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection name
+  * "conn1".
+  * @param {Float} [conf.db.connections[].version] a version that can be used for replacement selection within the SQL (see `binds` section for more details)
   * @param {String} [conf.db.connections[].service] the service name defined by the underlying database (must define if SID is not defined)
   * @param {String} [conf.db.connections[].sid] the SID defined by the underlying database (use only when supported, but service is preferred)
-  * @param {Object} [conf.db.connections[].params] global object that contains parameter values that will be included in all SQL calls made under the connection for parameter `bindVariables` if not overridden
-  * by individual "params" passed into the SQL function
-  * @param {Object} [conf.db.connections[].preparedSql] the object that contains options for prepared SQL
-  * @param {Object} [conf.db.connections[].preparedSql.substitutes] key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
+  * @param {Object} [conf.db.connections[].binds] global object that contains parameter values that will be included in all SQL calls made under the connection for parameter `binds` if not overridden
+  * by individual "binds" passed into the SQL function
+  * @param {Object} [conf.db.connections[].substitutes] key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
   * @param {Object} conf.db.connections[].sql the object that contains the SQL connection options (excluding username/password)
   * @param {String} [conf.db.connections[].sql.host] the database host override from conf.univ.db
   * @param {String} conf.db.connections[].sql.dialect the database dialect (e.g. mysql, mssql, oracle, etc.)
@@ -176,16 +197,6 @@ class Manager {
         conn.sql.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dbx error logging
       }
       dbx = new conf.db.dialects[dlct](def.username, def.password, conn.sql, conn.service, conn.sid, privatePath, track, conn.sql.errorLogging, conn.sql.logging, conf.debug);
-      /*if (dlct === 'oracle') {
-        dbx = new OracleDB(def.username, def.password, conn.sql, conn.service, conn.sid, privatePath, track, conn.sql.errorLogging, conn.sql.logging, conf.debug);
-      } else if (dlct === 'mssql') {
-        dbx = new MSSQLDB(def.username, def.password, conn.sql, conn.service || conn.sid, conn.sql.errorLogging, conn.sql.logging, conf.debug);
-        //dbx = new Sequelize(conn.service || conn.sid, def.username, def.password, conn.sql);
-        //if (!dbx.init) dbx.init = function sequelizeInit(opts, scb) { // needed for dialect to fulfill Manager interface contract
-        //  if (scb) setImmediate(scb);
-        //};
-      } else throw new Error(`Unsupported database dialect for ${dlct} at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
-      */
       // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
       if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
       //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
@@ -210,7 +221,8 @@ class Manager {
    * Commit the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
    * @param {Object} [opts={}] The operational options
    * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
-   * `opts.executeInSeries`
+   * any global options set directly on `opts`. For example, `opts.connections.myConnection.executeInseries` would override `opts.executeInSeries` for the connection named `myConnection`,
+   * but would use `opts.executeInSeries` for any other connections that ae not overridden.
    * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
    * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
    * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
@@ -294,7 +306,7 @@ class SQLS {
    * Reads all the prepared SQL definition files for a specified name directory and adds a function to execute the SQL file contents
    * @constructs SQLS
    * @param {String} sqlBasePth the absolute path that SQL files will be included
-   *  @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+   * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
    * @param {Object} psopts options for prepared statements
    * @param {Object} psopts.substitutes key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
    * @param {Object} db the object where SQL retrieval methods will be stored (by file name parts separated by a period- except the file extension)
@@ -360,14 +372,16 @@ class SQLS {
    * @param {String} name the name of the SQL (excluding the extension)
    * @param {String} fpth the path to the SQL file to execute
    * @param {String} ext the file extension that will be used
-   * @returns {function} an `async function` that executes SQL statement(s)
+   * @returns {Manager~PreparedFunction} an `async function` that executes SQL statement(s)
    */
   async prepared(name, fpth, ext) {
     const sqls = internal(this);
     if (sqls.at.conn.sql.logging) sqls.at.conn.sql.logging(`Generating prepared statement for ${fpth} at name ${name}`);
-    const crud = Path.parse(fpth).name.match(/[^\.]*/)[0].toUpperCase();
-    if (!CRUD_TYPES.includes(crud)) {
-      throw new Error(`Prepared statement must be prefixed with one of ${CRUD_TYPES.join(',')} followed by a "." for ${fpth} at name ${name}`)
+    let crud = Path.parse(fpth).name.match(/[^\.]*/)[0].toUpperCase();
+    if (!CRUD_TYPES.includes(crud)) crud = null;
+    if (sqls.at.conn.sql.logging) {
+      sqls.at.conn.sql.logging(`Generating prepared statement for ${fpth} at name ${name}${
+        crud ? '' : ` (statement execution must include "opts.type" set to one of ${OPERATION_TYPES.join(',')} since the SQL file path is not prefixed with the type)`}`);
     }
     // cache the SQL statement capture in order to accommodate dynamic file updates on expiration
     sqls.at.stms = sqls.at.stms || { methods: {} };
@@ -405,26 +419,31 @@ class SQLS {
 
     /**
     * Sets/formats SQL parameters and executes an SQL statement
-    * @param {Object} [params] the bind variable names/values to pass into the SQL
-    * @param {String} [locale] the locale that will be used for date formatting
-    * @param {Object} [frags] the SQL fragments being used (if any)
-    * @param {Boolean} [ctch] `true` to catch and return errors instead of throwing them
+    * @see Manager~PreparedFunction
     */
-    return async function execSqlPublic(params, locale, frags, ctch) {
-      var mopt = { params: params, opts: frags };
-      if (params && sqls.at.conn.params) for (var i in sqls.at.conn.params) {
-        if (typeof params[i] === 'undefined') params[i] = sqls.at.conn.params[i]; // add per connection static parameters when not overridden
+    return async function execSqlPublic(opts, frags) {
+      const binds = {}, mopt = { binds, opts: frags };
+      if (!crud && (!opts || !opts.type || !opts.type)) {
+        return Promise.reject(new Error(`statement execution must include "opts.type" set to one of ${OPERATION_TYPES.join(',')} since the SQL file path was not prefixed with the type`));
       }
-      if (params && locale) for (var i in params) params[i] = (params[i] instanceof Date && params[i].toISOString()) || params[i]; // convert dates to ANSI format for use in SQL
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, params, frags, { type: crud }, ctch));
+      if (sqls.at.conn.binds) for (let i in sqls.at.conn.binds) {
+        if (!opts || !opts.binds || !opts.binds.hasOwnProperty(i)) {
+          binds[i] = sqls.at.conn.binds[i]; // add per connection static parameters when not overridden
+        }
+      }
+      if (opts && opts.binds) {
+        for (let i in opts.binds) {
+          binds[i] = (opts.binds[i] instanceof Date && opts.binds[i].toISOString()) || opts.binds[i]; // convert dates to ANSI format for use in SQL
+        }
+      }
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, opts.type || crud, binds, frags));
     };
   }
 
-  genExecSqlFromFileFunction(fpth, params, frags, sopt, ctch) {
-    const sqls = internal(this);
+  genExecSqlFromFileFunction(fpth, type, binds, frags) {
+    const sqls = internal(this), opts = { type, binds };
     return async function execSqlFromFile(sql) {
-      var opts = { statementOptions: sopt, bindVariables: params };
-      return await sqls.at.dbs.exec(fpth, sql, opts, frags, ctch);
+      return await sqls.at.dbs.exec(fpth, sql, opts, frags);
     };
   }
 
@@ -501,29 +520,28 @@ class DBS {
 
   /**
   * Executes SQL using the underlying framework API
-  * @param {String} fpth the originating file path where the SQL resides
-  * @param {String} sql the SQL to execute with optional fragment definitions {@link DBS#frag}
-  * @param {Object} opts the options passed to the SQL API
-  * @param {String[]} frags the frament keys within the SQL that will be retained
-  * @param {Boolean} [ctch] `true` to catch and return errors instead of throwing them
-  * @returns {Object[] | Error} the execution results or an error when `ctch` is true
+  * @param {String} fpth The originating file path where the SQL resides
+  * @param {String} sql The SQL to execute with optional substitutions {@link DBS#frag}
+  * @param {Manager~ExecOptions} opts The eectution options
+  * @param {String[]} frags The frament keys within the SQL that will be retained
+  * @returns {(Object[] | undefined | Error)} The execution results, `undefined` when not perfroming a read or an error when `opts.returnErrors` is true
   */
-  async exec(fpth, sql, opts, frags, ctch) {
+  async exec(fpth, sql, opts, frags) {
     const dbs = internal(this);
-    const sqlf = dbs.this.frag(sql, frags, opts.bindVariables);
+    const sqlf = dbs.this.frag(sql, frags, opts.binds);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
     if (dbs.at.logging) {
       dbs.at.logging(`Executing SQL ${fpth} with options ${JSON.stringify(opts)}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
     }
     let rslt;
     try {
-      dbs.at.pending += opts.statementOptions.type === 'READ' ? 0 : 1;
+      dbs.at.pending += opts.type === 'READ' ? 0 : 1;
       rslt = await dbs.at.dbx.exec(sqlf, generateDbsOpts(dbs, opts), frags); // execute the prepared SQL statement
     } catch (err) {
       if (dbs.at.errorLogging) {
         dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
       }
-      if (ctch) return err;
+      if (opts.returnErrors) return err;
       else throw err;
     }
     if (dbs.at.logging) {
@@ -534,10 +552,10 @@ class DBS {
 
   /**
   * Removes any SQL fragments that are wrapped around [[? someKey]] and [[?]] when the specified keys does not contain the discovered key (same for dialect and version keys)
-  * Replaces any SQL parameters that are wrapped around :someParam with the indexed parameter names (i.e. :someParam :someParam1 ...) and adds the replacement value to the supplied `bindVariables`
+  * Replaces any SQL parameters that are wrapped around :someParam with the indexed parameter names (i.e. :someParam :someParam1 ...) and adds the replacement value to the supplied `binds`
   * @param {String} sql the SQL to defragement
   * @param {String[]} [keys] fragment keys which will remain intact within the SQL
-  * @param {Object} [rplmts] an object that contains the SQL parameterized `bindVariables` that will be used for parameterized array composition
+  * @param {Object} [rplmts] an object that contains the SQL parameterized `binds` that will be used for parameterized array composition
   * @returns {String} the defragmented SQL
   */
   frag(sql, keys, rplmts) {
@@ -590,7 +608,7 @@ class DBS {
  * Generates options for {@link DBS}
  * @private
  * @param {DBS} dbs The {@link DBS} state instance
- * @param {DialectOptions} [opts] Optional options where options are added
+ * @param {DialectOptions} [opts] Optional options where additional options will be set
  * @returns {DialectOptions} The {@link Dialect} options
  */
 function generateDbsOpts(dbs, opts) {

@@ -20,8 +20,8 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async init(opts) {
-    expect(opts, 'Options').to.be.object();
-    //expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(7);
+    expect(opts, 'opts').to.be.object();
+    expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(7);
     return true;
   }
 
@@ -30,8 +30,8 @@ class TestDialect extends Dialect {
    */
   async exec(sql, opts, frags) {
     expectOpts(this, opts, true);
-    expect(opts.bindVariables, 'opts.bindVariables').to.be.object();
-    expect(opts.bindVariables, 'opts.bindVariables').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
+    expect(opts.binds, 'opts.binds').to.be.object();
+    expect(opts.binds, 'opts.binds').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
 
     const isSingleRecord = sql.includes(TestDialect.testSqlSingleRecordKey);
     if (isSingleRecord) { // only test for frags when returning a single record
@@ -92,16 +92,15 @@ class TestDialect extends Dialect {
 /**
  * Expects options
  * @param {TestDialect} dialect The dialect instance being tested
- * @param {(DialectOptions | DialectExecOptions)} opts The expected options
+ * @param {(DialectOptions | ExecOptions)} opts The expected options
  * @param {Boolean} isExec Flag indicating if the options are coming from {@link Dialect.exec}
  */
 function expectOpts(dialect, opts, isExec) {
   expect(opts, 'opts').to.be.object();
 
   if (isExec) {
-    expect(opts.statementOptions, 'opts.statementOptions').to.be.object();
-    expect(Manager.OPERATION_TYPES, 'opts.statementOptions.type').to.have.part.include(opts.statementOptions.type);
-    dialect.testPending += opts.statementOptions.type === 'READ' ? 0 : 1;
+    expect(Manager.OPERATION_TYPES, 'opts.type').to.have.part.include(opts.type);
+    dialect.testPending += opts.type === 'READ' ? 0 : 1;
   }
 
   expect(opts.tx, 'opts.tx').to.be.object();
