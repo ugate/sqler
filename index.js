@@ -424,7 +424,7 @@ class SQLS {
     return async function execSqlPublic(opts, frags) {
       const binds = {}, mopt = { binds, opts: frags };
       if (!crud && (!opts || !opts.type || !opts.type)) {
-        return Promise.reject(new Error(`statement execution must include "opts.type" set to one of ${OPERATION_TYPES.join(',')} since the SQL file path was not prefixed with the type`));
+        throw new Error(`Statement execution must include "opts.type" set to one of ${OPERATION_TYPES.join(',')} since the SQL file path was not prefixed with a type`);
       }
       if (sqls.at.conn.binds) for (let i in sqls.at.conn.binds) {
         if (!opts || !opts.binds || !opts.binds.hasOwnProperty(i)) {
