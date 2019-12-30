@@ -422,9 +422,9 @@ class SQLS {
     * @see Manager~PreparedFunction
     */
     return async function execSqlPublic(opts, frags) {
-      const binds = {}, mopt = { binds, opts: frags };
-      if (!crud && (!opts || !opts.type || !opts.type)) {
-        throw new Error(`Statement execution must include "opts.type" set to one of ${OPERATION_TYPES.join(',')} since the SQL file path was not prefixed with a type`);
+      const binds = {}, mopt = { binds, opts: frags }, type = (opts && opts.type && opts.type.toUpperCase()) || crud;
+      if (!type || !OPERATION_TYPES.includes(type)) {
+        throw new Error(`Statement execution must include "opts.type" set to one of ${OPERATION_TYPES.join(',')} since the SQL file path was not prefixed with a type (found: ${type})`);
       }
       if (sqls.at.conn.binds) for (let i in sqls.at.conn.binds) {
         if (!opts || !opts.binds || !opts.binds.hasOwnProperty(i)) {
@@ -436,7 +436,7 @@ class SQLS {
           binds[i] = (opts.binds[i] instanceof Date && opts.binds[i].toISOString()) || opts.binds[i]; // convert dates to ANSI format for use in SQL
         }
       }
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, opts.type || crud, binds, frags));
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, type, binds, frags));
     };
   }
 
