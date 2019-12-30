@@ -22,7 +22,10 @@
   "bugs": {
     "url": "https://github.com/ugate/sqler/issues"
   },
-  "homepage": "https://github.com/ugate/sqler#readme",
+  "homepage": "https://ugate.github.io/sqler",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "asynchro": "^4.0.0"
   },
@@ -33,5 +36,9 @@
     "jsdoc": "^3.6.3",
     "jsdocp": "^1.0.3",
     "minami": "^1.2.3"
-  }
+  },
+  "files": [
+    "/index.js",
+    "/lib/**/*"
+  ]
 }
