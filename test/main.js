@@ -19,6 +19,11 @@ const plan = `DB Manager`;
 
 lab.experiment(plan, () => {
 
+  if (Tester.before) lab.before(Tester.before);
+  if (Tester.after) lab.before(Tester.after);
+  if (Tester.beforeEach) lab.beforeEach(Tester.beforeEach);
+  if (Tester.afterEach) lab.afterEach(Tester.afterEach);
+
   lab.test(`${plan}: No Cache`, { timeout: TEST_TKO }, Tester.noCache);
   lab.test(`${plan}: Interval Cache`, { timeout: TEST_TKO }, Tester.intervalCache);
 });
