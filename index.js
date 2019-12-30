@@ -381,7 +381,7 @@ class SQLS {
     if (!CRUD_TYPES.includes(crud)) crud = null;
     if (sqls.at.conn.sql.logging) {
       sqls.at.conn.sql.logging(`Generating prepared statement for ${fpth} at name ${name}${
-        crud ? '' : ` (statement execution must include "opts.type" set to one of ${OPERATION_TYPES.join(',')} since the SQL file path is not prefixed with the type)`}`);
+        crud ? '' : ` (statement execution must include "opts.type" set to one of ${CRUD_TYPES.join(',')} since the SQL file path is not prefixed with the type)`}`);
     }
     // cache the SQL statement capture in order to accommodate dynamic file updates on expiration
     sqls.at.stms = sqls.at.stms || { methods: {} };
@@ -423,8 +423,8 @@ class SQLS {
     */
     return async function execSqlPublic(opts, frags) {
       const binds = {}, mopt = { binds, opts: frags }, type = (opts && opts.type && opts.type.toUpperCase()) || crud;
-      if (!type || !OPERATION_TYPES.includes(type)) {
-        throw new Error(`Statement execution must include "opts.type" set to one of ${OPERATION_TYPES.join(',')} since the SQL file path was not prefixed with a type (found: ${type})`);
+      if (!type || !CRUD_TYPES.includes(type)) {
+        throw new Error(`Statement execution must include "opts.type" set to one of ${CRUD_TYPES.join(',')} since the SQL file path was not prefixed with a type (found: ${type})`);
       }
       if (sqls.at.conn.binds) for (let i in sqls.at.conn.binds) {
         if (!opts || !opts.binds || !opts.binds.hasOwnProperty(i)) {
