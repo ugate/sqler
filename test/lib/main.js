@@ -57,8 +57,9 @@ class Tester {
       pendingCount = await testCUD(priv.mgr, connName, conf, xopts);
       await testOperation('commit', priv.mgr, connName, pendingCount);
 
-      // TODO : xopts.autocommit = true;
-      // TODO : pendingCount = await testCUD(priv.mgr, connName, conf, xopts);
+      if (LOGGER.info) LOGGER.info('>> CUD tests using autocommit = true');
+      xopts.driverOptions = { autocommit: true };
+      pendingCount = await testCUD(priv.mgr, connName, conf, xopts);
     } catch (err) {
       priv.error = err;
       throw err;
@@ -180,12 +181,12 @@ async function initManager(conf, cache) {
 async function testRead(mgr, connName, cache, cacheOpts) {
   if (LOGGER.info) LOGGER.info(`Begin basic test`);
 
-  const opts = createExecOpts();
+  const opts = createExecOpts(), label = `READ mgr.db.${connName}.read.some.tables`;
   const rslt1 = await mgr.db[connName].read.some.tables(opts, ['test-frag']);
   
   expect(rslt1).to.be.array();
   expect(rslt1).to.be.length(2); // two records should be returned w/o order by
-  if (LOGGER.info) LOGGER.info('BEFORE Cache Update:', rslt1);
+  if (LOGGER.info) LOGGER.info(`${label} BEFORE cache update:`, rslt1);
   
   
   // change the SQL file
@@ -202,11 +203,11 @@ async function testRead(mgr, connName, cache, cacheOpts) {
 
     expect(rslt2).to.be.array();
     expect(rslt2).to.be.length(cache ? 1 : 2); // one record w/order by and updated by cache
-    if (LOGGER.info) LOGGER.info('AFTER Cahce Update:', rslt2);
+    if (LOGGER.info) LOGGER.info(`${label} AFTER cache update:`, rslt2);
 
     // no commits, only reads
-    await testOperation('pendingCommit', mgr, connName, 0);
-    await testOperation('commit', mgr, connName, 0);
+    await testOperation('pendingCommit', mgr, connName, 0, label);
+    await testOperation('commit', mgr, connName, 0, label);
   } finally {
     await sqlFile(sql);
   }
@@ -221,21 +222,23 @@ async function testRead(mgr, connName, cache, cacheOpts) {
  * @returns {Integer} The number of pending commits
  */
 async function testCUD(mgr, connName, conf, xopts) {
-  let autocommit = xopts && xopts.autocommit;
-  if (!xopts || !xopts.hasOwnProperty('autocommit')) {
+  let autocommit = xopts && xopts.driverOptions && xopts.driverOptions.autocommit;
+  if (!xopts || !xopts.driverOptions || !xopts.driverOptions.hasOwnProperty('autocommit')) {
     const tst = getConnConf(conf, connName);
     autocommit = tst.sql.driverOptions && tst.sql.driverOptions.autocommit;
   }
   
-  let pendCnt = 0, cudRslt;
+  let pendCnt = 0, cudRslt, label;
 
   cudRslt = await mgr.db.tst.finance.create.annual.report(xopts);
-  expect(cudRslt, 'mgr.db.tst.finance.create.annual.report() result').to.be.undefined();
-  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt);
+  label = 'CREATE mgr.db.tst.finance.create.annual.report()';
+  expect(cudRslt, `${label} result`).to.be.undefined();
+  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
   
   cudRslt = await mgr.db.tst.finance.ap.update.audits(xopts);
-  expect(cudRslt, 'mgr.db.tst.finance.ap.update.audits() result').to.be.undefined();
-  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt);
+  label = 'UPDATE mgr.db.tst.finance.ap.update.audits()';
+  expect(cudRslt, `${label} result`).to.be.undefined();
+  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
 
   return pendCnt;
 }
@@ -245,12 +248,13 @@ async function testCUD(mgr, connName, conf, xopts) {
  * @param {String} type The type of manager operation to test (e.g. `rollback`, `commit`, `close`, etc.)
  * @param {String} connName The connection name to use
  * @param {*} expected The expected result
+ * @param {String} [label] A label to use for the operation
  * @returns {Object} The operation result
  */
-async function testOperation(type, mgr, connName, expected) {
+async function testOperation(type, mgr, connName, expected, label) {
   const rslt = await mgr[type]();
-  expect(rslt, `DB ${type} result`).to.be.object();
-  expect(rslt[connName], `DB ${type} result`).to.equal(expected);
+  expect(rslt, `${label || 'DB'} ${type} result`).to.be.object();
+  expect(rslt[connName], `${label || 'DB'} ${type} result`).to.equal(expected);
   return rslt;
 } 
 

@@ -100,6 +100,7 @@ const COMPARE = Object.freeze({
   * @property {Integer} [numOfIterations] The number of times the SQL should be executed. When supported, should take less round-trips back to the DB
   * rather than calling generated SQL functions multiple times.
   * @property {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned rather then thrown
+  * @property {Object} [driverOptions] Options that may override the connection `driverOptions` passed into the {@link Manager} constructor
   */
  // TODO : @param {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
 
@@ -451,12 +452,13 @@ class SQLS {
           binds[i] = (opts.binds[i] instanceof Date && opts.binds[i].toISOString()) || opts.binds[i]; // convert dates to ANSI format for use in SQL
         }
       }
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, type, binds, frags));
+      const driverOptions = opts && opts.driverOptions ? opts.driverOptions : undefined;
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, type, binds, frags, driverOptions));
     };
   }
 
-  genExecSqlFromFileFunction(fpth, type, binds, frags) {
-    const sqls = internal(this), opts = { type, binds };
+  genExecSqlFromFileFunction(fpth, type, binds, frags, driverOptions) {
+    const sqls = internal(this), opts = { type, binds, driverOptions };
     return async function execSqlFromFile(sql) {
       return await sqls.at.dbs.exec(fpth, sql, opts, frags);
     };

@@ -82,7 +82,7 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   isAutocommit(opts) {
-    return opts && opts.hasOwnProperty('autocommit') ? opts.autocommit : this.driverOptions && this.driverOptions.autocommit;
+    return opts && opts.driverOptions && opts.driverOptions.hasOwnProperty('autocommit') ? opts.driverOptions.autocommit : this.driverOptions && this.driverOptions.autocommit;
   }
 
   /**
