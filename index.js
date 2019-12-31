@@ -92,7 +92,55 @@ const COMPARE = Object.freeze({
  */
 
  /**
-  * Options that are passed to generated/prepared SQL functions
+  * Private options for global {@link Manager} use
+  * @typedef {Object} Manager~PrivateOptions
+  * @property {String} username The username to connect to the database
+  * @property {String} password The password to connect to the database
+  * @property {String} [host] The host to connect to for the database
+  * @property {String} [port] The port to connect to for the database (when not included in the host)
+  * @property {String} [protocol] The protocol to use when connecting to the database
+  * @property {String} [privatePath] The private path set by an originating {@link Manager} constructor (when not already set) that may be used by an implementing {@link Dialect} for private data use
+  * (e.g. `TNS` files, etc.)
+  */
+
+ /**
+  * Options for connections used by {@link Manager}
+  * @typedef {Object} Manager~ConnectionOptions
+  * @property {String} id Identifies the connection within a {@link Manager~PrivateOptions}
+  * @property {String} dialect The database dialect (e.g. mysql, mssql, oracle, etc.)
+  * @property {String} name The name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
+  * connection container `manager.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
+  * @property {String} [dir=name] The alternative dir where `*.sql` files will be found relative to `mainPath` passed into a {@link Manager} constructor. The directory path will be used as the basis
+  * for generating SQL statements from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
+  * within the file name with the last entry as the executable {@link Manager~PreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
+  * as "mgr.db.conn1.user.team.details()". But when `dir` is set to "myDir" the SQL files will be loaded from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection
+  * name "conn1".
+  * @property {Float} [version] A version that can be used for version substitutions within an SQL statement
+  * @property {String} [service] The service name defined by the underlying database (may be required depending on the implementing {@link Dialect}
+  * @property {Object} [binds] The global object that contains bind variable values that will be included in all SQL calls made under the connection for parameter `binds` if not overridden
+  * by individual "binds" passed into the {@link Manager~PreparedFunction}
+  * @property {Object} [substitutes] Key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
+  * @property {String} [host] The database host override for a value specified in {@link Manager~PrivateOptions}
+  * @property {String} [port] The database port override for a value specified in {@link Manager~PrivateOptions}
+  * @property {String} [protocol] The database protocol override for a value specified in {@link Manager~PrivateOptions}
+  * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
+  * @property {Object} [pool] The connection pool options (__overrides any `driverOptions` that may pertain the pool__)
+  * @property {Integer} [pool.max] The maximum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool max__)
+  * @property {Integer} [pool.min] The minumum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool min__)
+  * @property {Integer} [pool.idle] The maximum time, in milliseconds, that a connection can be idle before being released (__overrides any `driverOptions` that may pertain the pool idle__)
+  * @property {Integer} [pool.increment] The number of connections that are opened whenever a connection request exceeds the number of currently open connections
+  * (__overrides any `driverOptions` that may pertain the pool increment__)
+  * @property {Integer} [pool.timeout] The number of milliseconds that a connection request should wait in the queue before the request is terminated
+  * (__overrides any `driverOptions` that may pertain the pool timeout__)
+  * @property {String} [pool.alias] __When supported__, the alias of this pool in the connection pool cache (__overrides any `driverOptions` that may pertain the pool alias__)
+  * @property {(Boolean | String[])} [log] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the log output. Explicity set to `false` to disable
+  * connection _log_ level logging even if it is turned on via the {@link Manager}.
+  * @property {(Boolean | String[])} [logError] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the error log output. Explicity set to `false` to disable
+  * connection _error_ level logging even if it is turned on via the {@link Manager}.
+  */
+
+ /**
+  * Options that are passed to generated {@link Manager~PreparedFunction}
   * @typedef {Object} Manager~ExecOptions
   * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
   * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
@@ -100,9 +148,9 @@ const COMPARE = Object.freeze({
   * @property {Integer} [numOfIterations] The number of times the SQL should be executed. When supported, should take less round-trips back to the DB
   * rather than calling generated SQL functions multiple times.
   * @property {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned rather then thrown
-  * @property {Object} [driverOptions] Options that may override the connection `driverOptions` passed into the {@link Manager} constructor
+  * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
   */
- // TODO : @param {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
+ // TODO : @property {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
 
  /**
   * Generated/prepared SQL function
@@ -124,42 +172,21 @@ class Manager {
 
   /**
   * Creates a new database manager. Vendor-specific implementations should have constructors that accept properties defined by {@link Dialect}.
-  * @param {Object} conf the configuration
+  * @param {Object} conf The configuration options
   * @param {String} [conf.mainPath=require.main] root directory starting point to look for SQL files (defaults to `require.main` path or `process.cwd()`)
   * @param {String} [conf.privatePath=process.cwd()] current working directory where generated files will be located (if any)
-  * @param {Object} conf.univ the universal configuration that, for security and sharing puposes, remains external to an application
-  * @param {Object} conf.univ.db the database configuration that contains connection ID objects that match the connection IDs of each of the `conf.db.connections` - each connection object should contain a
-  * "host", "username" and "password" property that will be used to connect to the underlying database (e.g. { db: myConnId: { host: "someDbhost.example.com", username: 'someUser', password: 'somePass' } })
-  * @param {Object} conf.db the database configuration
-  * @param {Object} conf.dialects an object that contains dialect implementation details where each property name matches a dialect name and the value contains either the module class or a string that points to the
-  * a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`). When using a directory path the dialect path will be prefixed with `process.cwd()` before loading.
-  * @param {Object[]} conf.db.connections the connections that will be configured
-  * @param {String} conf.db.connections[].id identifies the connection within the passed `conf.univ.db`
-  * @param {String} conf.db.connections[].name the name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
-  * connection container `manager.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
-  * @param {String} [conf.db.connections[].dir=connection.name] the alternative dir where `*.sql` files will be found relative to `mainPath`. The directory path will be used as the basis for generating SQL statements
-  * from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
-  * within the file name with the last entry as the executable {@link Manager~PreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
-  * as "mgr.db.conn1.user.team.details()". But when `dir` is set to "myDir" the SQL files will be loaded from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection name
-  * "conn1".
-  * @param {Float} [conf.db.connections[].version] a version that can be used for replacement selection within the SQL (see `binds` section for more details)
-  * @param {String} [conf.db.connections[].service] the service name defined by the underlying database (must define if SID is not defined)
-  * @param {String} [conf.db.connections[].sid] the SID defined by the underlying database (use only when supported, but service is preferred)
-  * @param {Object} [conf.db.connections[].binds] global object that contains parameter values that will be included in all SQL calls made under the connection for parameter `binds` if not overridden
-  * by individual "binds" passed into the SQL function
-  * @param {Object} [conf.db.connections[].substitutes] key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
-  * @param {Object} conf.db.connections[].sql the object that contains the SQL connection options (excluding username/password)
-  * @param {String} [conf.db.connections[].sql.host] the database host override from conf.univ.db
-  * @param {String} conf.db.connections[].sql.dialect the database dialect (e.g. mysql, mssql, oracle, etc.)
-  * @param {Object} [conf.db.connections[].sql.driverOptions] options for the specified dialect passed directly into the {@link Dialect} driver
-  * @param {Object} [conf.db.connections[].sql.pool] the connection pool options
-  * @param {Integer} [conf.db.connections[].sql.pool.max] the maximum number of connections in the pool
-  * @param {Integer} [conf.db.connections[].sql.pool.min] the minumum number of connections in the pool
-  * @param {Integer} [conf.db.connections[].sql.pool.idle] the maximum time, in milliseconds, that a connection can be idle before being released
-  * @param {String[]} [conf.db.connections[].log] additional logging parameters passed to the `infoLogger`/`errorLogger` function log activity (will also append additional names that identify the connection)
+  * @param {Object} conf.univ The universal configuration that, for security and sharing purposes, remains external to an application
+  * @param {Object} conf.univ.db The database options that contain _private_ sensitive configuration. Each property should correspond to a {@link Manager~PrivateOptions} instance and the property name should
+  * be linked to a {@link Manager~ConnectionOptions} `id` within `conf.db.connections`. Each {@link Manager~PrivateOptions} instance will be used to connect to the underlying database
+  * (e.g. `{ db: myConnId: { host: "someDbhost.example.com", username: 'someUser', password: 'somePass' } }`)
+  * @param {Object} conf.db The _public_ facing database configuration
+  * @param {Object} conf.db.dialects An object that contains {@link Dialect} implementation details where each property name matches a dialect name and the value contains either the module class or a string
+  * that points to a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`). When using a directory path the dialect path will be prefixed with
+  * `process.cwd()` before loading.
+  * @param {Manager~ConnectionOptions[]} conf.db.connections the connections options that will be used
   * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
-  * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging
-  * (pass `true` to use the console)
+  * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
+  * Pass `true` to use the console. Omit to disable logging altogether.
   */
   constructor(conf, cache, logging) {
     if (!conf) throw new Error('Database configuration is required');
@@ -172,36 +199,38 @@ class Manager {
     mgr.at.logError = logging === true ? generateLogger(console.error, ['db', 'error']) : (logging && logging(['db', 'error'])) || console.error;
     mgr.at.log = logging === true ? generateLogger(console.log, ['db']) : (logging && logging(['db'])) || console.log;
     //const reserved = Object.getOwnPropertyNames(Manager.prototype);
-    for (let i = 0, conn, def, dbx, dlct, track = {}; i < connCnt; ++i) {
+    for (let i = 0, conn, priv, dialect, dlct, track = {}; i < connCnt; ++i) {
       conn = conf.db.connections[i];
       if (!conn.id) throw new Error(`Connection at index ${i} must have and "id"`);
-      def = conf.univ.db[conn.id]; // pull host/credentials from external conf resource
-      if (!def) throw new Error(`Connection at index ${i} has invalid "id": ${conn.id}`);
-      conn.sql.host = conn.sql.host || def.host;
-      dlct = conn.sql.dialect.toLowerCase();
+      priv = conf.univ.db[conn.id]; // pull host/credentials from external conf resource
+      if (!priv) throw new Error(`Connection at index ${i} has invalid "id": ${conn.id} that cannot be found within the provided "conf.univ.db"`);
+      priv = JSON.parse(JSON.stringify(conf.univ.db[conn.id]));
+      priv.privatePath = privatePath;
+      conn.host = conn.host || priv.host;
+      dlct = conn.dialect.toLowerCase();
       if (!conf.db.dialects.hasOwnProperty(dlct)) {
-        throw new Error(`Database configuration.db.dialects does not contain an implementation definition/module for ${dlct} at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
+        throw new Error(`Database configuration.db.dialects does not contain an implementation definition/module for ${dlct} at connection index ${i}/ID ${conn.id} for host ${conn.host}`);
       }
       if (typeof conf.db.dialects[dlct] === 'string') {
         if (/^[a-z@]/i.test(conf.db.dialects[dlct])) conf.db.dialects[dlct] = require(conf.db.dialects[dlct]);
         else conf.db.dialects[dlct] = require(Path.join(process.cwd(), conf.db.dialects[dlct]));
       }
-      //if (!(conf.db.dialects[dlct] instanceof Dialect)) throw new Error(`Database dialect for ${dlct} is not an instance of a sqler "${Dialect.constructor.name}" at connection index ${i}/ID ${conn.id} for host ${conn.sql.host}`);
-      if (conn.sql.log !== false && !conn.sql.log) conn.sql.log = [];
-      if (conn.sql.logError !== false && !conn.sql.logError) conn.sql.logError = [];
-      if (conn.sql.log !== false) {
-        let ltags = [...conn.sql.log, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
-        conn.sql.logging = logging === true ? generateLogger(console.log, ltags) : logging && logging(ltags); // override dbx non-error logging
+      //if (!(conf.db.dialects[dlct] instanceof Dialect)) throw new Error(`Database dialect for ${dlct} is not an instance of a sqler "${Dialect.constructor.name}" at connection index ${i}/ID ${conn.id} for host ${conn.host}`);
+      if (conn.log !== false && !conn.log) conn.log = [];
+      if (conn.logError !== false && !conn.logError) conn.logError = [];
+      if (conn.log !== false) {
+        let ltags = [...conn.log, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
+        conn.logging = logging === true ? generateLogger(console.log, ltags) : logging && logging(ltags); // override dialect non-error logging
       }
-      if (conn.sql.logError !== false) {
-        let ltags = [...conn.sql.logError, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
-        conn.sql.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dbx error logging
+      if (conn.logError !== false) {
+        let ltags = [...conn.logError, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
+        conn.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dialect error logging
       }
-      dbx = new conf.db.dialects[dlct](def.username, def.password, conn.sql, conn.service, conn.sid, privatePath, track, conn.sql.errorLogging, conn.sql.logging, conf.debug);
+      dialect = new conf.db.dialects[dlct](priv, conn, track, conn.errorLogging, conn.logging, conf.debug);
       // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
       if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
       //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
-      mgr.at.sqls[i] = new SQLS(mainPath, cache, conn.sql, (mgr.this[ns][conn.name] = {}), new DBS(dbx, conf, conn), conn);
+      mgr.at.sqls[i] = new SQLS(mainPath, cache, conn, (mgr.this[ns][conn.name] = {}), new DBS(dialect, conn));
     }
   }
 
@@ -322,24 +351,22 @@ class SQLS {
    * @constructs SQLS
    * @param {String} sqlBasePth the absolute path that SQL files will be included
    * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
-   * @param {Object} psopts options for prepared statements
-   * @param {Object} psopts.substitutes key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
+   * @param {Manager~ConnectionOptions} conn options for the prepared statements
    * @param {Object} db the object where SQL retrieval methods will be stored (by file name parts separated by a period- except the file extension)
    * @param {DBS} dbs the database service to use
-   * @param {Object} conn the connection configuration
    */
-  constructor(sqlBasePth, cache, psopts, db, dbs, conn) {
+  constructor(sqlBasePth, cache, conn, db, dbs) {
     if (!conn.name) throw new Error(`Connection ${conn.id} must have a name`);
 
     const sqls = internal(this);
     sqls.at.connectionName = conn.name;
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
     sqls.at.cache = cache;
-    sqls.at.subs = psopts && psopts.substitutes;
     sqls.at.subrxs = sqls.at.subs && [];
     sqls.at.db = db;
     sqls.at.dbs = dbs;
     sqls.at.conn = conn;
+    sqls.at.subs = conn.substitutes;
     if (sqls.at.subs) for (let key in sqls.at.subs) sqls.at.subrxs.push({ from: new RegExp(key, 'g'), to: sqls.at.subs[key] }); // turn text value into global regexp
   }
 
@@ -366,7 +393,7 @@ class SQLS {
           nm = files[fi].replace(/[^0-9a-zA-Z\.]/g, '_');
           ns = nm.split('.');
           ext = ns.length > 1 ? ns.pop() : '';
-          nm = `${sqls.at.conn.sql.dialect}_${sqls.at.conn.name}_${pnm ? `${pnm}_` : ''}${ns.join('_')}`;
+          nm = `${sqls.at.conn.dialect}_${sqls.at.conn.name}_${pnm ? `${pnm}_` : ''}${ns.join('_')}`;
           for (let ni = 0, nl = ns.length, so = cont; ni < nl; ++ni) {
             so[ns[ni]] = so[ns[ni]] || (ni < nl - 1 ? {} : await sqls.this.prepared(nm, pth, ext));
             so = so[ns[ni]];
@@ -374,7 +401,7 @@ class SQLS {
         }
         await Promise.all(proms);
       } catch (err) {
-        if (sqls.at.conn.sql.erroLogging) sqls.at.conn.sql.erroLogging(`Failed to build SQL statements from files in directory ${pth || pdir}`, err);
+        if (sqls.at.conn.erroLogging) sqls.at.conn.erroLogging(`Failed to build SQL statements from files in directory ${pth || pdir}`, err);
         throw err;
       }
     };
@@ -391,11 +418,11 @@ class SQLS {
    */
   async prepared(name, fpth, ext) {
     const sqls = internal(this);
-    if (sqls.at.conn.sql.logging) sqls.at.conn.sql.logging(`Generating prepared statement for ${fpth} at name ${name}`);
+    if (sqls.at.conn.logging) sqls.at.conn.logging(`Generating prepared statement for ${fpth} at name ${name}`);
     let crud = Path.parse(fpth).name.match(/[^\.]*/)[0].toUpperCase();
     if (!CRUD_TYPES.includes(crud)) crud = null;
-    if (sqls.at.conn.sql.logging) {
-      sqls.at.conn.sql.logging(`Generating prepared statement for ${fpth} at name ${name}${
+    if (sqls.at.conn.logging) {
+      sqls.at.conn.logging(`Generating prepared statement for ${fpth} at name ${name}${
         crud ? '' : ` (statement execution must include "opts.type" set to one of ${CRUD_TYPES.join(',')} since the SQL file path is not prefixed with the type)`}`);
     }
     // cache the SQL statement capture in order to accommodate dynamic file updates on expiration
@@ -407,14 +434,14 @@ class SQLS {
         let sql;
         const cached = await sqls.at.cache.get(id);
         if (!cached || !cached.item) {
-          if (sqls.at.conn.sql.logging) sqls.at.conn.sql.logging(`Refreshing cached ${fpth} at ID ${id}`);
+          if (sqls.at.conn.logging) sqls.at.conn.logging(`Refreshing cached ${fpth} at ID ${id}`);
           sql = await readSqlFile();
           sqls.at.cache.set(id, sql); // no need to await set
         } else sql = cached.item;
         return await execFn(sql);
       };
     } else {
-      if (sqls.at.conn.sql.logging) sqls.at.conn.sql.logging(`Setting static ${fpth} at "${name}"`);
+      if (sqls.at.conn.logging) sqls.at.conn.logging(`Setting static ${fpth} at "${name}"`);
       const sql = await readSqlFile();
       sqls.at.stms.methods[name][ext] = async function staticSql(opts, execFn) { // execute the SQL statement with static statements
         return await execFn(sql);
@@ -515,18 +542,15 @@ class DBS {
   /**
    * Database service constructor
    * @constructs DBS
-   * @param {Object} dbx the database service implementation/executor to use
-   * @param {Object} conf the application configuration profile
-   * @param {Object} [conn] the connection configuration
+   * @param {Dialect} dialect the database dialect implementation/executor to use
+   * @param {Manager~ConnectionOptions} conn the connection options
    */
-  constructor(dbx, conf, conn) {
+  constructor(dialect, conn) {
     const dbs = internal(this);
-    dbs.at.dbx = dbx;
-    dbs.at.conf = conf;
-    dbs.at.conn = conn;
-    dbs.at.errorLogging = conn.sql.errorLogging;
-    dbs.at.logging = conn.sql.logging;
-    dbs.at.dialect = conn.sql.dialect.toLowerCase();
+    dbs.at.dialect = dialect;
+    dbs.at.dialectName = conn.dialect && conn.dialect.toLowerCase();
+    dbs.at.errorLogging = conn && conn.errorLogging;
+    dbs.at.logging = conn && conn.logging;
     dbs.at.version = conn.version || 0;
     dbs.at.pending = 0;
   }
@@ -538,7 +562,7 @@ class DBS {
    */
   async init(opts) {
     const dbs = internal(this);
-    return await dbs.at.dbx.init(opts);
+    return await dbs.at.dialect.init(opts);
   }
 
   /**
@@ -558,16 +582,16 @@ class DBS {
     }
     let rslt;
     try {
-      rslt = await dbs.at.dbx.exec(sqlf, generateDbsOpts(dbs, 'exec', opts), frags); // execute the prepared SQL statement
+      rslt = await dbs.at.dialect.exec(sqlf, generateDbsOpts(dbs, 'exec', opts), frags); // execute the prepared SQL statement
     } catch (err) {
       if (dbs.at.errorLogging) {
-        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
+        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
       }
       if (opts.returnErrors) return err;
       else throw err;
     }
     if (dbs.at.logging) {
-      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.length) || 0} records (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
+      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.length) || 0} records (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
     }
     return rslt;
   }
@@ -591,7 +615,7 @@ class DBS {
       return keys || (pkey + key);
     });
     sql = sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[\!(?!\[\[\!)\s*(\w+)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[\!\]\]((?:\r?\n|\n)*)/g, function sqlDiaRpl(match, lb1, key, fsql, lb2) {
-      return (key && key.toLowerCase() === dbs.at.dialect && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
+      return (key && key.toLowerCase() === dbs.at.dialectName && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });
     sql = sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[version(?!\[\[version)\s*(=|<=?|>=?|<>)\s*[+-]?(\d+\.?\d*)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[version\]\]((?:\r?\n|\n)*)/gi, function sqlVerRpl(match, lb1, key, ver, fsql, lb2) {
       return (key && ver && !isNaN(ver = parseFloat(ver)) && COMPARE[key](dbs.at.version, ver) && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
@@ -606,7 +630,7 @@ class DBS {
    */
   async commit() {
     const dbs = internal(this);
-    const rslt = await dbs.at.dbx.commit(generateDbsOpts(dbs, 'commit'));
+    const rslt = await dbs.at.dialect.commit(generateDbsOpts(dbs, 'commit'));
     dbs.at.pending = 0;
     return rslt;
   }
@@ -616,7 +640,7 @@ class DBS {
    */
   async rollback() {
     const dbs = internal(this);
-    const rslt = dbs.at.dbx.rollback(generateDbsOpts(dbs, 'rollback'));
+    const rslt = dbs.at.dialect.rollback(generateDbsOpts(dbs, 'rollback'));
     dbs.at.pending = 0;
     return rslt;
   }
@@ -626,7 +650,7 @@ class DBS {
    */
   async close() {
     const dbs = internal(this);
-    const rslt = await dbs.at.dbx.close(generateDbsOpts(dbs, 'close'));
+    const rslt = await dbs.at.dialect.close(generateDbsOpts(dbs, 'close'));
     dbs.at.pending = 0;
     return rslt;
   }
@@ -651,7 +675,7 @@ class DBS {
 function generateDbsOpts(dbs, operation, opts) {
   const ropts = opts || {};
   if (operation === 'exec') {
-    dbs.at.pending += opts.type === 'READ' || dbs.at.dbx.isAutocommit(opts) ? 0 : 1;
+    dbs.at.pending += opts.type === 'READ' || dbs.at.dialect.isAutocommit(opts) ? 0 : 1;
   }
   ropts.sqler = { tx: { pending: dbs.at.pending } };
   return ropts;

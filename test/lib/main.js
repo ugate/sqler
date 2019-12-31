@@ -92,12 +92,10 @@ function getConf() {
           "name": "tst",
           "dir": "db",
           "service": "TESTSRV",
-          "sql": {
-            "dialect": "test",
-            "driverOptions": {
-              "numOfPreparedStmts": 7,
-              "autocommit": false
-            }
+          "dialect": "test",
+          "driverOptions": {
+            "numOfPreparedStmts": 7,
+            "autocommit": false
           }
         }
       ]
@@ -225,7 +223,7 @@ async function testCUD(mgr, connName, conf, xopts) {
   let autocommit = xopts && xopts.driverOptions && xopts.driverOptions.autocommit;
   if (!xopts || !xopts.driverOptions || !xopts.driverOptions.hasOwnProperty('autocommit')) {
     const tst = getConnConf(conf, connName);
-    autocommit = tst.sql.driverOptions && tst.sql.driverOptions.autocommit;
+    autocommit = tst.driverOptions && tst.driverOptions.autocommit;
   }
   
   let pendCnt = 0, cudRslt, label;

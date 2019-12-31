@@ -67,9 +67,7 @@ const conf = {
         "name": "fin",
         "dir": "db/finance",
         "service": "MYSRV",
-        "sql": {
-          "dialect": dialect
-        }
+        "dialect": dialect
       }
     ]
   }

@@ -11,8 +11,8 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  constructor(username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug) {
-    super(username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug);
+  constructor(priv, connConf, track, errorLogger, logger, debug) {
+    super(priv, connConf, track, errorLogger, logger, debug);
     this.testPending = 0;
   }
 
@@ -21,7 +21,7 @@ class TestDialect extends Dialect {
    */
   async init(opts) {
     expect(opts, 'opts').to.be.object();
-    expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(this.sqlConf.driverOptions && this.sqlConf.driverOptions.numOfPreparedStmts);
+    expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(this.connConf.driverOptions && this.connConf.driverOptions.numOfPreparedStmts);
     return true;
   }
 
@@ -83,7 +83,7 @@ class TestDialect extends Dialect {
    */
   isAutocommit(opts) {
     return opts && opts.driverOptions && opts.driverOptions.hasOwnProperty('autocommit') ? 
-      opts.driverOptions.autocommit : this.sqlConf && this.sqlConf.driverOptions && this.sqlConf.driverOptions.autocommit;
+      opts.driverOptions.autocommit : this.connConf && this.connConf.driverOptions && this.connConf.driverOptions.autocommit;
   }
 
   /**
