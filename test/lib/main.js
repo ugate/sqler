@@ -20,23 +20,49 @@ class Tester {
 
   static async beforeEach() {
     const cch = priv.cache;
-    priv.cache = null;
+    priv.mgr = priv.cache = null;
     if (cch && cch.start) await cch.start();
   }
 
   static async afterEach() {
-    const cch = priv.cache;
-    priv.cache = null;
-    if (cch && cch.stop) await cch.stop();
+    const mgr = priv.mgr, cch = priv.cache, error = priv.error;
+    priv.mgr = priv.cache = priv.error = null;
+    const proms = [];
+    if (mgr && !error) proms.push(testOperation('close', mgr, 'tst', 1));
+    if (cch && cch.stop) proms.push(cch.stop());
+    return Promise.all(proms);
   }
 
   static async noCache() {
-    return testSql();
+    const conf = getConf(), connName = 'tst';
+    await initManager(conf);
+
+    try {
+      await testRead(priv.mgr, connName);
+    } catch (err) {
+      priv.error = err;
+      throw err;
+    }
   }
 
   static async intervalCache() {
     const cacheOpts = { expiresIn: 100 };
-    return testSql(new IntervalCache(cacheOpts), cacheOpts);
+    const conf = getConf(), connName = 'tst';
+    await initManager(conf, new IntervalCache(cacheOpts));
+
+    try {
+      await testRead(priv.mgr, connName, priv.cache, cacheOpts);
+
+      let xopts = createExecOpts(), pendingCount;
+      pendingCount = await testCUD(priv.mgr, connName, conf, xopts);
+      await testOperation('commit', priv.mgr, connName, pendingCount);
+
+      // TODO : xopts.autocommit = true;
+      // TODO : pendingCount = await testCUD(priv.mgr, connName, conf, xopts);
+    } catch (err) {
+      priv.error = err;
+      throw err;
+    }
   }
 }
 
@@ -66,7 +92,11 @@ function getConf() {
           "dir": "db",
           "service": "TESTSRV",
           "sql": {
-            "dialect": "test"
+            "dialect": "test",
+            "driverOptions": {
+              "numOfPreparedStmts": 7,
+              "autocommit": false
+            }
           }
         }
       ]
@@ -76,62 +106,153 @@ function getConf() {
 }
 
 /**
- * Tests that SQL statements work with and w/o {@link Cache} by re-writting the SQL file to see if the cahce picks it up
- * @param {Cache} [cache] the {@link Cache} that will be used for SQL statements
- * @param {Object} [cacheOpts] the options that were used on the specified {@link Cache}
+ * @returns {Object} The test execution options to pass into {@link Manager.execute}
  */
-async function testSql(cache, cacheOpts) {
-  if (LOGGER.info) LOGGER.info(`Begin basic test`);
-    
-  const conf = getConf();
+function createExecOpts() {
+  return { binds: { someCol1: 1, someCol2: 2, someCol3: 3 } };
+}
+
+/**
+ * Gets a connection by name in a specified configuration
+ * @param {Object} conf The {@link #getConf} object
+ * @param {String} name The connection name to find
+ * @returns {Object} The connection configuration object that matches the specified name
+ */
+function getConnConf(conf, name) {
+  for (let conn of conf.db.connections) {
+    if (conn.name === name) return conn;
+  }
+}
+
+/**
+ * Sets a generated manager using the specified cache and validates the test SQL functions are generated
+ * @param {Object} conf The manager configuration
+ * @param {Cache} [cache] The cache to use for the manager
+ */
+async function initManager(conf, cache) {
   priv.cache = cache;
   priv.mgr = new Manager(conf, priv.cache, !!LOGGER.info);
   await priv.mgr.init();
 
-  let error;
+  expect(priv.mgr.db, 'priv.mgr.db').to.be.object();
+  expect(priv.mgr.db.tst, 'priv.mgr.db.tst').to.be.object();
+
+  expect(priv.mgr.db.tst.read, 'priv.mgr.db.tst.read').to.be.object();
+  expect(priv.mgr.db.tst.read.some, 'priv.mgr.db.tst.read.some').to.be.object();
+  expect(priv.mgr.db.tst.read.some.tables, 'priv.mgr.db.tst.read.some.tables').to.be.function();
+
+  expect(priv.mgr.db.tst.finance, 'priv.mgr.db.tst.finance').to.be.object();
+
+  expect(priv.mgr.db.tst.finance.read, 'priv.mgr.db.tst.finance.read').to.be.object();
+  expect(priv.mgr.db.tst.finance.read.annual, 'priv.mgr.db.tst.finance.read.annual').to.be.object();
+  expect(priv.mgr.db.tst.finance.read.annual.report, 'priv.mgr.db.tst.finance.read.annual.report').to.be.function();
+
+  expect(priv.mgr.db.tst.finance.create, 'priv.mgr.db.tst.finance.create').to.be.object();
+  expect(priv.mgr.db.tst.finance.create.annual, 'priv.mgr.db.tst.finance.create.annual').to.be.object();
+  expect(priv.mgr.db.tst.finance.create.annual.report, 'priv.mgr.db.tst.finance.create.annual.report').to.be.function();
+
+  expect(priv.mgr.db.tst.finance.ap, 'priv.mgr.db.tst.finance.ap').to.be.object();
+
+  expect(priv.mgr.db.tst.finance.ap.delete, 'priv.mgr.db.tst.finance.ap.delete').to.be.object();
+  expect(priv.mgr.db.tst.finance.ap.delete.audits, 'priv.mgr.db.tst.finance.ap.delete.audits').to.be.function();
+
+  expect(priv.mgr.db.tst.finance.ap.update, 'priv.mgr.db.tst.finance.ap.update').to.be.object();
+  expect(priv.mgr.db.tst.finance.ap.update.audits, 'priv.mgr.db.tst.finance.ap.update.audits').to.be.function();
+
+  expect(priv.mgr.db.tst.finance.ar, 'priv.mgr.db.tst.finance.ar').to.be.object();
+
+  expect(priv.mgr.db.tst.finance.ar.delete, 'priv.mgr.db.tst.finance.ar.delete').to.be.object();
+  expect(priv.mgr.db.tst.finance.ar.delete.audits, 'priv.mgr.db.tst.finance.ar.delete.audits').to.be.function();
+
+  expect(priv.mgr.db.tst.finance.ar.update, 'priv.mgr.db.tst.finance.ar.update').to.be.object();
+  expect(priv.mgr.db.tst.finance.ar.update.audits, 'priv.mgr.db.tst.finance.ar.update.audits').to.be.function();
+
+}
+
+/**
+ * Tests that `read` SQL statements work with and w/o {@link Cache} by re-writting the SQL file to see if the cahce picks it up
+ * @param {Manager} mgr The {@link Manager} that will be used
+ * @param {String} connName The connection name to use
+ * @param {Cache} [cache] the {@link Cache} that will be used for SQL statements
+ * @param {Object} [cacheOpts] the options that were used on the specified {@link Cache}
+ * @returns {(Error | undefined)} An error when the test fails
+ */
+async function testRead(mgr, connName, cache, cacheOpts) {
+  if (LOGGER.info) LOGGER.info(`Begin basic test`);
+
+  const opts = createExecOpts();
+  const rslt1 = await mgr.db[connName].read.some.tables(opts, ['test-frag']);
+  
+  expect(rslt1).to.be.array();
+  expect(rslt1).to.be.length(2); // two records should be returned w/o order by
+  if (LOGGER.info) LOGGER.info('BEFORE Cache Update:', rslt1);
+  
+  
+  // change the SQL file
+  const sql = (await sqlFile()).toString();
   try {
-    const opts = { binds: { someCol1: 1, someCol2: 2, someCol3: 3 } };
-    const rslt1 = await priv.mgr.db.tst.read.some.tables(opts, ['test-frag']);
-    
-    expect(rslt1).to.be.array();
-    expect(rslt1).to.be.length(2); // two records should be returned w/o order by
-    if (LOGGER.info) LOGGER.info('BEFORE Cache Update:', rslt1);
-    
-    
-    // change the SQL file
-    const sql = (await sqlFile()).toString();
-    try {
-      // update the file
-      await sqlFile(`${sql}\nORDER BY SOME_COL1`);
+    // update the file
+    await sqlFile(`${sql}\nORDER BY SOME_COL1`);
 
-      // wait for the the SQL statement to expire
-      await Labrat.wait(cacheOpts && cacheOpts.hasOwnProperty('expiresIn') ? cacheOpts.expiresIn : 1000);
+    // wait for the the SQL statement to expire
+    await Labrat.wait(cacheOpts && cacheOpts.hasOwnProperty('expiresIn') ? cacheOpts.expiresIn : 1000);
 
-      const frags = cache ? ['test-frag'] : null;
-      const rslt2 = await priv.mgr.db.tst.read.some.tables(opts, frags);
+    const frags = cache ? ['test-frag'] : null;
+    const rslt2 = await mgr.db[connName].read.some.tables(opts, frags);
 
-      expect(rslt2).to.be.array();
-      expect(rslt2).to.be.length(cache ? 1 : 2); // one record w/order by and updated by cache
-      if (LOGGER.info) LOGGER.info('AFTER Cahce Update:', rslt2);
+    expect(rslt2).to.be.array();
+    expect(rslt2).to.be.length(cache ? 1 : 2); // one record w/order by and updated by cache
+    if (LOGGER.info) LOGGER.info('AFTER Cahce Update:', rslt2);
 
-      const commitRslt = await priv.mgr.commit();
-      expect(commitRslt, 'DB commit result').to.be.object();
-      expect(commitRslt.tst, 'DB commit count').to.equal(0);
-
-    } finally {
-      await sqlFile(sql);
-    }
-  } catch (err) {
-    error = err;
-    throw err;
+    // no commits, only reads
+    await testOperation('pendingCommit', mgr, connName, 0);
+    await testOperation('commit', mgr, connName, 0);
   } finally {
-    if (!error) {
-      const closeRslt = await priv.mgr.close();
-      expect(closeRslt, 'DB close result').to.be.object();
-      expect(closeRslt.tst, 'DB close count').to.equal(1);
-    }
+    await sqlFile(sql);
   }
 }
+
+/**
+ * Tests create, update, delete
+ * @param {Manager} mgr The manager
+ * @param {String} connName The connection name to use
+ * @param {Object} conf The {@link #getConf} object
+ * @param {Manager~ExecOptions} xopts The execution options
+ * @returns {Integer} The number of pending commits
+ */
+async function testCUD(mgr, connName, conf, xopts) {
+  let autocommit = xopts && xopts.autocommit;
+  if (!xopts || !xopts.hasOwnProperty('autocommit')) {
+    const tst = getConnConf(conf, connName);
+    autocommit = tst.sql.driverOptions && tst.sql.driverOptions.autocommit;
+  }
+  
+  let pendCnt = 0, cudRslt;
+
+  cudRslt = await mgr.db.tst.finance.create.annual.report(xopts);
+  expect(cudRslt, 'mgr.db.tst.finance.create.annual.report() result').to.be.undefined();
+  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt);
+  
+  cudRslt = await mgr.db.tst.finance.ap.update.audits(xopts);
+  expect(cudRslt, 'mgr.db.tst.finance.ap.update.audits() result').to.be.undefined();
+  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt);
+
+  return pendCnt;
+}
+
+/**
+ * Tests if the specified operation and operation result
+ * @param {String} type The type of manager operation to test (e.g. `rollback`, `commit`, `close`, etc.)
+ * @param {String} connName The connection name to use
+ * @param {*} expected The expected result
+ * @returns {Object} The operation result
+ */
+async function testOperation(type, mgr, connName, expected) {
+  const rslt = await mgr[type]();
+  expect(rslt, `DB ${type} result`).to.be.object();
+  expect(rslt[connName], `DB ${type} result`).to.equal(expected);
+  return rslt;
+} 
 
 /**
  * Reads/writes test SQL file

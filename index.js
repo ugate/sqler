@@ -150,7 +150,7 @@ class Manager {
   * @param {Object} conf.db.connections[].sql the object that contains the SQL connection options (excluding username/password)
   * @param {String} [conf.db.connections[].sql.host] the database host override from conf.univ.db
   * @param {String} conf.db.connections[].sql.dialect the database dialect (e.g. mysql, mssql, oracle, etc.)
-  * @param {Object} [conf.db.connections[].sql.dialectOptions] options for the specified dialect passed directly into the {@link Dialect} driver
+  * @param {Object} [conf.db.connections[].sql.driverOptions] options for the specified dialect passed directly into the {@link Dialect} driver
   * @param {Object} [conf.db.connections[].sql.pool] the connection pool options
   * @param {Integer} [conf.db.connections[].sql.pool.max] the maximum number of connections in the pool
   * @param {Integer} [conf.db.connections[].sql.pool.min] the minumum number of connections in the pool
@@ -196,11 +196,12 @@ class Manager {
         let ltags = [...conn.sql.logError, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
         conn.sql.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dbx error logging
       }
-      dbx = new conf.db.dialects[dlct](def.username, def.password, conn.sql, conn.service, conn.sid, privatePath, track, conn.sql.errorLogging, conn.sql.logging, conf.debug);
+      dbx = new conf.db.dialects[dlct](conn.sql && conn.sql.driverOptions, def.username, def.password, conn.sql, conn.service, conn.sid,
+        privatePath, track, conn.sql.errorLogging, conn.sql.logging, conf.debug);
       // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
       if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
       //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
-      mgr.at.sqls[i] = new SQLS(mainPath, cache, conn.preparedSql, (mgr.this[ns][conn.name] = {}), new DBS(dbx, conf, conn), conn);
+      mgr.at.sqls[i] = new SQLS(mainPath, cache, conn.sql, (mgr.this[ns][conn.name] = {}), new DBS(dbx, conf, conn), conn);
     }
   }
 
@@ -244,6 +245,19 @@ class Manager {
     return operation(internal(this), 'rollback', opts, connNames);
   }
 
+   /**
+   * Determines the number of pending transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
+   * @param {Object} [opts={}] The operational options
+   * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
+   * `opts.executeInSeries`
+   * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
+   * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
+   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
+   */
+  async pendingCommit(opts, ...connNames) {
+    return operation(internal(this), 'pendingCommit', opts, connNames);
+  }
+ 
   /**
    * Closes all database pools/connections/etc.
    * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
@@ -278,7 +292,8 @@ async function operation(mgr, funcName, opts, connNames) {
   const ax = new Asynchro({}, true);
   const queue = sqli => {
     const func = () => {
-      return sqli[funcName]();
+      if (typeof sqli[funcName] === 'function') return sqli[funcName]();
+      return Promise.resolve(sqli[funcName]);
     };
     const hasOverride = opts.connections && opts.connections[name] && typeof opts.connections[name] === 'object' && opts.connections[name].hasOwnProperty('executeInSeries');
     if (hasOverride ? opts.connections[name].executeInSeries : opts.executeInSeries) {
@@ -469,6 +484,13 @@ class SQLS {
   }
 
   /**
+   * @returns {Integer} The number of executed transactions that are pending commit
+   */
+  get pendingCommit() {
+    return internal(this).at.dbs.pendingCommit;
+  }
+
+  /**
    * @returns {Integer} the number of prepared statements found in SQL files
    */
   get numOfPreparedStmts() {
@@ -535,8 +557,7 @@ class DBS {
     }
     let rslt;
     try {
-      dbs.at.pending += opts.type === 'READ' ? 0 : 1;
-      rslt = await dbs.at.dbx.exec(sqlf, generateDbsOpts(dbs, opts), frags); // execute the prepared SQL statement
+      rslt = await dbs.at.dbx.exec(sqlf, generateDbsOpts(dbs, 'exec', opts), frags); // execute the prepared SQL statement
     } catch (err) {
       if (dbs.at.errorLogging) {
         dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dbx.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dbx.lastConnectionInUseCount || 'N/A'})`);
@@ -584,7 +605,9 @@ class DBS {
    */
   async commit() {
     const dbs = internal(this);
-    return dbs.at.dbx.commit(generateDbsOpts(dbs));
+    const rslt = await dbs.at.dbx.commit(generateDbsOpts(dbs, 'commit'));
+    dbs.at.pending = 0;
+    return rslt;
   }
 
   /**
@@ -592,7 +615,9 @@ class DBS {
    */
   async rollback() {
     const dbs = internal(this);
-    return dbs.at.dbx.rollback(generateDbsOpts(dbs));
+    const rslt = dbs.at.dbx.rollback(generateDbsOpts(dbs, 'rollback'));
+    dbs.at.pending = 0;
+    return rslt;
   }
 
   /**
@@ -600,7 +625,17 @@ class DBS {
    */
   async close() {
     const dbs = internal(this);
-    return dbs.at.dbx.close(generateDbsOpts(dbs));
+    const rslt = await dbs.at.dbx.close(generateDbsOpts(dbs, 'close'));
+    dbs.at.pending = 0;
+    return rslt;
+  }
+
+  /**
+   * @returns {Integer} The number of executed transactions that are pending commit
+   */
+  get pendingCommit() {
+    const dbs = internal(this);
+    return dbs.at.pending;
   }
 }
 
@@ -608,12 +643,16 @@ class DBS {
  * Generates options for {@link DBS}
  * @private
  * @param {DBS} dbs The {@link DBS} state instance
+ * @param {String} operation The operaion for whcih the generated options are generated for (e.g. exec, commit, rollback, close, etc.)
  * @param {DialectOptions} [opts] Optional options where additional options will be set
  * @returns {DialectOptions} The {@link Dialect} options
  */
-function generateDbsOpts(dbs, opts) {
+function generateDbsOpts(dbs, operation, opts) {
   const ropts = opts || {};
-  ropts.tx = { pending: dbs.at.pending };
+  if (operation === 'exec') {
+    dbs.at.pending += opts.type === 'READ' || dbs.at.dbx.isAutocommit(opts) ? 0 : 1;
+  }
+  ropts.sqler = { tx: { pending: dbs.at.pending } };
   return ropts;
 }
 

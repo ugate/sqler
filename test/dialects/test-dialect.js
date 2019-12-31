@@ -11,8 +11,8 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  constructor(username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug) {
-    super(username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug);
+  constructor(driverOptions, username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug) {
+    super(driverOptions, username, password, sqlConf, name, type, privatePath, track, errorLogger, logger, debug);
     this.testPending = 0;
   }
 
@@ -21,7 +21,7 @@ class TestDialect extends Dialect {
    */
   async init(opts) {
     expect(opts, 'opts').to.be.object();
-    expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(7);
+    expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(this.driverOptions && this.driverOptions.numOfPreparedStmts);
     return true;
   }
 
@@ -29,7 +29,7 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async exec(sql, opts, frags) {
-    expectOpts(this, opts, true);
+    expectOpts(this, opts, 'exec');
     expect(opts.binds, 'opts.binds').to.be.object();
     expect(opts.binds, 'opts.binds').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
 
@@ -39,7 +39,9 @@ class TestDialect extends Dialect {
       expect(frags[0], 'frags[0]').to.equal(TestDialect.testMultiRecordFragKey);
     }
 
-    const cols = sql.match(/SELECT([\s\S]*?)FROM/i)[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
+    let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
+    if (!cols) return;
+    cols = cols[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
     const rcrd = {};
     let ci = 0;
     for (let col of cols) {
@@ -53,15 +55,17 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async commit(opts) {
-    expectOpts(this, opts);
-    return this.testPending = 0;
+    expectOpts(this, opts, 'commit');
+    const committed = this.testPending;
+    this.testPending = 0;
+    return committed;
   }
 
   /**
    * @inheritdoc
    */
   async rollback(opts) {
-    expectOpts(this, opts);
+    expectOpts(this, opts, 'rollback');
     return this.testPending = 0;
   }
 
@@ -69,9 +73,16 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async close(opts) {
-    expectOpts(this, opts);
+    expectOpts(this, opts, 'close');
     this.testPending = 0;
     return 1;
+  }
+
+  /**
+   * @inheritdoc
+   */
+  isAutocommit(opts) {
+    return opts && opts.hasOwnProperty('autocommit') ? opts.autocommit : this.driverOptions && this.driverOptions.autocommit;
   }
 
   /**
@@ -93,18 +104,19 @@ class TestDialect extends Dialect {
  * Expects options
  * @param {TestDialect} dialect The dialect instance being tested
  * @param {(DialectOptions | ExecOptions)} opts The expected options
- * @param {Boolean} isExec Flag indicating if the options are coming from {@link Dialect.exec}
+ * @param {String} operation The operation origin
  */
-function expectOpts(dialect, opts, isExec) {
+function expectOpts(dialect, opts, operation) {
   expect(opts, 'opts').to.be.object();
 
-  if (isExec) {
-    expect(Manager.OPERATION_TYPES, 'opts.type').to.have.part.include(opts.type);
-    dialect.testPending += opts.type === 'READ' ? 0 : 1;
+  if (operation === 'exec') {
+    expect(Manager.OPERATION_TYPES, `opts.type from "${operation}"`).to.have.part.include(opts.type);
+    dialect.testPending += opts.type === 'READ' || dialect.isAutocommit(opts) ? 0 : 1;
   }
 
-  expect(opts.tx, 'opts.tx').to.be.object();
-  expect(opts.tx.pending, 'opts.tx.pending').to.equal(dialect.testPending);
+  expect(opts.sqler, `opts.sqler from "${operation}"`).to.be.object();
+  expect(opts.sqler.tx, `opts.sqler.tx from "${operation}"`).to.be.object();
+  expect(opts.sqler.tx.pending, `opts.sqler.tx.pending from "${operation}"`).to.equal(dialect.testPending);
 }
 
 module.exports = TestDialect;
