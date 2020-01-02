@@ -677,7 +677,7 @@ function generateDbsOpts(dbs, operation, opts) {
   if (operation === 'exec') {
     dbs.at.pending += opts.type === 'READ' || dbs.at.dialect.isAutocommit(opts) ? 0 : 1;
   }
-  ropts.sqler = { tx: { pending: dbs.at.pending } };
+  ropts.tx = { pending: dbs.at.pending };
   return ropts;
 }
 

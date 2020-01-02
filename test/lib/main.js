@@ -232,9 +232,30 @@ async function testCUD(mgr, connName, conf, xopts) {
   label = 'CREATE mgr.db.tst.finance.create.annual.report()';
   expect(cudRslt, `${label} result`).to.be.undefined();
   await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+
+  cudRslt = await mgr.db.tst.finance.read.annual.report(xopts);
+  label = 'READ mgr.db.tst.finance.read.annual.report()';
+  expect(cudRslt, `${label} result`).to.be.array();
+  expect(cudRslt, `${label} result length`).to.be.length(2); // two records should be returned w/o order by
+  await testOperation('pendingCommit', mgr, connName, pendCnt, label);
   
   cudRslt = await mgr.db.tst.finance.ap.update.audits(xopts);
   label = 'UPDATE mgr.db.tst.finance.ap.update.audits()';
+  expect(cudRslt, `${label} result`).to.be.undefined();
+  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+
+  cudRslt = await mgr.db.tst.finance.ap.delete.audits(xopts);
+  label = 'DELETE mgr.db.tst.finance.ap.delete.audits()';
+  expect(cudRslt, `${label} result`).to.be.undefined();
+  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+
+  cudRslt = await mgr.db.tst.finance.ar.update.audits(xopts);
+  label = 'UPDATE mgr.db.tst.finance.ar.update.audits()';
+  expect(cudRslt, `${label} result`).to.be.undefined();
+  await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+
+  cudRslt = await mgr.db.tst.finance.ar.delete.audits(xopts);
+  label = 'DELETE mgr.db.tst.finance.ar.delete.audits()';
   expect(cudRslt, `${label} result`).to.be.undefined();
   await testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
 

@@ -115,9 +115,8 @@ function expectOpts(dialect, opts, operation) {
     dialect.testPending += opts.type === 'READ' || dialect.isAutocommit(opts) ? 0 : 1;
   }
 
-  expect(opts.sqler, `opts.sqler from "${operation}"`).to.be.object();
-  expect(opts.sqler.tx, `opts.sqler.tx from "${operation}"`).to.be.object();
-  expect(opts.sqler.tx.pending, `opts.sqler.tx.pending from "${operation}"`).to.equal(dialect.testPending);
+  expect(opts.tx, `opts.tx from "${operation}"`).to.be.object();
+  expect(opts.tx.pending, `opts.tx.pending from "${operation}"`).to.equal(dialect.testPending);
 }
 
 module.exports = TestDialect;
