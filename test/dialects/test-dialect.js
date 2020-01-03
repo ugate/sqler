@@ -14,6 +14,35 @@ class TestDialect extends Dialect {
   constructor(priv, connConf, track, errorLogger, logger, debug) {
     super(priv, connConf, track, errorLogger, logger, debug);
     this.testPending = 0;
+
+    expect(priv, 'priv').to.be.object();
+    expect(priv.host, 'priv.host').to.be.string();
+    expect(priv.host, 'priv.host.length').to.not.be.empty();
+    expect(priv.username, 'priv.username').to.be.string();
+    expect(priv.username, 'priv.username.length').to.not.be.empty();
+    expect(priv.password, 'priv.password').to.be.string();
+    expect(priv.password, 'priv.password.length').to.not.be.empty();
+
+    expect(connConf, 'connConf').to.be.object();
+    expect(connConf.id, 'connConf.id').to.be.string();
+    expect(connConf.id, 'connConf.id.length').to.not.be.empty();
+    expect(connConf.name, 'connConf.name').to.be.string();
+    expect(connConf.name, 'connConf.name.length').to.not.be.empty();
+    expect(connConf.dir, 'connConf.dir').to.be.string();
+    expect(connConf.dir, 'connConf.dir.length').to.not.be.empty();
+    expect(connConf.service, 'connConf.service').to.be.string();
+    expect(connConf.service, 'connConf.service.length').to.not.be.empty();
+    expect(connConf.dialect, 'connConf.dialect').to.be.string();
+    expect(connConf.dialect, 'connConf.dialect.length').to.not.be.empty();
+
+    expect(connConf.driverOptions, 'connConf.driverOptions').to.be.object();
+    expect(connConf.driverOptions.numOfPreparedStmts, 'connConf.driverOptions.numOfPreparedStmts').to.be.number();
+    expect(connConf.driverOptions.autocommit, 'connConf.driverOptions.autocommit').to.be.boolean();
+
+    expect(track, 'track').to.be.object();
+    expect(errorLogger, 'errorLogger').to.be.function();
+    expect(logger, 'logger').to.be.function();
+    expect(debug, 'debug').to.be.boolean();
   }
 
   /**
@@ -32,6 +61,15 @@ class TestDialect extends Dialect {
     expectOpts(this, opts, 'exec');
     expect(opts.binds, 'opts.binds').to.be.object();
     expect(opts.binds, 'opts.binds').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
+
+    if (frags) {
+      expect(frags, 'frags').to.be.array();
+      expect(frags, 'frags.length').to.not.be.empty();
+      for (let frag of frags) {
+        expect(frag, 'frag (iteration)').to.be.string();
+        expect(frag, 'frag (iteration) length').to.not.be.empty();
+      }
+    }
 
     const isSingleRecord = sql.includes(TestDialect.testSqlSingleRecordKey);
     if (isSingleRecord) { // only test for frags when returning a single record
