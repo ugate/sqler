@@ -227,7 +227,7 @@ class Manager {
         let ltags = [...conn.logError, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
         conn.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dialect error logging
       }
-      dialect = new conf.db.dialects[dlct](priv, conn, track, conn.errorLogging, conn.logging, conf.debug);
+      dialect = new conf.db.dialects[dlct](priv, conn, track, conn.errorLogging, conn.logging, conf.debug || false);
       // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
       if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
       //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
