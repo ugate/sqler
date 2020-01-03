@@ -30,7 +30,7 @@ In order to use `sqler` a simple implementation of [Dialect](https://ugate.githu
 
 - [SQL Server](https://github.com/ugate/sqler-mssql)
 - [Oracle](https://github.com/ugate/sqler-oracle)
-- [Intersystems Caché](https://github.com/ugate/sqler-icache)
+- [ODBC](https://github.com/ugate/sqler-odbc)
 
 Example<sub id="example"></sub>:
 ```sql

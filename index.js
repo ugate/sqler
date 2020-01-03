@@ -91,76 +91,106 @@ const COMPARE = Object.freeze({
  * // be refreshed/re-read every 60 seconds
  */
 
- /**
-  * Private options for global {@link Manager} use
-  * @typedef {Object} Manager~PrivateOptions
-  * @property {String} username The username to connect to the database
-  * @property {String} password The password to connect to the database
-  * @property {String} [host] The host to connect to for the database
-  * @property {String} [port] The port to connect to for the database (when not included in the host)
-  * @property {String} [protocol] The protocol to use when connecting to the database
-  * @property {String} [privatePath] The private path set by an originating {@link Manager} constructor (when not already set) that may be used by an implementing {@link Dialect} for private data use
-  * (e.g. `TNS` files, etc.)
-  */
+/**
+ * Private options for global {@link Manager} use
+ * @typedef {Object} Manager~PrivateOptions
+ * @property {String} username The username to connect to the database
+ * @property {String} password The password to connect to the database
+ * @property {String} [host] The host to connect to for the database
+ * @property {String} [port] The port to connect to for the database (when not included in the host)
+ * @property {String} [protocol] The protocol to use when connecting to the database
+ * @property {String} [privatePath] The private path set by an originating {@link Manager} constructor (when not already set) that may be used by an implementing {@link Dialect} for private data use
+ * (e.g. `TNS` files, etc.)
+ */
 
- /**
-  * Options for connections used by {@link Manager}
-  * @typedef {Object} Manager~ConnectionOptions
-  * @property {String} id Identifies the connection within a {@link Manager~PrivateOptions}
-  * @property {String} dialect The database dialect (e.g. mysql, mssql, oracle, etc.)
-  * @property {String} name The name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
-  * connection container `manager.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
-  * @property {String} [dir=name] The alternative dir where `*.sql` files will be found relative to `mainPath` passed into a {@link Manager} constructor. The directory path will be used as the basis
-  * for generating SQL statements from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
-  * within the file name with the last entry as the executable {@link Manager~PreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
-  * as "mgr.db.conn1.user.team.details()". But when `dir` is set to "myDir" the SQL files will be loaded from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection
-  * name "conn1".
-  * @property {Float} [version] A version that can be used for version substitutions within an SQL statement
-  * @property {String} [service] The service name defined by the underlying database (may be required depending on the implementing {@link Dialect}
-  * @property {Object} [binds] The global object that contains bind variable values that will be included in all SQL calls made under the connection for parameter `binds` if not overridden
-  * by individual "binds" passed into the {@link Manager~PreparedFunction}
-  * @property {Object} [substitutes] Key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
-  * @property {String} [host] The database host override for a value specified in {@link Manager~PrivateOptions}
-  * @property {String} [port] The database port override for a value specified in {@link Manager~PrivateOptions}
-  * @property {String} [protocol] The database protocol override for a value specified in {@link Manager~PrivateOptions}
-  * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
-  * @property {Object} [pool] The connection pool options (__overrides any `driverOptions` that may pertain the pool__)
-  * @property {Integer} [pool.max] The maximum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool max__)
-  * @property {Integer} [pool.min] The minumum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool min__)
-  * @property {Integer} [pool.idle] The maximum time, in milliseconds, that a connection can be idle before being released (__overrides any `driverOptions` that may pertain the pool idle__)
-  * @property {Integer} [pool.increment] The number of connections that are opened whenever a connection request exceeds the number of currently open connections
-  * (__overrides any `driverOptions` that may pertain the pool increment__)
-  * @property {Integer} [pool.timeout] The number of milliseconds that a connection request should wait in the queue before the request is terminated
-  * (__overrides any `driverOptions` that may pertain the pool timeout__)
-  * @property {String} [pool.alias] __When supported__, the alias of this pool in the connection pool cache (__overrides any `driverOptions` that may pertain the pool alias__)
-  * @property {(Boolean | String[])} [log] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the log output. Explicity set to `false` to disable
-  * connection _log_ level logging even if it is turned on via the {@link Manager}.
-  * @property {(Boolean | String[])} [logError] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the error log output. Explicity set to `false` to disable
-  * connection _error_ level logging even if it is turned on via the {@link Manager}.
-  */
+/**
+ * Configuration options for {@link Manager} use
+ * @typedef {Object} Manager~ConfigurationOptions
+ * @property {String} [mainPath] Root directory starting point to look for SQL files (defaults to `require.main` path or `process.cwd()`)
+ * @property {String} [privatePath] Current working directory where generated files will be located (if any, defaults to `process.cwd()`)
+ * @property {Object} db The _public_ facing database configuration
+ * @property {Object} db.dialects An object that contains {@link Dialect} implementation details where each property name matches a dialect name and the value contains either the module class or a string
+ * that points to a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`). When using a directory path the dialect path will be prefixed with
+ * `process.cwd()` before loading.
+ * @property {Manager~ConnectionOptions[]} db.connections The connections options that will be used.
+ * @property {Manager~UniversalOptions} univ The {@link Manager~UniversalOptions}
+ */
 
- /**
-  * Options that are passed to generated {@link Manager~PreparedFunction}
-  * @typedef {Object} Manager~ExecOptions
-  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
-  * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
-  * @property {Object} [binds] The key/value pair of replacement parameters that will be bound in the SQL statement
-  * @property {Integer} [numOfIterations] The number of times the SQL should be executed. When supported, should take less round-trips back to the DB
-  * rather than calling generated SQL functions multiple times.
-  * @property {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned rather then thrown
-  * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
-  */
+/**
+ * The universal configuration that, for security and sharing purposes, remains external to an application
+ * @typedef {Object} Manager~UniversalOptions
+ * @property {Object} db The database options that contain _private_ sensitive configuration. Each property should correspond to a {@link Manager~PrivateOptions} instance and the property name should
+ * be linked to a {@link Manager~ConnectionOptions} `id` within `conf.db.connections`. Each {@link Manager~PrivateOptions} instance will be used to connect to the underlying database
+ * (e.g. `{ db: myConnId: { host: "someDbhost.example.com", username: "someUser", password: "somePass" } }`)
+ */
+
+/**
+* Options for connections used by {@link Manager}
+ * @typedef {Object} Manager~ConnectionOptions
+ * @property {String} id Identifies the connection within a {@link Manager~PrivateOptions}
+ * @property {String} dialect The database dialect (e.g. mysql, mssql, oracle, etc.)
+ * @property {String} name The name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
+ * connection container `manager.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
+ * @property {String} [dir=name] The alternative dir where `*.sql` files will be found relative to `mainPath` passed into a {@link Manager} constructor. The directory path will be used as the basis
+ * for generating SQL statements from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
+ * within the file name with the last entry as the executable {@link Manager~PreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
+ * as "mgr.db.conn1.user.team.details()". But when `dir` is set to "myDir" the SQL files will be loaded from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection
+ * name "conn1".
+ * @property {Float} [version] A version that can be used for version substitutions within an SQL statement
+ * @property {String} [service] The service name defined by the underlying database (may be required depending on the implementing {@link Dialect}
+ * @property {Object} [binds] The global object that contains bind variable values that will be included in all SQL calls made under the connection for parameter `binds` if not overridden
+ * by individual "binds" passed into the {@link Manager~PreparedFunction}
+ * @property {Object} [substitutes] Key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
+ * @property {String} [host] The database host override for a value specified in {@link Manager~PrivateOptions}
+ * @property {String} [port] The database port override for a value specified in {@link Manager~PrivateOptions}
+ * @property {String} [protocol] The database protocol override for a value specified in {@link Manager~PrivateOptions}
+ * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
+ * @property {Object} [pool] The connection pool options (__overrides any `driverOptions` that may pertain the pool__)
+ * @property {Integer} [pool.max] The maximum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool max__)
+ * @property {Integer} [pool.min] The minumum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool min__)
+ * @property {Integer} [pool.idle] The maximum time, in milliseconds, that a connection can be idle before being released (__overrides any `driverOptions` that may pertain the pool idle__)
+ * @property {Integer} [pool.increment] The number of connections that are opened whenever a connection request exceeds the number of currently open connections
+ * (__overrides any `driverOptions` that may pertain the pool increment__)
+ * @property {Integer} [pool.timeout] The number of milliseconds that a connection request should wait in the queue before the request is terminated
+ * (__overrides any `driverOptions` that may pertain the pool timeout__)
+ * @property {String} [pool.alias] __When supported__, the alias of this pool in the connection pool cache (__overrides any `driverOptions` that may pertain the pool alias__)
+ * @property {(Boolean | String[])} [log] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the log output. Explicity set to `false` to disable
+ * connection _log_ level logging even if it is turned on via the {@link Manager}.
+ * @property {(Boolean | String[])} [logError] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the error log output. Explicity set to `false` to disable
+ * connection _error_ level logging even if it is turned on via the {@link Manager}.
+ */
+
+/**
+ * Options that are passed to generated {@link Manager~PreparedFunction}
+ * @typedef {Object} Manager~ExecOptions
+ * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
+ * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
+ * @property {Object} [binds] The key/value pair of replacement parameters that will be bound in the SQL statement
+ * @property {Integer} [numOfIterations] The number of times the SQL should be executed. When supported, should take less round-trips back to the DB
+ * rather than calling generated SQL functions multiple times.
+ * @property {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned rather then thrown
+ * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
+ */
  // TODO : @property {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
 
+/**
+ * Generated/prepared SQL function
+ * @async
+ * @callback {Function} Manager~PreparedFunction
+ * @param {Manager~ExecOptions} [opts] The SQL execution options
+ * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
+ * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
+ * @returns {(Object[] | undefined | Error)} The result set of dynamically generated result models, undefined when executing a non-read SQL statement or an `Error` when
+ * `opts.returnErrors` is _true_.
+ */
+
  /**
-  * Generated/prepared SQL function
-  * @async
-  * @callback {Function} Manager~PreparedFunction
-  * @param {Manager~ExecOptions} [opts] The SQL execution options
-  * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
-  * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
-  * @returns {(Object[] | undefined | Error)} The result set of dynamically generated result models, undefined when executing a non-read SQL statement or an `Error` when
-  * `opts.returnErrors` is _true_.
+  * Operational options for {@link Manager} methods
+  * @typedef {Object} Manager~OperationOptions
+  * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
+  * any global options set directly on the {@link Manager~OperationOptions}. For example, `opts.connections.myConnection.executeInseries` would override `opts.executeInSeries`
+  * for the connection named `myConnection`, but would use `opts.executeInSeries` for any other connections that ae not overridden.
+  * @property {Boolean} [executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel.
   */
 
 /**
@@ -172,18 +202,7 @@ class Manager {
 
   /**
   * Creates a new database manager. Vendor-specific implementations should have constructors that accept properties defined by {@link Dialect}.
-  * @param {Object} conf The configuration options
-  * @param {String} [conf.mainPath=require.main] root directory starting point to look for SQL files (defaults to `require.main` path or `process.cwd()`)
-  * @param {String} [conf.privatePath=process.cwd()] current working directory where generated files will be located (if any)
-  * @param {Object} conf.univ The universal configuration that, for security and sharing purposes, remains external to an application
-  * @param {Object} conf.univ.db The database options that contain _private_ sensitive configuration. Each property should correspond to a {@link Manager~PrivateOptions} instance and the property name should
-  * be linked to a {@link Manager~ConnectionOptions} `id` within `conf.db.connections`. Each {@link Manager~PrivateOptions} instance will be used to connect to the underlying database
-  * (e.g. `{ db: myConnId: { host: "someDbhost.example.com", username: 'someUser', password: 'somePass' } }`)
-  * @param {Object} conf.db The _public_ facing database configuration
-  * @param {Object} conf.db.dialects An object that contains {@link Dialect} implementation details where each property name matches a dialect name and the value contains either the module class or a string
-  * that points to a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`). When using a directory path the dialect path will be prefixed with
-  * `process.cwd()` before loading.
-  * @param {Manager~ConnectionOptions[]} conf.db.connections the connections options that will be used
+  * @param {Manager~ConfigurationOptions} conf The configuration options
   * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
   * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
   * Pass `true` to use the console. Omit to disable logging altogether.
@@ -250,11 +269,7 @@ class Manager {
 
   /**
    * Commit the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
-   * @param {Object} [opts={}] The operational options
-   * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
-   * any global options set directly on `opts`. For example, `opts.connections.myConnection.executeInseries` would override `opts.executeInSeries` for the connection named `myConnection`,
-   * but would use `opts.executeInSeries` for any other connections that ae not overridden.
-   * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
+   * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
    * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
    */
@@ -264,10 +279,7 @@ class Manager {
 
   /**
    * Rollback the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
-   * @param {Object} [opts={}] The operational options
-   * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
-   * `opts.executeInSeries`
-   * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
+   * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
    * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
    */
@@ -277,10 +289,7 @@ class Manager {
 
    /**
    * Determines the number of pending transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
-   * @param {Object} [opts={}] The operational options
-   * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
-   * `opts.executeInSeries`
-   * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
+   * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
    * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
    */
@@ -309,10 +318,7 @@ class Manager {
  * @private
  * @param {Manager} mgr The _internal_/private {@link Manager} store
  * @param {String} funcName The async function name to call on each {@link SQLS} instance
- * @param {Object} [opts={}] The operational options
- * @param {Object} [opts.connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
- * `opts.executeInSeries`
- * @param {Boolean} [opts.executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel
+ * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
  * @param {String[]} [connNames] The connection names to perform the commit on (defaults to all connections)
  * @returns {Object} The result from Asynchro
  */
