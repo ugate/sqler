@@ -144,6 +144,8 @@ const COMPARE = Object.freeze({
  * @property {String} [host] The database host override for a value specified in {@link Manager~PrivateOptions}
  * @property {String} [port] The database port override for a value specified in {@link Manager~PrivateOptions}
  * @property {String} [protocol] The database protocol override for a value specified in {@link Manager~PrivateOptions}
+ * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
+ * perform `date.toISOString()`. __Gets overridden by the same option set on {@link Manager~ExecOptions}__.
  * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
  * @property {Object} [pool] The connection pool options (__overrides any `driverOptions` that may pertain the pool__)
  * @property {Integer} [pool.max] The maximum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool max__)
@@ -168,6 +170,8 @@ const COMPARE = Object.freeze({
  * @property {Object} [binds] The key/value pair of replacement parameters that will be bound in the SQL statement
  * @property {Integer} [numOfIterations] The number of times the SQL should be executed. When supported, should take less round-trips back to the DB
  * rather than calling generated SQL functions multiple times.
+ * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
+ * perform `date.toISOString()`. __Overrides the same option set on {@link Manager~ConnectionOptions}__.
  * @property {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned rather then thrown
  * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
  */
@@ -374,6 +378,7 @@ class SQLS {
     sqls.at.dbs = dbs;
     sqls.at.conn = conn;
     sqls.at.subs = conn.substitutes;
+    sqls.at.dateFormatter = conn.dateFormatter;
     if (sqls.at.subs) for (let key in sqls.at.subs) sqls.at.subrxs.push({ from: new RegExp(key, 'g'), to: sqls.at.subs[key] }); // turn text value into global regexp
   }
 
@@ -481,8 +486,22 @@ class SQLS {
         }
       }
       if (opts && opts.binds) {
+        let dfunc;
         for (let i in opts.binds) {
-          binds[i] = (opts.binds[i] instanceof Date && opts.binds[i].toISOString()) || opts.binds[i]; // convert dates to ANSI format for use in SQL
+          if (opts.binds[i] instanceof Date) {
+            dfunc = opts.dateFormatter || sqls.at.dateFormatter;
+            if (dfunc === true) {
+              binds[i] = opts.binds[i].toISOString(); // convert dates to ANSI format for use in SQL
+              continue;
+            } else if (dfunc && typeof dfunc === 'function') {
+              dfunc = dfunc(opts.binds[i]);
+              if (typeof dfunc === 'string') {
+                binds[i] = dfunc;
+                continue;
+              }
+            }
+          }
+          binds[i] = opts.binds[i];
         }
       }
       const driverOptions = opts && opts.driverOptions ? opts.driverOptions : undefined;
