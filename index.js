@@ -201,10 +201,11 @@ class Manager {
     //const reserved = Object.getOwnPropertyNames(Manager.prototype);
     for (let i = 0, conn, priv, dialect, dlct, track = {}; i < connCnt; ++i) {
       conn = conf.db.connections[i];
-      if (!conn.id) throw new Error(`Connection at index ${i} must have and "id"`);
+      if (!conn.id) throw new Error(`Connection at index ${i} must have an "id"`);
+      if (!conn.dialect || typeof conn.dialect !== 'string') throw new Error(`Connection at index ${i}/ID ${conn.id} must have have a valid "name"`);
       priv = conf.univ.db[conn.id]; // pull host/credentials from external conf resource
-      if (!priv) throw new Error(`Connection at index ${i} has invalid "id": ${conn.id} that cannot be found within the provided "conf.univ.db"`);
-      priv = JSON.parse(JSON.stringify(conf.univ.db[conn.id]));
+      if (!priv) throw new Error(`Connection at index ${i}/ID ${conn.id} has an "id" that cannot be found within the provided "conf.univ.db"`);
+      priv = JSON.parse(JSON.stringify(priv));
       priv.privatePath = privatePath;
       conn.host = conn.host || priv.host;
       dlct = conn.dialect.toLowerCase();
