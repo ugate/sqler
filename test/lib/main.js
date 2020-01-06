@@ -168,6 +168,11 @@ async function initManager(conf, cache) {
   expect(priv.mgr.db.tst.finance.ar.update, 'priv.mgr.db.tst.finance.ar.update').to.be.object();
   expect(priv.mgr.db.tst.finance.ar.update.audits, 'priv.mgr.db.tst.finance.ar.update.audits').to.be.function();
 
+  expect(priv.mgr.db.tst.no, 'priv.mgr.db.tst.no').to.be.object();
+  expect(priv.mgr.db.tst.no.prefix, 'priv.mgr.db.tst.no.prefix').to.be.object();
+  expect(priv.mgr.db.tst.no.prefix.some, 'priv.mgr.db.tst.no.prefix.some').to.be.object();
+  expect(priv.mgr.db.tst.no.prefix.some.tables, 'priv.mgr.db.tst.no.prefix.some.tables').to.be.function();
+
 }
 
 /**
