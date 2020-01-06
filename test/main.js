@@ -20,7 +20,7 @@ const plan = `DB Manager`;
 lab.experiment(plan, () => {
 
   if (Tester.before) lab.before(Tester.before);
-  if (Tester.after) lab.before(Tester.after);
+  if (Tester.after) lab.after(Tester.after);
   if (Tester.beforeEach) lab.beforeEach(Tester.beforeEach);
   if (Tester.afterEach) lab.afterEach(Tester.afterEach);
 

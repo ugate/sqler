@@ -62,19 +62,19 @@ class TestDialect extends Dialect {
     expect(opts.binds, 'opts.binds').to.be.object();
     expect(opts.binds, 'opts.binds').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
 
-    if (frags) {
-      expect(frags, 'frags').to.be.array();
-      expect(frags, 'frags.length').to.not.be.empty();
-      for (let frag of frags) {
-        expect(frag, 'frag (iteration)').to.be.string();
-        expect(frag, 'frag (iteration) length').to.not.be.empty();
-      }
-    }
-
     const isSingleRecord = sql.includes(TestDialect.testSqlSingleRecordKey);
-    if (isSingleRecord) { // only test for frags when returning a single record
-      expect(frags, 'frags').to.be.array();
-      expect(frags[0], 'frags[0]').to.equal(TestDialect.testMultiRecordFragKey);
+
+    if (frags) {
+      const fragLabel = `${isSingleRecord ? 'Single record ' : ''}frags`;
+      expect(frags, fragLabel).to.be.array();
+      expect(frags, `${fragLabel}.length`).to.not.be.empty();
+      for (let frag of frags) {
+        expect(frag, `${fragLabel} (iteration)`).to.be.string();
+        expect(frag, `${fragLabel} (iteration) length`).to.not.be.empty();
+        if (isSingleRecord) {
+          expect(frag, `${fragLabel} (iteration) testMultiRecordFragKey`).to.equal(TestDialect.testMultiRecordFragKey);
+        }
+      }
     }
 
     let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
@@ -128,7 +128,7 @@ class TestDialect extends Dialect {
    * @returns {String} a SQL segment indicating a test SQL should only return a single record
    */
   static get testSqlSingleRecordKey() {
-    return 'ORDER BY';
+    return '\nORDER BY *';
   }
 
   /**

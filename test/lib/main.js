@@ -4,11 +4,13 @@
 const { Labrat, LOGGER } = require('@ugate/labrat');
 const { Manager } = require('../../index');
 const IntervalCache = require('../cache/interval-cache');
+const TestDialect = require('../../test/dialects/test-dialect');
 const Fs = require('fs');
 const { expect } = require('@hapi/code');
 // TODO : import { Labrat, LOGGER } from '@ugate/labrat';
 // TODO : import { Manager } from '../../index.mjs';
 // TODO : import * as IntervalCache from '../cache/interval-cache.mjs';
+// TODO : import * as TestDialect from '../test/dialects/test-dialect.mjs';
 // TODO : import * as Fs from 'fs';
 // TODO : import { expect } from '@hapi/code';
 
@@ -94,7 +96,7 @@ function getConf() {
           "service": "TESTSRV",
           "dialect": "test",
           "driverOptions": {
-            "numOfPreparedStmts": 7,
+            "numOfPreparedStmts": 8,
             "autocommit": false
           }
         }
@@ -179,35 +181,47 @@ async function initManager(conf, cache) {
 async function testRead(mgr, connName, cache, cacheOpts) {
   if (LOGGER.info) LOGGER.info(`Begin basic test`);
 
-  const opts = createExecOpts(), label = `READ mgr.db.${connName}.read.some.tables`;
-  const rslt1 = await mgr.db[connName].read.some.tables(opts, ['test-frag']);
-  
-  expect(rslt1).to.be.array();
-  expect(rslt1).to.be.length(2); // two records should be returned w/o order by
-  if (LOGGER.info) LOGGER.info(`${label} BEFORE cache update:`, rslt1);
-  
+  const opts = createExecOpts();
+  const label = `READ mgr.db.${connName}.read.some.tables`;
+  const labelWithoutPrefix = `READ mgr.db.${connName}.no.prefix.tables`;
+  const optsNoPrefix = JSON.parse(JSON.stringify(opts));
+  optsNoPrefix.type = 'READ';
+  const performRead = async (label, length, noPrefix, opts, frags = ['test-frag']) => {
+    let readRslt;
+    if (noPrefix) readRslt = await mgr.db[connName].no.prefix.some.tables(opts, frags);
+    else readRslt = await mgr.db[connName].read.some.tables(opts, frags);
+    expect(readRslt, `${label} results`).to.be.array();
+    expect(readRslt, `${label} results.length`).to.be.length(length);
+    if (LOGGER.info) LOGGER.info(label, readRslt);
+  };
+  // two records should be returned w/o order by
+  await performRead(`${label} BEFORE cache update:`, 2, false, opts);
+  await performRead(`${labelWithoutPrefix} BEFORE cache update (w/o SQL file prefix for CRUD):`, 2, true, optsNoPrefix);
   
   // change the SQL file
-  const sql = (await sqlFile()).toString();
+  const sql = (await sqlFile()).toString(), sqlNoPrefix = (await sqlFile(null, true)).toString();
   try {
-    // update the file
-    await sqlFile(`${sql}\nORDER BY SOME_COL1`);
+    // update the files to indicate that the result should contain a single record vs multiple
+    await sqlFile(`${sql}${TestDialect.testSqlSingleRecordKey}`);
+    await sqlFile(`${sqlNoPrefix}${TestDialect.testSqlSingleRecordKey}`, true);
 
     // wait for the the SQL statement to expire
     await Labrat.wait(cacheOpts && cacheOpts.hasOwnProperty('expiresIn') ? cacheOpts.expiresIn : 1000);
 
-    const frags = cache ? ['test-frag'] : null;
-    const rslt2 = await mgr.db[connName].read.some.tables(opts, frags);
-
-    expect(rslt2).to.be.array();
-    expect(rslt2).to.be.length(cache ? 1 : 2); // one record w/order by and updated by cache
-    if (LOGGER.info) LOGGER.info(`${label} AFTER cache update:`, rslt2);
+    // only when using a cache will the SQL be updated to reflect a single record
+    const rslt2Cnt = cache ? 1 : 2;
+    await performRead(`${label} AFTER ${cache ? '' : 'no-'}cache update:`, rslt2Cnt, false, opts);
+    await performRead(`${labelWithoutPrefix} AFTER ${cache ? '' : 'no-'}cache update (w/o SQL file prefix for CRUD):`, rslt2Cnt, true, optsNoPrefix);
 
     // no commits, only reads
     await testOperation('pendingCommit', mgr, connName, 0, label);
     await testOperation('commit', mgr, connName, 0, label);
   } finally {
-    await sqlFile(sql);
+    try {
+      await sqlFile(sql);
+    } finally {
+      await sqlFile(sqlNoPrefix, true);
+    }
   }
 }
 
@@ -280,9 +294,10 @@ async function testOperation(type, mgr, connName, expected, label) {
 /**
  * Reads/writes test SQL file
  * @param {String} [sql] The SQL to write to the test file (omit to just read file)
+ * @param {Boolean} [noPrefix] Truthy to use SQL file w/o prefix
  */
-async function sqlFile(sql) {
-  const sqlPath = './test/db/read.some.tables.sql';
+async function sqlFile(sql, noPrefix) {
+  const sqlPath = `./test/db/${noPrefix ? 'no.prefix' : 'read'}.some.tables.sql`;
   if (typeof sql === 'string') {
     return Fs.promises.writeFile(sqlPath, sql);
   } else {
