@@ -409,6 +409,7 @@ class SQLS {
             proms.push(prepare(cont[nm] = {}, `${pnm ? `${pnm}_` : ''}${nm}`, pth));
             continue;
           }
+          if (!files[fi].endsWith('.sql')) continue;
           nm = files[fi].replace(/[^0-9a-zA-Z\.]/g, '_');
           ns = nm.split('.');
           ext = ns.length > 1 ? ns.pop() : '';
