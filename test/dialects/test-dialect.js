@@ -28,8 +28,10 @@ class TestDialect extends Dialect {
     expect(connConf.id, 'connConf.id.length').to.not.be.empty();
     expect(connConf.name, 'connConf.name').to.be.string();
     expect(connConf.name, 'connConf.name.length').to.not.be.empty();
-    expect(connConf.dir, 'connConf.dir').to.be.string();
-    expect(connConf.dir, 'connConf.dir.length').to.not.be.empty();
+    if (connConf.dir) {
+      expect(connConf.dir, 'connConf.dir').to.be.string();
+      expect(connConf.dir, 'connConf.dir.length').to.not.be.empty();
+    }
     expect(connConf.service, 'connConf.service').to.be.string();
     expect(connConf.service, 'connConf.service.length').to.not.be.empty();
     expect(connConf.dialect, 'connConf.dialect').to.be.string();
@@ -40,8 +42,8 @@ class TestDialect extends Dialect {
     expect(connConf.driverOptions.autocommit, 'connConf.driverOptions.autocommit').to.be.boolean();
 
     expect(track, 'track').to.be.object();
-    expect(errorLogger, 'errorLogger').to.be.function();
-    expect(logger, 'logger').to.be.function();
+    expect(errorLogger, 'errorLogger').to.satisfy(value => typeof value === 'boolean' || typeof value === 'function');
+    expect(logger, 'logger').to.satisfy(value => typeof value === 'boolean' || typeof value === 'function');
     expect(debug, 'debug').to.be.boolean();
   }
 

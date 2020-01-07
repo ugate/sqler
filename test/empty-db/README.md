@@ -1,0 +1,1 @@
+__Empty DB directory should exist in order to test zero SQL count errors__

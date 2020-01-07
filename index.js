@@ -213,19 +213,25 @@ class Manager {
   */
   constructor(conf, cache, logging) {
     if (!conf) throw new Error('Database configuration is required');
-    if (!conf.db.dialects) throw new Error('Database configuration.dialects are required');
-    const mgr = internal(this), connCnt = conf.db.connections.length, mainPath = conf.mainPath || (require.main && require.main.filename.replace(/([^\\\/]*)$/, '')) || process.cwd();
+    if (!conf.db || !conf.db.dialects) throw new Error('Database configuration.db.dialects are required');
+    if (!conf.univ || !conf.univ.db || !Object.keys(conf.univ.db).length) throw new Error('Database configuration.univ.db properties are required');
+    if (!Array.isArray(conf.db.connections) || !conf.db.connections.length) throw new Error('Database configuration.db.connections must contain at least one connection');
+    const connCnt = conf.db.connections.length;
+    const mgr = internal(this);
+    const mainPath = conf.mainPath || (require.main && require.main.filename.replace(/([^\\\/]*)$/, '')) || process.cwd();
     const privatePath = conf.privatePath || process.cwd();
     const ns = 'db';
     mgr.this[ns] = {};
     mgr.at.sqls = new Array(connCnt);
-    mgr.at.logError = logging === true ? generateLogger(console.error, ['db', 'error']) : (logging && logging(['db', 'error'])) || console.error;
-    mgr.at.log = logging === true ? generateLogger(console.log, ['db']) : (logging && logging(['db'])) || console.log;
+    mgr.at.logError = logging === true ? generateLogger(console.error, ['db', 'error']) : logging && logging(['db', 'error']);
+    mgr.at.log = logging === true ? generateLogger(console.log, ['db']) : logging && logging(['db']);
+    mgr.at.dbCount = 0;
     //const reserved = Object.getOwnPropertyNames(Manager.prototype);
     for (let i = 0, conn, priv, dialect, dlct, track = {}; i < connCnt; ++i) {
       conn = conf.db.connections[i];
       if (!conn.id) throw new Error(`Connection at index ${i} must have an "id"`);
-      if (!conn.dialect || typeof conn.dialect !== 'string') throw new Error(`Connection at index ${i}/ID ${conn.id} must have have a valid "name"`);
+      if (!conn.name) throw new Error(`Connection at index ${i}/ID ${conn.id} must have have a valid "name"`);
+      if (!conn.dialect || typeof conn.dialect !== 'string') throw new Error(`Connection at index ${i}/ID ${conn.id} must have have a valid "dialect" name`);
       priv = conf.univ.db[conn.id]; // pull host/credentials from external conf resource
       if (!priv) throw new Error(`Connection at index ${i}/ID ${conn.id} has an "id" that cannot be found within the provided "conf.univ.db"`);
       priv = JSON.parse(JSON.stringify(priv));
@@ -250,11 +256,12 @@ class Manager {
         let ltags = [...conn.logError, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
         conn.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dialect error logging
       }
-      dialect = new conf.db.dialects[dlct](priv, conn, track, conn.errorLogging, conn.logging, conf.debug || false);
+      dialect = new conf.db.dialects[dlct](priv, conn, track, conn.errorLogging || false, conn.logging || false, conf.debug || false);
       // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
       if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
       //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
       mgr.at.sqls[i] = new SQLS(mainPath, cache, conn, (mgr.this[ns][conn.name] = {}), new DBS(dialect, conn));
+      mgr.at.dbCount++;
     }
   }
 
@@ -264,11 +271,12 @@ class Manager {
    */
   async init() {
     const mgr = internal(this);
-    if (mgr.at.sqlsCount) throw new Error(`${mgr.at.sqlsCount} database(s) already initialized`);
+    if (mgr.at.isInit) throw new Error(`${mgr.at.dbCount} database(s) are already initialized`);
     const rslt = await operation(mgr, 'init');
-    mgr.at.sqlsCount = Object.getOwnPropertyNames(rslt).length;
-    mgr.at.log(`${mgr.at.sqlsCount} database(s) are ready for use`);
-    return mgr.at.sqlsCount;
+    mgr.at.isInit = true;
+    mgr.at.dbCount = Object.getOwnPropertyNames(rslt).length;
+    if (mgr.at.log) mgr.at.log(`${mgr.at.dbCount} database(s) are ready for use`);
+    return rslt;
   }
 
   /**
@@ -335,13 +343,14 @@ async function operation(mgr, funcName, opts, connNames) {
       if (typeof sqli[funcName] === 'function') return sqli[funcName]();
       return Promise.resolve(sqli[funcName]);
     };
+    const name = sqli.connectionName;
     const hasOverride = opts.connections && opts.connections[name] && typeof opts.connections[name] === 'object' && opts.connections[name].hasOwnProperty('executeInSeries');
     if (hasOverride ? opts.connections[name].executeInSeries : opts.executeInSeries) {
-      ax.series(sqli.connectionName, func);
+      ax.series(name, func);
     } else {
-      ax.parallel(sqli.connectionName, func);
+      ax.parallel(name, func);
     }
-  }
+  };
   for (let i = 0, l = mgr.at.sqls.length; i < l; ++i) {
     if (cnl) {
       if (!connNames.includes(mgr.at.sqls[i].connectionName)) continue;
@@ -367,8 +376,6 @@ class SQLS {
    * @param {DBS} dbs the database service to use
    */
   constructor(sqlBasePth, cache, conn, db, dbs) {
-    if (!conn.name) throw new Error(`Connection ${conn.id} must have a name`);
-
     const sqls = internal(this);
     sqls.at.connectionName = conn.name;
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
