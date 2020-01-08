@@ -380,12 +380,12 @@ class SQLS {
     sqls.at.connectionName = conn.name;
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
     sqls.at.cache = cache;
-    sqls.at.subrxs = sqls.at.subs && [];
-    sqls.at.db = db;
-    sqls.at.dbs = dbs;
     sqls.at.conn = conn;
     sqls.at.subs = conn.substitutes;
+    sqls.at.subrxs = conn.substitutes && [];
     sqls.at.dateFormatter = conn.dateFormatter;
+    sqls.at.db = db;
+    sqls.at.dbs = dbs;
     if (sqls.at.subs) for (let key in sqls.at.subs) sqls.at.subrxs.push({ from: new RegExp(key, 'g'), to: sqls.at.subs[key] }); // turn text value into global regexp
   }
 
