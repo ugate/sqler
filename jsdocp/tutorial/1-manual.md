@@ -63,6 +63,8 @@ const mgr = new Manager(conf);
 // initialize connections and set SQL functions
 await mgr.init();
 
+console.log('Manager is ready for use');
+
 // execute the SQL statement and capture the results
 const rslts = await mgr.db.fin.read.ap.companies({ binds: { invoiceAudit: 'Y' } });
 
@@ -71,7 +73,6 @@ process.on('SIGINT', async function sigintDB() {
   await mrg.close();
   console.log('Manager has been closed');
 });
-console.log('Manager is ready for use');
 ```
 Each `conf.db.dialect` property should contain all of the [Dialect](Dialect.html) vendor/driver implmentations used by the manager and can be set to either an extending Dialect class or a _path_ to an extended Dialect module. Many Dialects have already been implemented in separate modules that [listed in the README.md](index.html#dialects). The prior example calls `mgr.db.fin.ap.list.companies()` that uses the `conf.db.connections[].name = "fin"` as the property namespace under `db` on the manager instance.
 

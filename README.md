@@ -76,6 +76,8 @@ const mgr = new Manager(conf);
 // initialize connections and set SQL functions
 await mgr.init();
 
+console.log('Manager is ready for use');
+
 // execute the SQL statement and capture the results
 const rslts = await mgr.db.fin.read.ap.companies({ binds: { invoiceAudit: 'Y' } });
 
@@ -84,5 +86,4 @@ process.on('SIGINT', async function sigintDB() {
   await mrg.close();
   console.log('Manager has been closed');
 });
-console.log('Manager is ready for use');
 ```
