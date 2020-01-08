@@ -1,25 +1,24 @@
 'use strict';
 
-const Tester = require('./lib/main');
+const Tester = require('./lib/options');
 const { Labrat } = require('@ugate/labrat');
 const { expect } = require('@hapi/code');
 const Lab = require('@hapi/lab');
 const lab = Lab.script();
 exports.lab = lab;
 // ESM uncomment the following lines...
+// TODO : import * as Tester from './lib/options.mjs';
 // TODO : import { expect } from '@hapi/code';
 // TODO : import { Labrat } from '@ugate/labrat';
 // TODO : import * as Lab from '@hapi/lab';
-// TODO : import * as Tester from './lib/main.mjs';
 // TODO : export * as lab from lab;
 
-const TEST_TKO = 10000;
-const plan = `DB Manager`;
+const plan = `Options`;
 
-// node test/lib/main.js -NODE_ENV=test
+// node test/lib/options.js -NODE_ENV=test
 
-// "node_modules/.bin/lab" test/main.js -v
-// "node_modules/.bin/lab" test/main.js -vi 1
+// "node_modules/.bin/lab" test/options.js -v
+// "node_modules/.bin/lab" test/options.js -vi 1
 
 lab.experiment(plan, () => {
 
@@ -56,7 +55,4 @@ lab.experiment(plan, () => {
   lab.test(`${plan}: Custom Private Path`, Tester.valNPrivatePath);
   lab.test(`${plan}: Reinitialize Manager (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections duplicate' }, Tester.valReinit));
   lab.test(`${plan}: Debug`, Tester.valDebug);
-
-  lab.test(`${plan}: No Cache`, { timeout: TEST_TKO }, Tester.noCache);
-  lab.test(`${plan}: Interval Cache`, { timeout: TEST_TKO }, Tester.intervalCache);
 });
