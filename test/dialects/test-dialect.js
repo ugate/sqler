@@ -1,6 +1,7 @@
 'use strict';
 
 const { Manager, Dialect } = require('../../index');
+const UtilOpts = require('../util/utility-options');
 const { expect } = require('@hapi/code');
 
 /**
@@ -37,9 +38,11 @@ class TestDialect extends Dialect {
     expect(connConf.dialect, 'connConf.dialect').to.be.string();
     expect(connConf.dialect, 'connConf.dialect.length').to.not.be.empty();
 
-    expect(connConf.driverOptions, 'connConf.driverOptions').to.be.object();
-    expect(connConf.driverOptions.numOfPreparedStmts, 'connConf.driverOptions.numOfPreparedStmts').to.be.number();
-    expect(connConf.driverOptions.autocommit, 'connConf.driverOptions.autocommit').to.be.boolean();
+    if (connConf.driverOptions) {
+      expect(connConf.driverOptions, 'connConf.driverOptions').to.be.object();
+      expect(connConf.driverOptions.numOfPreparedStmts, 'connConf.driverOptions.numOfPreparedStmts').to.be.number();
+      expect(connConf.driverOptions.autocommit, 'connConf.driverOptions.autocommit').to.be.boolean();
+    }
 
     if (connConf.substitutes) {
       expect(connConf.substitutes, 'connConf.substitutes').to.be.object();
@@ -56,7 +59,9 @@ class TestDialect extends Dialect {
    */
   async init(opts) {
     expect(opts, 'opts').to.be.object();
-    expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(this.connConf.driverOptions && this.connConf.driverOptions.numOfPreparedStmts);
+    if (this.connConf.driverOptions) {
+      expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(this.connConf.driverOptions && this.connConf.driverOptions.numOfPreparedStmts);
+    }
     return true;
   }
 
@@ -64,9 +69,20 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async exec(sql, opts, frags) {
+    if ((opts.driverOptions && opts.driverOptions.throwExecError) || (this.connConf.driverOptions && this.connConf.driverOptions.throwExecError)) {
+      throw new Error(`Test error due to "opts.driverOptions.throwExecError" = ${opts.driverOptions.throwExecError}`);
+    }
+
+    const xoptsNoExpandedBinds = UtilOpts.createExecOpts(true);
     expectOpts(this, opts, 'exec');
     expect(opts.binds, 'opts.binds').to.be.object();
-    expect(opts.binds, 'opts.binds').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
+    if (xoptsNoExpandedBinds.binds) {
+      expect(opts.binds, 'opts.binds').to.contain(xoptsNoExpandedBinds.binds);
+    }
+    if (this.connConf.binds) {
+      expect(opts.binds, 'opts.binds').to.contain(this.connConf.binds);
+    }
+    expectExpansionBinds(sql, opts, UtilOpts.createExecOpts());
 
     if (this.connConf.substitutes) {
       for (let sub in this.connConf.substitutes) {
@@ -170,6 +186,25 @@ function expectOpts(dialect, opts, operation) {
 
   expect(opts.tx, `opts.tx from "${operation}"`).to.be.object();
   expect(opts.tx.pending, `opts.tx.pending from "${operation}"`).to.equal(dialect.testPending);
+}
+
+/**
+ * Expects binds that should have been expanded into multiple binds are persent
+ * @param {String} sql The SQL being validated
+ * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
+ * @param {Manager~ExecOptions} xopts The {@link Manager~ExecOptions} that are being validated against
+ */
+function expectExpansionBinds(sql, opts, xopts) {
+  if (!xopts.binds || !/IN[\s\n\r]*\(/.test(sql)) return;
+  for (let xopt in xopts.binds) {
+    if (!xopts.binds.hasOwnProperty(xopt)) continue;
+    if (!Array.isArray(xopts.binds[xopt])) continue;
+    for (let xi = 0, enm, xbinds = xopts.binds[xopt]; xi < xbinds.length; ++xi) {
+      enm = `${xopt}${xi || ''}`;
+      expect(opts.binds[enm], `opts.binds.${enm} (binds expansion) on SQL:\n${sql}\n`).to.equal(xbinds[xi]);
+      expect(sql).to.contain(`:${enm}`);
+    }
+  }
 }
 
 module.exports = TestDialect;

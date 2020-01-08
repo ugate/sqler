@@ -86,24 +86,34 @@ class UtilSql {
    * Tests that `read` SQL statements work with and w/o {@link Cache} by re-writting the SQL file to see if the cahce picks it up
    * @param {Manager} mgr The {@link Manager} that will be used
    * @param {String} connName The connection name to use
-   * @param {Cache} [cache] the {@link Cache} that will be used for SQL statements
-   * @param {Object} [cacheOpts] the options that were used on the specified {@link Cache}
+   * @param {Object} [testReadOpts] Options specific to the test read
+   * @param {Cache} [testReadOpts.cache] the {@link Cache} that will be used for SQL statements
+   * @param {Object} [testReadOpts.cacheOpts] the options that were used on the specified {@link Cache}
+   * @param {Manager~ConnectionOptions} [testReadOpts.connOpts] The {@link Manager~ConnectionOptions} that was used
+   * @param {Manager~ExecOptions} [testReadOpts.execOpts] The {@link Manager~ExecOptions} to use (leave `undefined` to create)
+   * @param {Boolean} [testReadOpts.returnErrors] Value passed into the {@link Manager~PreparedFunction}
    * @returns {(Error | undefined)} An error when the test fails
    */
-  static async testRead(mgr, connName, cache, cacheOpts) {
+  static async testRead(mgr, connName, testReadOpts) {
     if (LOGGER.info) LOGGER.info(`Begin basic test`);
 
-    const opts = UtilOpts.createExecOpts();
+    testReadOpts = testReadOpts || {};
+    const { cache, cacheOpts, connOpts, execOpts, returnErrors } = testReadOpts;
+    const opts = typeof execOpts === 'undefined' ? UtilOpts.createExecOpts() : execOpts;
     const label = `READ mgr.db.${connName}.read.some.tables`;
     const labelWithoutPrefix = `READ mgr.db.${connName}.no.prefix.tables`;
-    const optsNoPrefix = JSON.parse(JSON.stringify(opts));
+    const optsNoPrefix = JSON.parse(JSON.stringify(opts || {}));
     optsNoPrefix.type = 'READ';
     const performRead = async (label, length, noPrefix, opts, frags = ['test-frag']) => {
       let readRslt;
-      if (noPrefix) readRslt = await mgr.db[connName].no.prefix.some.tables(opts, frags);
-      else readRslt = await mgr.db[connName].read.some.tables(opts, frags);
-      expect(readRslt, `${label} results`).to.be.array();
-      expect(readRslt, `${label} results.length`).to.be.length(length);
+      if (noPrefix) readRslt = await mgr.db[connName].no.prefix.some.tables(opts, frags, returnErrors);
+      else readRslt = await mgr.db[connName].read.some.tables(opts, frags, returnErrors);
+      if (returnErrors && (connOpts && connOpts.driverOptions && connOpts.driverOptions.throwExecError) || (opts && opts.driverOptions && opts.driverOptions.throwExecError)) {
+        expect(readRslt, `${label} results`).to.be.error();
+      } else {
+        expect(readRslt, `${label} results`).to.be.array();
+        expect(readRslt, `${label} results.length`).to.be.length(length);
+      }
       if (LOGGER.info) LOGGER.info(label, readRslt);
     };
     // two records should be returned w/o order by

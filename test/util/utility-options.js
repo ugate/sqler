@@ -33,7 +33,8 @@ class UtilOpts {
             "dialect": "test",
             "driverOptions": {
               "numOfPreparedStmts": 8,
-              "autocommit": false
+              "autocommit": false,
+              "throwExecError": false
             }
           }
         ]
@@ -43,10 +44,20 @@ class UtilOpts {
   }
 
   /**
+   * @param {Boolean} [exclExpansion] Truthy to exclude expansion `binds` 
    * @returns {Object} The test execution options to pass into {@link Manager.execute}
    */
-  static createExecOpts() {
-    return { binds: { someCol1: 1, someCol2: 2, someCol3: 3 } };
+  static createExecOpts(exclExpansion) {
+    const xopts = { binds: { someCol1: 1, someCol2: 2, someCol3: 3 } };
+    if (!exclExpansion) xopts.binds.expanedCol = [1, 2, 3];
+    return xopts;
+  }
+
+  /**
+   * @returns {Object} The test execution options to pass into {@link Manager.execute}
+   */
+  static createConnectionBinds() {
+    return { someCol1: 1, someCol2: 2, someCol3: 3, someCol4: 4 };
   }
 
   /**

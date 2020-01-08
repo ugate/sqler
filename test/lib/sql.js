@@ -38,6 +38,7 @@ class Tester {
   static async noCache() {
     const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
     conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
+    conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
     await UtilSql.initManager(priv, conf, { logger: UtilOpts.generateTestConsoleLogger });
 
     try {
@@ -48,13 +49,33 @@ class Tester {
     }
   }
 
+  static async readErrorReturn() {
+    const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
+    await UtilSql.initManager(priv, conf);
+
+    const execOpts = UtilOpts.createExecOpts();
+    execOpts.driverOptions = execOpts.driverOptions || {};
+    execOpts.driverOptions.throwExecError = true;
+    return UtilSql.testRead(priv.mgr, connName, { execOpts, returnErrors: true });
+  }
+
+  static async readErrorThrow() {
+    const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
+    await UtilSql.initManager(priv, conf);
+
+    const execOpts = UtilOpts.createExecOpts();
+    execOpts.driverOptions = execOpts.driverOptions || {};
+    execOpts.driverOptions.throwExecError = true;
+    return UtilSql.testRead(priv.mgr, connName, { execOpts });
+  }
+
   static async intervalCache() {
     const cacheOpts = { expiresIn: 100 };
     const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
     await UtilSql.initManager(priv, conf, { cache: new IntervalCache(cacheOpts), logger: priv.mgrLogit });
 
     try {
-      await UtilSql.testRead(priv.mgr, connName, priv.cache, cacheOpts);
+      await UtilSql.testRead(priv.mgr, connName, { cache: priv.cache, cacheOpts });
 
       let xopts = UtilOpts.createExecOpts(), pendingCount;
       pendingCount = await UtilSql.testCUD(priv.mgr, connName, conf, xopts);

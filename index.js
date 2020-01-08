@@ -377,6 +377,7 @@ class SQLS {
    */
   constructor(sqlBasePth, cache, conn, db, dbs) {
     const sqls = internal(this);
+    sqls.at.numOfPreparedStmts = 0;
     sqls.at.connectionName = conn.name;
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
     sqls.at.cache = cache;
@@ -386,7 +387,9 @@ class SQLS {
     sqls.at.dateFormatter = conn.dateFormatter;
     sqls.at.db = db;
     sqls.at.dbs = dbs;
-    if (sqls.at.subs) for (let key in sqls.at.subs) sqls.at.subrxs.push({ from: new RegExp(key, 'g'), to: sqls.at.subs[key] }); // turn text value into global regexp
+    if (sqls.at.subs) for (let key in sqls.at.subs) {
+      sqls.at.subrxs.push({ from: new RegExp(key, 'g'), to: sqls.at.subs[key] }); // turn text value into global regexp
+    }
   }
 
   /**
@@ -412,7 +415,7 @@ class SQLS {
           if (!files[fi].endsWith('.sql')) continue;
           nm = files[fi].replace(/[^0-9a-zA-Z\.]/g, '_');
           ns = nm.split('.');
-          ext = ns.length > 1 ? ns.pop() : '';
+          ext = ns.pop();
           nm = `${sqls.at.conn.dialect}_${sqls.at.conn.name}_${pnm ? `${pnm}_` : ''}${ns.join('_')}`;
           for (let ni = 0, nl = ns.length, so = cont; ni < nl; ++ni) {
             so[ns[ni]] = so[ns[ni]] || (ni < nl - 1 ? {} : await sqls.this.prepared(nm, pth, ext));
@@ -421,7 +424,7 @@ class SQLS {
         }
         await Promise.all(proms);
       } catch (err) {
-        if (sqls.at.conn.erroLogging) sqls.at.conn.erroLogging(`Failed to build SQL statements from files in directory ${pth || pdir}`, err);
+        if (sqls.at.conn.errorLogging) sqls.at.conn.errorLogging(`Failed to build SQL statements from files in directory ${pth || pdir}`, err);
         throw err;
       }
     };
@@ -449,7 +452,7 @@ class SQLS {
     sqls.at.stms = sqls.at.stms || { methods: {} };
     sqls.at.stms.methods[name] = {};
     if (sqls.at.cache) {
-      const id = `sqler:db:${name}${ext ? `:${ext}` : ''}`;
+      const id = `sqler:db:${name}:${ext}`;
       sqls.at.stms.methods[name][ext] = async function cachedSql(opts, execFn) { // execute the SQL statement with cached statements
         let sql;
         const cached = await sqls.at.cache.get(id);
@@ -473,17 +476,19 @@ class SQLS {
      * @returns {String} the SQL contents from the SQL file
      */
     async function readSqlFile() {
-      var data = await Fs.promises.readFile(fpth, { encoding: 'utf8' });
-      if (data && sqls.at.subrxs) for (let i = 0, l = sqls.at.subrxs.length; i < l; ++i) data = data.replace(sqls.at.subrxs[i].from, sqls.at.subrxs[i].to); // substitutions
-      const dt = ext === 'json' ? JSON.parse(data.toString('utf8').replace(/^\uFEFF/, '')) : data; // when present, replace BOM before parsing JSON result
-      return dt || data;
+      let data = await Fs.promises.readFile(fpth, { encoding: 'utf8' });
+      if (data && sqls.at.subrxs) for (let i = 0, l = sqls.at.subrxs.length; i < l; ++i) {
+        data = data.replace(sqls.at.subrxs[i].from, sqls.at.subrxs[i].to); // substitutions
+      }
+      return data;
+      // return ext === 'json' ? JSON.parse(data.toString('utf8').replace(/^\uFEFF/, '')) : data; // when present, replace BOM before parsing JSON result
     }
 
     /**
     * Sets/formats SQL parameters and executes an SQL statement
     * @see Manager~PreparedFunction
     */
-    return async function execSqlPublic(opts, frags) {
+    return async function execSqlPublic(opts, frags, returnErrors) {
       const binds = {}, mopt = { binds, opts: frags }, type = (opts && opts.type && opts.type.toUpperCase()) || crud;
       if (!type || !CRUD_TYPES.includes(type)) {
         throw new Error(`Statement execution must include "opts.type" set to one of ${CRUD_TYPES.join(',')} since the SQL file path was not prefixed with a type (found: ${type})`);
@@ -513,14 +518,14 @@ class SQLS {
         }
       }
       const driverOptions = opts && opts.driverOptions ? opts.driverOptions : undefined;
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, type, binds, frags, driverOptions));
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, type, binds, frags, driverOptions, returnErrors));
     };
   }
 
-  genExecSqlFromFileFunction(fpth, type, binds, frags, driverOptions) {
+  genExecSqlFromFileFunction(fpth, type, binds, frags, driverOptions, returnErrors) {
     const sqls = internal(this), opts = { type, binds, driverOptions };
     return async function execSqlFromFile(sql) {
-      return await sqls.at.dbs.exec(fpth, sql, opts, frags);
+      return await sqls.at.dbs.exec(fpth, sql, opts, frags, returnErrors);
     };
   }
 
@@ -556,7 +561,7 @@ class SQLS {
    * @returns {Integer} the number of prepared statements found in SQL files
    */
   get numOfPreparedStmts() {
-    return internal(this).at.numOfPreparedStmts || 0;
+    return internal(this).at.numOfPreparedStmts;
   }
 
   /**
@@ -582,9 +587,9 @@ class DBS {
   constructor(dialect, conn) {
     const dbs = internal(this);
     dbs.at.dialect = dialect;
-    dbs.at.dialectName = conn.dialect && conn.dialect.toLowerCase();
-    dbs.at.errorLogging = conn && conn.errorLogging;
-    dbs.at.logging = conn && conn.logging;
+    dbs.at.dialectName = conn.dialect.toLowerCase();
+    dbs.at.errorLogging = conn.errorLogging;
+    dbs.at.logging = conn.logging;
     dbs.at.version = conn.version || 0;
     dbs.at.pending = 0;
   }
@@ -605,9 +610,10 @@ class DBS {
   * @param {String} sql The SQL to execute with optional substitutions {@link DBS#frag}
   * @param {Manager~ExecOptions} opts The eectution options
   * @param {String[]} frags The frament keys within the SQL that will be retained
-  * @returns {(Object[] | undefined | Error)} The execution results, `undefined` when not perfroming a read or an error when `opts.returnErrors` is true
+  * @param {Boolean} [returnErrors] Truthy to return any errors thrown during execution rather than throwing them
+  * @returns {(Object[] | undefined | Error)} The execution results, `undefined` when not perfroming a read or an error when `returnErrors` is true
   */
-  async exec(fpth, sql, opts, frags) {
+  async exec(fpth, sql, opts, frags, returnErrors) {
     const dbs = internal(this);
     const sqlf = dbs.this.frag(sql, frags, opts.binds);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
@@ -621,8 +627,8 @@ class DBS {
       if (dbs.at.errorLogging) {
         dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
       }
-      if (opts.returnErrors) return err;
-      else throw err;
+      if (returnErrors) return err;
+      throw err;
     }
     if (dbs.at.logging) {
       dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.length) || 0} records (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
@@ -633,20 +639,20 @@ class DBS {
   /**
   * Removes any SQL fragments that are wrapped around [[? someKey]] and [[?]] when the specified keys does not contain the discovered key (same for dialect and version keys)
   * Replaces any SQL parameters that are wrapped around :someParam with the indexed parameter names (i.e. :someParam :someParam1 ...) and adds the replacement value to the supplied `binds`
-  * @param {String} sql the SQL to defragement
-  * @param {String[]} [keys] fragment keys which will remain intact within the SQL
-  * @param {Object} [rplmts] an object that contains the SQL parameterized `binds` that will be used for parameterized array composition
-  * @returns {String} the defragmented SQL
+  * @param {String} sql The SQL to defragement
+  * @param {String[]} [keys] Fragment keys which will remain intact within the SQL
+  * @param {Object} [binds] An object that contains the SQL parameterized `binds` that will be used for parameterized array composition
+  * @returns {String} The defragmented SQL
   */
-  frag(sql, keys, rplmts) {
-    if (!sql) return sql;
+  frag(sql, keys, binds) {
     const dbs = internal(this);
     sql = sql.replace(/(:)([a-z]+[0-9]*?)/gi, function sqlArrayRpl(match, pkey, key) {
-      for (var i = 0, vals = key && rplmts && Array.isArray(rplmts[key]) && rplmts[key], keys = '', l = vals && vals.length; i < l; ++i) {
-        keys += ((keys && ', ') || '') + pkey + key + (i || '');
-        rplmts[key + (i || '')] = vals[i];
+      let newKeys = '';
+      for (let i = 0, vals = key && binds && Array.isArray(binds[key]) && binds[key], l = vals && vals.length; i < l; ++i) {
+        newKeys += ((newKeys && ', ') || '') + pkey + key + (i || ''); // set SQL expanded binds
+        binds[key + (i || '')] = vals[i]; // set expanded binds
       }
-      return keys || (pkey + key);
+      return newKeys || (pkey + key); // replace with new key(s) or leave as-is
     });
     sql = sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[\!(?!\[\[\!)\s*(\w+)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[\!\]\]((?:\r?\n|\n)*)/g, function sqlDiaRpl(match, lb1, key, fsql, lb2) {
       return (key && key.toLowerCase() === dbs.at.dialectName && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';

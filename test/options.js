@@ -47,6 +47,8 @@ lab.experiment(plan, () => {
   lab.test(`${plan}: External Dialect Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections[].dialect = <some external module id>' }, Tester.valConnectionsDialectImportExternal));
   lab.test(`${plan}: Duplicate Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections duplicate' }, Tester.valConnectionsIdDuplicate));
   lab.test(`${plan}: Connections Substitutes`, Tester.valConnectionsSubstitutes);
+  lab.test(`${plan}: Connections Binds`, Tester.valConnectionsBinds);
+  lab.test(`${plan}: Missing Connections Driver Options`, Tester.valConnectionsDriverOptionsMissing);
   lab.test(`${plan}: Connections Log None`, Tester.valConnectionsLogNone);
   lab.test(`${plan}: Connections Log Custom Tags`, Tester.valConnectionsLogTags);
   lab.test(`${plan}: Connections Log Custom Tags (with custom logger)`, Tester.valConnectionsLogTagsWithCustomLogger);

@@ -163,6 +163,18 @@ class Tester {
     return UtilSql.initManager(priv, conf);
   }
 
+  static async valConnectionsBinds() {
+    const conf = UtilOpts.getConf();
+    conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
+    return UtilSql.initManager(priv, conf);
+  }
+
+  static async valConnectionsDriverOptionsMissing() {
+    const conf = UtilOpts.getConf();
+    delete conf.db.connections[0].driverOptions;
+    return UtilSql.initManager(priv, conf);
+  }
+
   static async valNonexistentMainPath() {
     const conf = UtilOpts.getConf();
     conf.mainPath = '/some/fake/path';
