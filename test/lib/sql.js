@@ -39,7 +39,9 @@ class Tester {
     const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
     conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
     conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
-    await UtilSql.initManager(priv, conf, { logger: UtilOpts.generateTestConsoleLogger });
+    await UtilSql.initManager(priv, conf, {
+      logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateAbyssConsoleLogger
+    });
 
     try {
       await UtilSql.testRead(priv.mgr, connName);
