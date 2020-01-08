@@ -37,6 +37,7 @@ class Tester {
 
   static async noCache() {
     const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
+    conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
     await UtilSql.initManager(priv, conf, { logger: UtilOpts.generateTestConsoleLogger });
 
     try {

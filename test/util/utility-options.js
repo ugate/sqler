@@ -50,6 +50,14 @@ class UtilOpts {
   }
 
   /**
+   * @returns {Object} The test `substitutions` for {@link Manager~ConnectionOptions}
+   */
+  static createSubstituteOpts() {
+    // for testing purposes, the key should not be contained in the value (e.g. { SOME_OTHER_DB: 'SOME_OTHER_DB_TEST' })
+    return { SOME_OTHER_DB: 'SOME_OTHER_TEST_DB' };
+  }
+
+  /**
    * Gets a connection by name in a specified configuration
    * @param {Object} conf The {@link UtilOpts.getConf} object
    * @param {String} name The connection name to find

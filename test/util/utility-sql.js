@@ -40,6 +40,7 @@ class UtilSql {
 
     const conn = conf.db.connections[0];
     const cname = conn.name;
+
     expect(priv.mgr.db, 'priv.mgr.db').to.be.object();
     expect(priv.mgr.db[cname], `priv.mgr.db.${cname}`).to.be.object();
 

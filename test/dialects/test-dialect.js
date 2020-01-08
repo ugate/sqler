@@ -41,6 +41,10 @@ class TestDialect extends Dialect {
     expect(connConf.driverOptions.numOfPreparedStmts, 'connConf.driverOptions.numOfPreparedStmts').to.be.number();
     expect(connConf.driverOptions.autocommit, 'connConf.driverOptions.autocommit').to.be.boolean();
 
+    if (connConf.substitutes) {
+      expect(connConf.substitutes, 'connConf.substitutes').to.be.object();
+    }
+
     expect(track, 'track').to.be.object();
     expect(errorLogger, 'errorLogger').to.satisfy(value => typeof value === 'boolean' || typeof value === 'function');
     expect(logger, 'logger').to.satisfy(value => typeof value === 'boolean' || typeof value === 'function');
@@ -63,6 +67,15 @@ class TestDialect extends Dialect {
     expectOpts(this, opts, 'exec');
     expect(opts.binds, 'opts.binds').to.be.object();
     expect(opts.binds, 'opts.binds').to.contain({ someCol1: 1, someCol2: 2, someCol3: 3 });
+
+    if (this.connConf.substitutes) {
+      for (let sub in this.connConf.substitutes) {
+        if (!this.connConf.substitutes.hasOwnProperty(sub)) continue;
+        if (!sql.includes(sub) && !sql.includes(this.connConf.substitutes[sub])) continue; // SQL may not be using the substitute
+        expect(sql, `SQL substitute`).to.not.contain(sub);
+        expect(sql, `SQL substitute`).to.contain(this.connConf.substitutes[sub]);
+      }
+    }
 
     const isSingleRecord = sql.includes(TestDialect.testSqlSingleRecordKey);
 
