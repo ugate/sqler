@@ -615,7 +615,7 @@ class DBS {
   */
   async exec(fpth, sql, opts, frags, returnErrors) {
     const dbs = internal(this);
-    const sqlf = dbs.this.frag(sql, frags, opts.binds);
+    const sqlf = dbs.this.segmentSubs(sql, frags, opts.binds);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
     if (dbs.at.logging) {
       dbs.at.logging(`Executing SQL ${fpth} with options ${JSON.stringify(opts)}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
@@ -637,15 +637,29 @@ class DBS {
   }
 
   /**
-  * Removes any SQL fragments that are wrapped around [[? someKey]] and [[?]] when the specified keys does not contain the discovered key (same for dialect and version keys)
-  * Replaces any SQL parameters that are wrapped around :someParam with the indexed parameter names (i.e. :someParam :someParam1 ...) and adds the replacement value to the supplied `binds`
+  * Replaces or removes tagged substitution segments that appear in an SQL statement
+  * - __Expansions__ - Expands _bind_ variables that contain an array of values when they appear in the SQL statement. For example, an SQL statement with a section that contains
+  * `IN (:someParam)` and _binds_ of `{ someParam: [1,2,3] }` would become `IN (:someParam, :someParam1, :someParam2)` with _binds_ of `{ someParam: 1, someParam1: 2, SomeParam2: 3 }`
+  * - __Dialects__ - Replaces SQL segments that contain an open `[[! myDialectName]]` and closing `[[!]]` with the SQL content that is between the opening and closing _dialect_ tags
+  * when the {@link Manager~ConnectionOptions} contains the designated _dialect_ name (`myDialectName` in this case). For example, 
+  * `[[! oracle]] SOME_COL = SUBSTR(SOME_COL, 1, 1) [[!]] [[! mssql]] SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1) [[!]]`
+  * would become `SOME_COL = SUBSTR(SOME_COL, 1, 1)` when using an `oracle` dialect, `SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1)` when using an `mssql` dialect and omitted using any
+  * other dialect.
+  * - __Versions__ - Replaces SQL segments that contain an open `[[version = 1]]` and closing `[[version]]` with the SQL content that is between the opening and closing _version_ tags
+  * when the {@link Manager~ConnectionOptions} contains a _version_ that satisfys the comparative operator for the version within the tag designator. For example,
+  * `[[version <= 1]] SOME_OLD_COL [[version]] [[version > 1]] SOME_NEW_COL [[version]]` would become `SOME_OLD_COL` using a {@link Manager~ConnectionOptions} _version_ that is less than
+  * or equal to `1`, but woud become `SOME_NEW_COL` when the _version_ is greater than `1`.
+  * - __Fragments__ - Replaces SQL segments that contain an open `[[? someKey]]` and closing `[[?]]` with the SQL content that is between the opening and closing _fragment_ tags when
+  * the `keys` contain the designated fragment identifier. For example, `WHERE SOME_COL1 = 1 [[? someKey]] AND SOME_COL2 = 2 [[?]]` would become `WHERE SOME_COL1 = 1 AND SOME_COL2 = 2`
+  * when `keys` contains `[ 'someKey' ]`. If `keys` does not contain `someKey`, the statement would just become `WHERE SOME_COL1 = 1`.
   * @param {String} sql The SQL to defragement
   * @param {String[]} [keys] Fragment keys which will remain intact within the SQL
   * @param {Object} [binds] An object that contains the SQL parameterized `binds` that will be used for parameterized array composition
   * @returns {String} The defragmented SQL
   */
-  frag(sql, keys, binds) {
+ segmentSubs(sql, keys, binds) {
     const dbs = internal(this);
+    // expansion substitutes
     sql = sql.replace(/(:)([a-z]+[0-9]*?)/gi, function sqlArrayRpl(match, pkey, key) {
       let newKeys = '';
       for (let i = 0, vals = key && binds && Array.isArray(binds[key]) && binds[key], l = vals && vals.length; i < l; ++i) {
@@ -654,12 +668,15 @@ class DBS {
       }
       return newKeys || (pkey + key); // replace with new key(s) or leave as-is
     });
+    // dialect substitutes
     sql = sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[\!(?!\[\[\!)\s*(\w+)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[\!\]\]((?:\r?\n|\n)*)/g, function sqlDiaRpl(match, lb1, key, fsql, lb2) {
       return (key && key.toLowerCase() === dbs.at.dialectName && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });
+    // version substitutes
     sql = sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[version(?!\[\[version)\s*(=|<=?|>=?|<>)\s*[+-]?(\d+\.?\d*)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[version\]\]((?:\r?\n|\n)*)/gi, function sqlVerRpl(match, lb1, key, ver, fsql, lb2) {
       return (key && ver && !isNaN(ver = parseFloat(ver)) && COMPARE[key](dbs.at.version, ver) && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });
+    // fragment substitutes
     return sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[\?(?!\[\[\?)\s*(\w+)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[\?\]\]((?:\r?\n|\n)*)/g, function sqlFragRpl(match, lb1, key, fsql, lb2) {
       return (key && keys && keys.indexOf(key) >= 0 && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });

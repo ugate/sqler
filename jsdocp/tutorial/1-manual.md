@@ -111,6 +111,14 @@ Defining the _type_ of CRUD operation helps assist implementing [Dialect](Dialec
 
 Most RDMS drivers support [prepared statement variable substitutions](https://en.wikipedia.org/wiki/Prepared_statement) in some form or fashion. The most common of which is the typical syntax commonly associated with unamed or named bind parameters within prepared statements. However, `sqler` provides a few substitutional encapsulators that help with SQL statement composition. Each SQL file can define multiple encapsulators that indicates what portions of an SQL statement will be present before execution takes place. Substitutions use an openening `[[` and closing `]]` that can also be optionally prefixed with a SQL line comment `--[[`. The following sections discuss the differnt type of substitutions in more detail.
 
+The order of precedence in which substitutions are made:
+
+1. __[Raw Substitutions](#rs)__ - Set when an SQL file is read/cached
+1. __[Expanded SQL Substitutions](#es)__ - Set during [prepared function execution](Manager.html#~PreparedFunction)
+1. __[Dialect Substitutions](#ds)__ - Set during [prepared function execution](Manager.html#~PreparedFunction)
+1. __[Version Susbstitutions](#vs)__ - Set during [prepared function execution](Manager.html#~PreparedFunction)
+1. __[Fragment Substitutions](#fs)__ - Set during [prepared function execution](Manager.html#~PreparedFunction)
+
 #### 1️⃣ Expanded SQL Substitutions <sub id="es"></sub>:
 Depending on the underlying dialect support, named parameters typically follow some form of syntactic grammar like `:someParam`, where `someParam` is a parameter passed in to the `sqler` [generated SQL function](Manager.html#~PreparedFunction}) as the [bind variables](Manager.html#~ExecOptions). There may be instances where _any_ number of variables need to be substituded when an SQL statement is executed, but the actual number of variables is unknown at the time the SQL statement is written. This can be accomplished in `sqler` by simply adding a single variable to the SQL statement and passing an array of values during execution. For instance, passing the following [bind variables](Manager.html#~ExecOptions) JSON into the `sqler` [generated SQL function](Manager.html#~PreparedFunction}):
 <br/><br/>__[bind variables](Manager.html#~ExecOptions):__
