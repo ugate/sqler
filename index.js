@@ -615,7 +615,7 @@ class DBS {
   */
   async exec(fpth, sql, opts, frags, returnErrors) {
     const dbs = internal(this);
-    const sqlf = dbs.this.segmentSubs(sql, frags, opts.binds);
+    const sqlf = dbs.this.segmentSubs(sql, opts.binds, frags);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
     if (dbs.at.logging) {
       dbs.at.logging(`Executing SQL ${fpth} with options ${JSON.stringify(opts)}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
@@ -653,21 +653,23 @@ class DBS {
   * the `keys` contain the designated fragment identifier. For example, `WHERE SOME_COL1 = 1 [[? someKey]] AND SOME_COL2 = 2 [[?]]` would become `WHERE SOME_COL1 = 1 AND SOME_COL2 = 2`
   * when `keys` contains `[ 'someKey' ]`. If `keys` does not contain `someKey`, the statement would just become `WHERE SOME_COL1 = 1`.
   * @param {String} sql The SQL to defragement
-  * @param {String[]} [keys] Fragment keys which will remain intact within the SQL
   * @param {Object} [binds] An object that contains the SQL parameterized `binds` that will be used for parameterized array composition
+  * @param {String[]} [frags] Fragment keys which will remain intact within the SQL
   * @returns {String} The defragmented SQL
   */
- segmentSubs(sql, keys, binds) {
+ segmentSubs(sql, binds, frags) {
     const dbs = internal(this);
     // expansion substitutes
-    sql = sql.replace(/(:)([a-z]+[0-9]*?)/gi, function sqlArrayRpl(match, pkey, key) {
-      let newKeys = '';
-      for (let i = 0, vals = key && binds && Array.isArray(binds[key]) && binds[key], l = vals && vals.length; i < l; ++i) {
-        newKeys += ((newKeys && ', ') || '') + pkey + key + (i || ''); // set SQL expanded binds
-        binds[key + (i || '')] = vals[i]; // set expanded binds
-      }
-      return newKeys || (pkey + key); // replace with new key(s) or leave as-is
-    });
+    if (binds) {
+      sql = sql.replace(/(:)([a-z]+[0-9]*?)/gi, function sqlArrayRpl(match, pkey, key) {
+        let newKeys = '';
+        for (let i = 0, vals = key && Array.isArray(binds[key]) && binds[key], l = vals && vals.length; i < l; ++i) {
+          newKeys += ((newKeys && ', ') || '') + pkey + key + (i || ''); // set SQL expanded binds
+          binds[key + (i || '')] = vals[i]; // set expanded binds
+        }
+        return newKeys || (pkey + key); // replace with new key(s) or leave as-is
+      });
+    }
     // dialect substitutes
     sql = sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[\!(?!\[\[\!)\s*(\w+)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[\!\]\]((?:\r?\n|\n)*)/g, function sqlDiaRpl(match, lb1, key, fsql, lb2) {
       return (key && key.toLowerCase() === dbs.at.dialectName && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
@@ -677,9 +679,10 @@ class DBS {
       return (key && ver && !isNaN(ver = parseFloat(ver)) && COMPARE[key](dbs.at.version, ver) && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });
     // fragment substitutes
-    return sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[\?(?!\[\[\?)\s*(\w+)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[\?\]\]((?:\r?\n|\n)*)/g, function sqlFragRpl(match, lb1, key, fsql, lb2) {
-      return (key && keys && keys.indexOf(key) >= 0 && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
+    sql = sql.replace(/((?:\r?\n|\n)*)-{0,2}\[\[\?(?!\[\[\?)\s*(\w+)\s*\]\](?:\r?\n|\n)*([\S\s]*?)-{0,2}\[\[\?\]\]((?:\r?\n|\n)*)/g, function sqlFragRpl(match, lb1, key, fsql, lb2) {
+      return (key && frags && frags.indexOf(key) >= 0 && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });
+    return sql;
   }
 
   /**
