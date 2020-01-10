@@ -28,8 +28,9 @@ lab.experiment(plan, () => {
   if (Tester.beforeEach) lab.beforeEach(Tester.beforeEach);
   if (Tester.afterEach) lab.afterEach(Tester.afterEach);
 
-  lab.test(`${plan}: No Cache`, { timeout: TEST_TKO }, Tester.noCache);
+  lab.test(`${plan}: Read`, { timeout: TEST_TKO }, Tester.read);
   lab.test(`${plan}: Read Return Error`, { timeout: TEST_TKO }, Tester.readErrorReturn);
   lab.test(`${plan}: Read Throw Error`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'read throw' }, Tester.readErrorThrow));
+  lab.test(`${plan}: Read With SQL Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutions);
   lab.test(`${plan}: Interval Cache`, { timeout: TEST_TKO }, Tester.intervalCache);
 });

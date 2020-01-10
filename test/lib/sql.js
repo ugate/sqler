@@ -35,24 +35,19 @@ class Tester {
     return Promise.all(proms);
   }
 
-  static async noCache() {
-    const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
+  static async read() {
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
     conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
     conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
     await UtilSql.initManager(priv, conf, {
       logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateAbyssConsoleLogger
     });
 
-    try {
-      await UtilSql.testRead(priv.mgr, connName);
-    } catch (err) {
-      priv.error = err;
-      throw err;
-    }
+    return UtilSql.testRead(priv.mgr, connName);
   }
 
   static async readErrorReturn() {
-    const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
     await UtilSql.initManager(priv, conf);
 
     const execOpts = UtilOpts.createExecOpts();
@@ -62,7 +57,7 @@ class Tester {
   }
 
   static async readErrorThrow() {
-    const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
     await UtilSql.initManager(priv, conf);
 
     const execOpts = UtilOpts.createExecOpts();
@@ -71,9 +66,19 @@ class Tester {
     return UtilSql.testRead(priv.mgr, connName, { execOpts });
   }
 
+  static async readWithSubstitutions() {
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
+    await UtilSql.initManager(priv, conf);
+
+    const execOpts = UtilOpts.createExecOpts();
+    execOpts.driverOptions = execOpts.driverOptions || {};
+    execOpts.driverOptions.substitutes = UtilOpts.createSubstituteDriverOpts();
+    return UtilSql.testRead(priv.mgr, connName, { execOpts });
+  }
+
   static async intervalCache() {
     const cacheOpts = { expiresIn: 100 };
-    const conf = UtilOpts.getConf(), connName = conf.db.connections[0].name;
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
     await UtilSql.initManager(priv, conf, { cache: new IntervalCache(cacheOpts), logger: priv.mgrLogit });
 
     try {

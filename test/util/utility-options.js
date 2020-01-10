@@ -8,9 +8,9 @@ const { format } = require('util');
 // export
 class UtilOpts {
 
-  static getConf() {
+  static getConf(mainPath) {
     const conf = {
-      "mainPath": 'test',
+      "mainPath": mainPath || 'test',
       "univ": {
         "db": {
           "testId": {
@@ -32,7 +32,7 @@ class UtilOpts {
             "service": "TESTSRV",
             "dialect": "test",
             "driverOptions": {
-              "numOfPreparedStmts": 8,
+              "numOfPreparedStmts": 0,
               "autocommit": false,
               "throwExecError": false
             }
@@ -68,6 +68,17 @@ class UtilOpts {
     return { SOME_OTHER_DB: 'SOME_OTHER_TEST_DB' };
   }
 
+  /**
+   * @returns {Object} The test driver options to handle substitutions
+   */
+  static createSubstituteDriverOpts() {
+    return {
+      dialect: {
+        present: ['DIALECT_SUB_TEST_COL'],
+        absent: ['DIALECT_SUB_REMOVE_ME_COL']
+      }
+    };
+  }
   /**
    * Gets a connection by name in a specified configuration
    * @param {Object} conf The {@link UtilOpts.getConf} object

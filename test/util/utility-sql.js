@@ -6,12 +6,14 @@ const { Manager } = require('../../index');
 const TestDialect = require('../dialects/test-dialect');
 const UtilOpts = require('./utility-options');
 const Fs = require('fs');
+const Path = require('path');
 const { expect } = require('@hapi/code');
 // TODO : import { Labrat, LOGGER } from '@ugate/labrat';
 // TODO : import { Manager } from '../../index.mjs';
 // TODO : import * as TestDialect from '../dialects/test-dialect.mjs';
 // TODO : import * as UtilOpts from './utility-options.mjs';
 // TODO : import * as Fs from 'fs';
+// TODO : import * as Path from 'path';
 // TODO : import { expect } from '@hapi/code';
 
 // TODO : ESM uncomment the following line...
@@ -248,6 +250,39 @@ class UtilSql {
     } else {
       return Fs.promises.readFile(sqlPath);
     }
+  }
+
+  /**
+   * Scans a directory and any subdirectories for SQL files and adds their paths to the provided list
+   * @param {String[]} paths Where the SQL file paths will be stored
+   * @param {String} pdir The directory to scan for SQL files
+   */
+  static async sqlFilePaths(paths, pdir) {
+    let pth, proms = [];
+    const reads = await Fs.promises.readdir(pdir);
+    for (let ri = 0, stat; ri < reads.length; ++ri) {
+      pth = Path.resolve(pdir, reads[ri]);
+      stat = await Fs.promises.stat(pth);
+      if (stat && stat.isDirectory()) {
+        proms.push(UtilSql.sqlFilePaths(paths, pth));
+        continue;
+      }
+      if (!reads[ri].endsWith('.sql')) continue;
+      paths.push(pth);
+    }
+    return Promise.all(proms);
+  }
+
+  static async initConf(mainPath) {
+    const conf = UtilOpts.getConf(mainPath);
+    const basePath = Path.resolve(conf.mainPath || './test/db');
+    for (let conn of conf.db.connections) {
+      conn.driverOptions = conn.driverOptions || {};
+      conn.driverOptions.sqlPaths = [];
+      await UtilSql.sqlFilePaths(conn.driverOptions.sqlPaths, Path.join(basePath, conn.dir || conn.name));
+      conn.driverOptions.numOfPreparedStmts = conn.driverOptions.sqlPaths.length;
+    }
+    return conf;
   }
 }
 

@@ -73,6 +73,8 @@ class TestDialect extends Dialect {
       throw new Error(`Test error due to "opts.driverOptions.throwExecError" = ${opts.driverOptions.throwExecError}`);
     }
 
+    const xopts = UtilOpts.createExecOpts();
+
     const xoptsNoExpandedBinds = UtilOpts.createExecOpts(true);
     expectOpts(this, opts, 'exec');
     expect(opts.binds, 'opts.binds').to.be.object();
@@ -82,14 +84,16 @@ class TestDialect extends Dialect {
     if (this.connConf.binds) {
       expect(opts.binds, 'opts.binds').to.contain(this.connConf.binds);
     }
-    expectExpansionBinds(sql, opts, UtilOpts.createExecOpts());
+    expectExpansionBinds(sql, opts, xopts);
+
+    expectSqlSubstitutes(sql, opts, xopts);
 
     if (this.connConf.substitutes) {
       for (let sub in this.connConf.substitutes) {
         if (!this.connConf.substitutes.hasOwnProperty(sub)) continue;
         if (!sql.includes(sub) && !sql.includes(this.connConf.substitutes[sub])) continue; // SQL may not be using the substitute
-        expect(sql, `SQL substitute`).to.not.contain(sub);
-        expect(sql, `SQL substitute`).to.contain(this.connConf.substitutes[sub]);
+        expect(sql, `SQL raw substitute`).to.not.contain(sub);
+        expect(sql, `SQL raw substitute`).to.contain(this.connConf.substitutes[sub]);
       }
     }
 
@@ -203,6 +207,35 @@ function expectExpansionBinds(sql, opts, xopts) {
       enm = `${xopt}${xi || ''}`;
       expect(opts.binds[enm], `opts.binds.${enm} (binds expansion) on SQL:\n${sql}\n`).to.equal(xbinds[xi]);
       expect(sql).to.contain(`:${enm}`);
+    }
+  }
+}
+
+/**
+ * Expects the `opts.driverOptions.substitutes` to be substituted in the SQL statement
+ * @param {String} sql The SQL being validated
+ * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
+ * @param {Manager~ExecOptions} xopts The {@link Manager~ExecOptions} that are being validated against
+ */
+function expectSqlSubstitutes(sql, opts, xopts) {
+  expect(sql).to.not.contain('[[!');
+  expect(sql).to.not.contain('[[?');
+  expect(sql).to.not.contain('[[version');
+  if (!opts.driverOptions || !opts.driverOptions.substitutes) return;
+  if (opts.driverOptions.substitutes.dialects) {
+    for (let present of opts.driverOptions.substitutes.present) {
+      expect(sql).to.contain(present);
+    }
+    for (let absent of opts.driverOptions.substitutes.absent) {
+      expect(sql).to.not.contain(absent);
+    }
+  }
+  if (opts.driverOptions.substitutes.versions) {
+    for (let present of opts.driverOptions.versions.present) {
+      expect(sql).to.contain(present);
+    }
+    for (let absent of opts.driverOptions.versions.absent) {
+      expect(sql).to.not.contain(absent);
     }
   }
 }
