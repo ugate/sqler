@@ -69,16 +69,38 @@ class UtilOpts {
   }
 
   /**
-   * @returns {Object} The test driver options to handle substitutions
+   * @returns {Object} The test driver options to handle substitutions for dialects
    */
-  static createSubstituteDriverOpts() {
+  static createSubstituteDriverOptsDialects() {
     return {
-      dialect: {
-        present: ['DIALECT_SUB_TEST_COL'],
-        absent: ['DIALECT_SUB_REMOVE_ME_COL']
-      }
+      present: ['DIALECT_SUB_TEST_COL'],
+      absent: ['DIALECT_SUB_REMOVE_ME_COL']
     };
   }
+
+  /**
+   * @param {Number} presentVersion The version that should be present in the SQL being executed
+   * @param {Number} absentVersion The version that should __not__ be present in the SQL being executed
+   * @returns {Object} The test driver options to handle substitutions for versioning
+   */
+  static createSubstituteDriverOptsVersions(presentVersion, absentVersion) {
+    const rtn = {
+      present: [`VERSION_SUB_TEST_COL1 = ${presentVersion}`],
+      absent: [`VERSION_SUB_TEST_COL1 = ${absentVersion}`]
+    };
+    if (presentVersion !== 1) rtn.present.push('VERSION_SUB_TEST_COL2 = 3');
+    return rtn;
+  }
+
+  /**
+   * @returns {Object} An object with each property name as the fragment key and the value as the expected clause to be found in the executed SQL statement
+   */
+  static createSubstituteDriverOptsFrags() {
+    return {
+      myFragKey: 'FRAG_SUB_TEST_COL IS NOT NULL'
+    };
+  }
+
   /**
    * Gets a connection by name in a specified configuration
    * @param {Object} conf The {@link UtilOpts.getConf} object
@@ -113,6 +135,25 @@ class UtilOpts {
    */
   static generateTestAbyssLogger() {
     return function testAbyssLogger() {};
+  }
+
+  /**
+   * Checks if a specified driver option is present and returns the value when present
+   * @param {String} opt The option to check for
+   * @param {Manager~ExecOptions} execOpts The execution options being passed
+   * @param {Manager~ConnectionOptions} connConf The connection configuration being used
+   * @returns {Object} The driver option details that contain the following properties:
+   * - `source` - _execution_ when the option came from the {@link Manager~ExecOptions}, _connection_ when coming from the {@link Manager~ConnectionOptions}
+   * or _undefined_ when the option is not found.
+   * - `value` - The option value
+   */
+  static driverOpt(opt, execOpts, connConf) {
+    if (execOpts && execOpts.driverOptions && execOpts.driverOptions.hasOwnProperty(opt)) {
+      return { source: 'execution', value: execOpts.driverOptions[opt] };
+    } else if (connConf && connConf.driverOptions && connConf.driverOptions.hasOwnProperty(opt)) {
+      return { source: 'connection', value: connConf.driverOptions[opt] };
+    }
+    return {};
   }
 }
 

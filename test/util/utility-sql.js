@@ -94,48 +94,78 @@ class UtilSql {
    * @param {Manager~ConnectionOptions} [testReadOpts.connOpts] The {@link Manager~ConnectionOptions} that was used
    * @param {Manager~ExecOptions} [testReadOpts.execOpts] The {@link Manager~ExecOptions} to use (leave `undefined` to create)
    * @param {Boolean} [testReadOpts.returnErrors] Value passed into the {@link Manager~PreparedFunction}
+   * @param {Object} [testReadOpts.prepFuncPaths] Override the path(s) to the prepared function that resides on the {@link Manager}
+   * @param {String} [testReadOpts.prepFuncPaths.read='read.some.tables'] Override path from the `mgr.db[connName]` to the prepared function that will be executed for a file
+   * that is prefixed with `read`
+   * @param {String} [testReadOpts.prepFuncPaths.readNoPrefix='no.prefix.tables'] Override path from the `mgr.db[connName]` to the prepared function that will be executed for
+   * a file that is __not__ prefixed with `read`
+   * @param {String[]} [testReadOpts.frags] The framents to send to the prepared function
    * @returns {(Error | undefined)} An error when the test fails
    */
   static async testRead(mgr, connName, testReadOpts) {
     if (LOGGER.info) LOGGER.info(`Begin basic test`);
 
     testReadOpts = testReadOpts || {};
-    const { cache, cacheOpts, connOpts, execOpts, returnErrors } = testReadOpts;
+    const { cache, cacheOpts, connOpts, execOpts, returnErrors, frags, prepFuncPaths = { read: 'read.some.tables', readNoPrefix: 'no.prefix.some.tables' } } = testReadOpts;
     const opts = typeof execOpts === 'undefined' ? UtilOpts.createExecOpts() : execOpts;
-    const label = `READ mgr.db.${connName}.read.some.tables`;
-    const labelWithoutPrefix = `READ mgr.db.${connName}.no.prefix.tables`;
-    const optsNoPrefix = JSON.parse(JSON.stringify(opts || {}));
-    optsNoPrefix.type = 'READ';
-    const performRead = async (label, length, noPrefix, opts, frags = ['test-frag']) => {
-      let readRslt;
-      if (noPrefix) readRslt = await mgr.db[connName].no.prefix.some.tables(opts, frags, returnErrors);
-      else readRslt = await mgr.db[connName].read.some.tables(opts, frags, returnErrors);
-      if (returnErrors && (connOpts && connOpts.driverOptions && connOpts.driverOptions.throwExecError) || (opts && opts.driverOptions && opts.driverOptions.throwExecError)) {
+    const label = `READ mgr.db.${connName}.${prepFuncPaths.read}`;
+    const labelWithoutPrefix = `READ mgr.db.${connName}.${prepFuncPaths.readNoPrefix}`;
+    const optsNoPrefix = prepFuncPaths.readNoPrefix ? JSON.parse(JSON.stringify(opts || {})) : null;
+    if (optsNoPrefix) optsNoPrefix.type = 'READ';
+    const performRead = async (label, noPrefix, opts, frags) => {
+      let readRslt, pfunc;
+      const pths = noPrefix ? prepFuncPaths.readNoPrefix.split('.') : prepFuncPaths.read.split('.');
+      for (let ppth of pths) {
+        if (pfunc) pfunc = pfunc[ppth];
+        else pfunc = mgr.db[connName][ppth];
+      }
+      expect(pfunc, noPrefix ? labelWithoutPrefix : label).to.be.function();
+      if (noPrefix) readRslt = await pfunc(opts, frags, returnErrors);
+      else readRslt = await pfunc(opts, frags, returnErrors);
+      const throwOpt = UtilOpts.driverOpt('throwExecError', opts, connOpts);
+      if (returnErrors && throwOpt.source && throwOpt.value) {
         expect(readRslt, `${label} results`).to.be.error();
       } else {
+        const rcdCntOpt = UtilOpts.driverOpt('recordCount', opts, connOpts);
         expect(readRslt, `${label} results`).to.be.array();
-        expect(readRslt, `${label} results.length`).to.be.length(length);
+        expect(readRslt, `${label} results.length`).to.be.length((rcdCntOpt.source && rcdCntOpt.value) || 2);
       }
       if (LOGGER.info) LOGGER.info(label, readRslt);
     };
     // two records should be returned w/o order by
-    await performRead(`${label} BEFORE cache update:`, 2, false, opts);
-    await performRead(`${labelWithoutPrefix} BEFORE cache update (w/o SQL file prefix for CRUD):`, 2, true, optsNoPrefix);
+
+    await performRead(`${label} BEFORE cache update:`, false, opts, frags);
+    if (prepFuncPaths.readNoPrefix) {
+      await performRead(`${labelWithoutPrefix} BEFORE cache update (w/o SQL file prefix for CRUD):`, true, optsNoPrefix, frags);
+    }
     
     // change the SQL file
     const sql = (await UtilSql.sqlFile()).toString(), sqlNoPrefix = (await UtilSql.sqlFile(null, true)).toString();
     try {
-      // update the files to indicate that the result should contain a single record vs multiple
-      await UtilSql.sqlFile(`${sql}${TestDialect.testSqlSingleRecordKey}`);
-      await UtilSql.sqlFile(`${sqlNoPrefix}${TestDialect.testSqlSingleRecordKey}`, true);
+      // set the single record key on the driver options so that the test dialect can determine how many records to return (when the SQL contains the key)
+      opts.driverOptions = opts.driverOptions || {};
+      const singleRecordKey = '\nORDER BY *';
+      opts.driverOptions.singleRecordKey = singleRecordKey;
+      
+      // update the files to indicate that the result should contain a single record vs multiple (chen cache expiry is being used)
+      await UtilSql.sqlFile(`${sql}${singleRecordKey}`);
+      if (prepFuncPaths.readNoPrefix) {
+        await UtilSql.sqlFile(`${sqlNoPrefix}${singleRecordKey}`, true);
+      }
 
       // wait for the the SQL statement to expire
       await Labrat.wait(cacheOpts && cacheOpts.hasOwnProperty('expiresIn') ? cacheOpts.expiresIn : 1000);
 
       // only when using a cache will the SQL be updated to reflect a single record
-      const rslt2Cnt = cache ? 1 : 2;
-      await performRead(`${label} AFTER ${cache ? '' : 'no-'}cache update:`, rslt2Cnt, false, opts);
-      await performRead(`${labelWithoutPrefix} AFTER ${cache ? '' : 'no-'}cache update (w/o SQL file prefix for CRUD):`, rslt2Cnt, true, optsNoPrefix);
+      const origRcdCnt = opts.driverOptions.recordCount;
+      opts.driverOptions.recordCount = cache ? 1 : 2;
+      await performRead(`${label} AFTER ${cache ? '' : 'no-'}cache update:`, false, opts, frags);
+      if (prepFuncPaths.readNoPrefix) {
+        await performRead(`${labelWithoutPrefix} AFTER ${cache ? '' : 'no-'}cache update (w/o SQL file prefix for CRUD):`, true, optsNoPrefix, frags);
+      }
+
+      // set opts back to original value
+      opts.driverOptions.recordCount = origRcdCnt;
 
       // no commits, only reads
       await UtilSql.testOperation('pendingCommit', mgr, connName, 0, label);
@@ -146,9 +176,34 @@ class UtilSql {
       try {
         await UtilSql.sqlFile(sql);
       } finally {
-        await UtilSql.sqlFile(sqlNoPrefix, true);
+        if (prepFuncPaths.readNoPrefix) await UtilSql.sqlFile(sqlNoPrefix, true);
       }
     }
+  }
+
+  /**
+   * Tests for version substitutions using the `version` defined in the {@link Manager~ConnectionOptions}.
+   * @param {Object} priv The private dataspace
+   * @param {Manager} priv.mgr The {@link Manager} to use
+   * @param {Number} presentVersion The version that should be present in the executing SQL statement
+   * @param {Number} absentVersion The version that should __not__ be present in the executing SQL statement
+   * @returns {(Error | undefined)} The result from {@link #testRead}
+   */
+  static async testVersions(priv, presentVersion, absentVersion) {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
+
+    conn.version = presentVersion;
+
+    await UtilSql.initManager(priv, conf);
+
+    const execOpts = UtilOpts.createExecOpts();
+    execOpts.driverOptions = execOpts.driverOptions || {};
+    execOpts.driverOptions.versions = UtilOpts.createSubstituteDriverOptsVersions(conn.version, absentVersion);
+    const testOpts = {
+      execOpts,
+      prepFuncPaths: { read: 'finance.read.annual.report' }
+    };
+    return UtilSql.testRead(priv.mgr, connName, testOpts);
   }
 
   /**

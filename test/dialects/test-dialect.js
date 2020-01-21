@@ -69,8 +69,9 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async exec(sql, opts, frags) {
-    if ((opts.driverOptions && opts.driverOptions.throwExecError) || (this.connConf.driverOptions && this.connConf.driverOptions.throwExecError)) {
-      throw new Error(`Test error due to "opts.driverOptions.throwExecError" = ${opts.driverOptions.throwExecError}`);
+    if (UtilOpts.driverOpt('throwExecError', opts, this.connConf).value) {
+      throw new Error(`Test error due to "opts.driverOptions.throwExecError" = ${
+        opts.driverOptions.throwExecError} and "this.connConf.driverOptions.throwExecError" = ${this.connConf.driverOptions.throwExecError}`);
     }
 
     const xopts = UtilOpts.createExecOpts();
@@ -86,8 +87,6 @@ class TestDialect extends Dialect {
     }
     expectExpansionBinds(sql, opts, xopts);
 
-    expectSqlSubstitutes(sql, opts, xopts);
-
     if (this.connConf.substitutes) {
       for (let sub in this.connConf.substitutes) {
         if (!this.connConf.substitutes.hasOwnProperty(sub)) continue;
@@ -97,20 +96,31 @@ class TestDialect extends Dialect {
       }
     }
 
-    const isSingleRecord = sql.includes(TestDialect.testSqlSingleRecordKey);
+    const singleRecordKey = UtilOpts.driverOpt('singleRecordKey', opts, this.connConf), recordCount = UtilOpts.driverOpt('recordCount', opts, this.connConf);
 
     if (frags) {
-      const fragLabel = `${isSingleRecord ? 'Single record ' : ''}frags`;
+      const fragLabel = `frags`;
       expect(frags, fragLabel).to.be.array();
-      expect(frags, `${fragLabel}.length`).to.not.be.empty();
+
+      // frag names should have been removed
       for (let frag of frags) {
         expect(frag, `${fragLabel} (iteration)`).to.be.string();
         expect(frag, `${fragLabel} (iteration) length`).to.not.be.empty();
-        if (isSingleRecord) {
-          expect(frag, `${fragLabel} (iteration) testMultiRecordFragKey`).to.equal(TestDialect.testMultiRecordFragKey);
+        expect(sql, `${fragLabel} (iteration) removed`).to.not.contain(frag);
+      }
+
+      // check to make sure the expected fragments are included in the SQL statement
+      const fragSqlSnip = UtilOpts.driverOpt('fragSqlSnippets', opts, this.connConf);
+      if (fragSqlSnip.source && fragSqlSnip.value) {
+        for (let fkey in fragSqlSnip.value) {
+          if (frags.includes(fkey)) {
+            expect(sql).to.contain(fragSqlSnip.value[fkey]);
+          }
         }
       }
     }
+
+    expectSqlSubstitutes(sql, opts, this.connConf, frags);
 
     let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
     if (!cols) return;
@@ -120,8 +130,15 @@ class TestDialect extends Dialect {
     for (let col of cols) {
       rcrd[col.substr(col.lastIndexOf('.') + 1)] = ++ci;
     }
-    // simple test output when the 
-    return isSingleRecord ? [rcrd] : [rcrd, rcrd];
+    // simple test output records (single record key overrides the record count)
+    if (singleRecordKey.source && sql.includes(singleRecordKey.value)) {
+      return [rcrd];
+    }
+    const rtn = [];
+    for (let i = 0; i < (recordCount.value || 2); ++i) {
+     rtn.push(rcrd);
+    }
+    return rtn;
   }
 
   /**
@@ -157,20 +174,6 @@ class TestDialect extends Dialect {
   isAutocommit(opts) {
     return opts && opts.driverOptions && opts.driverOptions.hasOwnProperty('autocommit') ? 
       opts.driverOptions.autocommit : this.connConf && this.connConf.driverOptions && this.connConf.driverOptions.autocommit;
-  }
-
-  /**
-   * @returns {String} a SQL segment indicating a test SQL should only return a single record
-   */
-  static get testSqlSingleRecordKey() {
-    return '\nORDER BY *';
-  }
-
-  /**
-   * @returns {String} a SQL fragment that will be checked for when returning multiple records in a test
-   */
-  static get testMultiRecordFragKey() {
-    return 'test-frag';
   }
 }
 
@@ -217,25 +220,25 @@ function expectExpansionBinds(sql, opts, xopts) {
  * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
  * @param {Manager~ExecOptions} xopts The {@link Manager~ExecOptions} that are being validated against
  */
-function expectSqlSubstitutes(sql, opts, xopts) {
+function expectSqlSubstitutes(sql, opts, connConf) {
   expect(sql).to.not.contain('[[!');
   expect(sql).to.not.contain('[[?');
   expect(sql).to.not.contain('[[version');
   if (!opts.driverOptions || !opts.driverOptions.substitutes) return;
   if (opts.driverOptions.substitutes.dialects) {
-    for (let present of opts.driverOptions.substitutes.present) {
+    for (let present of opts.driverOptions.substitutes.dialects.present) {
       expect(sql).to.contain(present);
     }
-    for (let absent of opts.driverOptions.substitutes.absent) {
+    for (let absent of opts.driverOptions.substitutes.dialects.absent) {
       expect(sql).to.not.contain(absent);
     }
   }
   if (opts.driverOptions.substitutes.versions) {
-    for (let present of opts.driverOptions.versions.present) {
-      expect(sql).to.contain(present);
+    for (let present of opts.driverOptions.substitutes.versions.present) {
+      expect(sql, connConf.version).to.contain(present);
     }
-    for (let absent of opts.driverOptions.versions.absent) {
-      expect(sql).to.not.contain(absent);
+    for (let absent of opts.driverOptions.substitutes.versions.absent) {
+      expect(sql, connConf.version).to.not.contain(absent);
     }
   }
 }

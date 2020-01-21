@@ -66,14 +66,42 @@ class Tester {
     return UtilSql.testRead(priv.mgr, connName, { execOpts });
   }
 
-  static async readWithSubstitutions() {
+  static async readWithSubstitutionsDialects() {
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
     await UtilSql.initManager(priv, conf);
 
     const execOpts = UtilOpts.createExecOpts();
     execOpts.driverOptions = execOpts.driverOptions || {};
-    execOpts.driverOptions.substitutes = UtilOpts.createSubstituteDriverOpts();
-    return UtilSql.testRead(priv.mgr, connName, { execOpts });
+    execOpts.driverOptions.substitutes = { dialects: UtilOpts.createSubstituteDriverOptsDialects() };
+    return UtilSql.testRead(priv.mgr, connName, {
+      execOpts,
+      prepFuncPaths: { read: 'finance.read.annual.report' }
+    });
+  }
+
+  static async readWithSubstitutionsFrags() {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
+    await UtilSql.initManager(priv, conf);
+
+    conn.driverOptions = conn.driverOptions || {};
+    conn.driverOptions.fragSqlSnippets = UtilOpts.createSubstituteDriverOptsFrags();
+    let frags = [];
+    for (let frag in conn.driverOptions.fragSqlSnippets) {
+      frags.push(frag);
+    }
+
+    return UtilSql.testRead(priv.mgr, connName, {
+      frags,
+      prepFuncPaths: { read: 'finance.read.annual.report' }
+    });
+  }
+
+  static async readWithSubstitutionsVersion1() {
+    return UtilSql.testVersions(priv, 1, 2);
+  }
+
+  static async readWithSubstitutionsVersion2() {
+    return UtilSql.testVersions(priv, 2, 1);
   }
 
   static async intervalCache() {
