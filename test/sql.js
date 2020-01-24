@@ -36,4 +36,5 @@ lab.experiment(plan, () => {
   lab.test(`${plan}: Read With SQL Version = 2 Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsVersion2);
   lab.test(`${plan}: Read With SQL Fragment Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsFrags);
   lab.test(`${plan}: Interval Cache`, { timeout: TEST_TKO }, Tester.intervalCache);
+  lab.test(`${plan}: Execute Multiple Iterations`, { timeout: TEST_TKO }, Tester.execMultipleIterations);
 });

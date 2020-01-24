@@ -518,12 +518,13 @@ class SQLS {
         }
       }
       const driverOptions = opts && opts.driverOptions ? opts.driverOptions : undefined;
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, type, binds, frags, driverOptions, returnErrors));
+      const numOfIterations = (opts && opts.numOfIterations) || 1;
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, type, numOfIterations, binds, frags, driverOptions, returnErrors));
     };
   }
 
-  genExecSqlFromFileFunction(fpth, type, binds, frags, driverOptions, returnErrors) {
-    const sqls = internal(this), opts = { type, binds, driverOptions };
+  genExecSqlFromFileFunction(fpth, type, numOfIterations, binds, frags, driverOptions, returnErrors) {
+    const sqls = internal(this), opts = { type, numOfIterations, binds, driverOptions };
     return async function execSqlFromFile(sql) {
       return await sqls.at.dbs.exec(fpth, sql, opts, frags, returnErrors);
     };

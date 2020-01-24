@@ -124,6 +124,17 @@ class Tester {
       throw err;
     }
   }
+
+  static async execMultipleIterations() {
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
+    await UtilSql.initManager(priv, conf);
+
+    const execOpts = UtilOpts.createExecOpts();
+    execOpts.driverOptions = execOpts.driverOptions || {};
+    // use driver options property as control value to validate against in the test dialect
+    execOpts.numOfIterations = execOpts.driverOptions.numOfIterations = 2;
+    return UtilSql.testRead(priv.mgr, connName, { execOpts });
+  }
 }
 
 // TODO : ESM comment the following line...
