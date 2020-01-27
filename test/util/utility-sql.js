@@ -29,12 +29,12 @@ class UtilSql {
    * @param {Function} [initOpts.logger] A custom logger to use for the manager
    * @param {Manager} [initOpts.mgr] The manager to initialize
    * @param {Boolean} [initOpts.skipPrepFuncs] Truthy to skip {@link Manager~PreparedFunction} validation
+   * @param {Boolean} [initOpts.returnErrors] Override value passed into {@link Manager.init}
    */
   static async initManager(priv, conf, initOpts = {}) {
     const { cache, logger, mgr, skipPrepFuncs } = initOpts;
     priv.cache = cache;
     priv.mgr = mgr || new Manager(conf, priv.cache, logger || false);
-    await priv.mgr.init();
 
     if (!conf) return; // should throw error in manager
     
@@ -42,6 +42,33 @@ class UtilSql {
 
     const conn = conf.db.connections[0];
     const cname = conn.name;
+
+    const initRtnsErrors = initOpts.hasOwnProperty('returnErrors');
+    const initThrowsErrors = initOpts.returnErrors && conn.driverOptions && conn.driverOptions.throwInitError;
+    const initRslts = initRtnsErrors ? await priv.mgr.init(initOpts.returnErrors) : await priv.mgr.init();
+
+    expect(initRslts, 'manager.init()').to.be.object();
+    expect(initRslts.result, 'manager.init() results').to.be.object();
+    if (initThrowsErrors) {
+      expect(initRslts.errors, 'manager.init() errors').to.be.array();
+      expect(initRslts.errors, 'manager.init() errors length = conf.db.connections.length').to.have.length(conf.db.connections.length);
+      for (let err of initRslts.errors) {
+        expect(err, 'manager.init() error').to.be.error();
+      }
+    } else {
+      let name;
+      for (let iname in initRslts.result) {
+        if (initRslts.result.hasOwnProperty(iname)) continue;
+        name = null;
+        for (let cconn of conf.db.connections) {
+          if (cconn.name === iname) {
+            name = cconn.name;
+            break;
+          }
+        }
+        expect(iname, `manager.init() result.${iname} = conf.db.connections[].name`).to.equal(name);
+      }
+    }
 
     expect(priv.mgr.db, 'priv.mgr.db').to.be.object();
     expect(priv.mgr.db[cname], `priv.mgr.db.${cname}`).to.be.object();
@@ -295,8 +322,9 @@ class UtilSql {
    */
   static async testOperation(type, mgr, connName, expected, label, opts, allConnections) {
     const rslt = allConnections ? await mgr[type](opts) : await mgr[type](opts, connName);
-    expect(rslt, `${label || 'DB'} ${type} result`).to.be.object();
-    expect(rslt[connName], `${label || 'DB'} ${type} result`).to.equal(expected);
+    expect(rslt, `${label || 'DB'} ${type} returned`).to.be.object();
+    expect(rslt.result, `${label || 'DB'} ${type} result`).to.be.object();
+    expect(rslt.result[connName], `${label || 'DB'} ${type} result.${connName}`).to.equal(expected);
     return rslt;
   } 
 

@@ -60,6 +60,9 @@ class TestDialect extends Dialect {
   async init(opts) {
     expect(opts, 'opts').to.be.object();
     if (this.connConf.driverOptions) {
+      if (this.connConf.driverOptions.throwInitError) {
+        throw new Error(`Test error due to "this.connConf.driverOptions.throwInitError" = ${this.connConf.driverOptions.throwInitError}`);
+      }
       expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(this.connConf.driverOptions && this.connConf.driverOptions.numOfPreparedStmts);
     }
     return true;

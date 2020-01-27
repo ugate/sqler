@@ -180,16 +180,23 @@ class Tester {
     return UtilSql.initManager(priv, conf);
   }
 
-  static async valNMainPathEmpty() {
+  static async valMainPathEmpty() {
     const conf = await UtilSql.initConf('test/empty-db');
     conf.db.connections[0].driverOptions.numOfPreparedStmts = 0; // prevent statement count mismatch error
     return UtilSql.initManager(priv, conf, { skipPrepFuncs: true }); // skip prepared function validation since they will be empty
   }
 
-  static async valNPrivatePath() {
+  static async valPrivatePath() {
     const conf = await UtilSql.initConf();
     conf.privatePath = 'test/';
     return UtilSql.initManager(priv, conf);
+  }
+
+  static async valInitErrorReturn() {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0];
+    conn.driverOptions = conn.driverOptions || {};
+    conn.driverOptions.throwInitError = true;
+    return UtilSql.initManager(priv, conf, { returnErrors: true });
   }
 
   static async valReinit() {

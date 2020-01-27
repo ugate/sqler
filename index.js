@@ -195,14 +195,24 @@ const COMPARE = Object.freeze({
  * @property {Object} raw The raw results from the execution (driver-specific execution resuls).
  */
 
- /**
-  * Operational options for {@link Manager} methods
-  * @typedef {Object} Manager~OperationOptions
-  * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `executeInSeries` that will override
-  * any global options set directly on the {@link Manager~OperationOptions}. For example, `opts.connections.myConnection.executeInseries` would override `opts.executeInSeries`
-  * for the connection named `myConnection`, but would use `opts.executeInSeries` for any other connections that ae not overridden.
-  * @property {Boolean} [executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel.
-  */
+/**
+ * Operational options for {@link Manager} methods
+ * @typedef {Object} Manager~OperationOptions
+ * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `returnErrors` and/or `executeInSeries`
+ * that will override any global options set directly on the {@link Manager~OperationOptions}. For example, `opts.connections.myConnection.executeInseries` would override
+ * `opts.executeInSeries` for the connection named `myConnection`, but would use `opts.executeInSeries` for any other connections that ae not overridden.
+ * @property {Boolean} [executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel.
+ * @property {Boolean} [returnErrors] Set to truthy to return any errors. Otherise throw any errors as they are encountered.
+ */
+
+/**
+ * Results returned from invoking an operational method on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.commit}, {@link Manager.rollback}, {@link Manager.pendingCommit},
+ * {@link Manager.close}, etc.).
+ * @typedef {Object} Manager~OperationResults
+ * @property {Object} result An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection).
+ * @property {Error[]} errors Any errors that may have occurred on the operational methods. Should only be populated when {@link Manager~OperationOptions} are used with a truthy value set on
+ * `returnErrors`. Each will contain meta properties set by [Asynchro](https://ugate.github.io/asynchro).
+ */
 
 /**
  * The database(s) manager entry point that autogenerates/manages SQL execution functions from underlying SQL statement files.
@@ -274,12 +284,13 @@ class Manager {
 
   /**
    * Initializes the defined database connections
-   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
+   * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
+   * @returns {Manager~OperationResults} The results
    */
-  async init() {
+  async init(returnErrors) {
     const mgr = internal(this);
     if (mgr.at.isInit) throw new Error(`${mgr.at.dbCount} database(s) are already initialized`);
-    const rslt = await operation(mgr, 'init');
+    const rslt = await operation(mgr, 'init', { returnErrors });
     mgr.at.isInit = true;
     mgr.at.dbCount = Object.getOwnPropertyNames(rslt).length;
     if (mgr.at.log) mgr.at.log(`${mgr.at.dbCount} database(s) are ready for use`);
@@ -290,7 +301,7 @@ class Manager {
    * Commit the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
    * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
-   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
+   * @returns {Manager~OperationResults} The results
    */
   async commit(opts, ...connNames) {
     return operation(internal(this), 'commit', opts, connNames);
@@ -300,7 +311,7 @@ class Manager {
    * Rollback the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
    * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
-   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
+   * @returns {Manager~OperationResults} The results
    */
   async rollback(opts, ...connNames) {
     return operation(internal(this), 'rollback', opts, connNames);
@@ -310,7 +321,7 @@ class Manager {
    * Determines the number of pending transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
    * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
-   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
+   * @returns {Manager~OperationResults} The results
    */
   async pendingCommit(opts, ...connNames) {
     return operation(internal(this), 'pendingCommit', opts, connNames);
@@ -318,7 +329,7 @@ class Manager {
  
   /**
    * Closes all database pools/connections/etc.
-   * @returns {Object} An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection)
+   * @returns {Manager~OperationResults} The results
    */
   async close() {
     return operation(internal(this), 'close');
@@ -339,23 +350,28 @@ class Manager {
  * @param {String} funcName The async function name to call on each {@link SQLS} instance
  * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
  * @param {String[]} [connNames] The connection names to perform the commit on (defaults to all connections)
- * @returns {Object} The result from Asynchro
+ * @returns {Manager~OperationResults} The results
  */
 async function operation(mgr, funcName, opts, connNames) {
   opts = opts || {};
   const cnl = (connNames && connNames.length) || 0;
-  const ax = new Asynchro({}, true);
+  const ax = new Asynchro({}, opts.returnErrors ? false : true);
   const queue = sqli => {
     const func = () => {
       if (typeof sqli[funcName] === 'function') return sqli[funcName]();
       return Promise.resolve(sqli[funcName]);
     };
     const name = sqli.connectionName;
-    const hasOverride = opts.connections && opts.connections[name] && typeof opts.connections[name] === 'object' && opts.connections[name].hasOwnProperty('executeInSeries');
-    if (hasOverride ? opts.connections[name].executeInSeries : opts.executeInSeries) {
-      ax.series(name, func);
+    const hasConnOpts = opts.connections && opts.connections[name] && typeof opts.connections[name] === 'object';
+    const hasSeriesOverride = hasConnOpts && opts.connections[name].hasOwnProperty('executeInSeries');
+    const hasErrorOverride = hasConnOpts && opts.connections[name].hasOwnProperty('returnErrors');
+    const throws = hasErrorOverride && opts.connections[name].returnErrors ? false : true;
+    if (hasSeriesOverride ? opts.connections[name].executeInSeries : opts.executeInSeries) {
+      if (hasErrorOverride) ax.seriesThrowOverride(name, throws, func);
+      else ax.series(name, func);
     } else {
-      ax.parallel(name, func);
+      if (hasErrorOverride) ax.parallelThrowOverride(name, throws, func);
+      else ax.parallel(name, func);
     }
   };
   for (let i = 0, l = mgr.at.sqls.length; i < l; ++i) {
@@ -364,7 +380,8 @@ async function operation(mgr, funcName, opts, connNames) {
       queue(mgr.at.sqls[i]);
     } else queue(mgr.at.sqls[i]);
   }
-  return ax.run();
+  const result = await ax.run();
+  return { result, errors: ax.errors };
 }
 
 /**

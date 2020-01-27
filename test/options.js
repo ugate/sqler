@@ -53,8 +53,9 @@ lab.experiment(plan, () => {
   lab.test(`${plan}: Connections Log Custom Tags`, Tester.valConnectionsLogTags);
   lab.test(`${plan}: Connections Log Custom Tags (with custom logger)`, Tester.valConnectionsLogTagsWithCustomLogger);
   lab.test(`${plan}: Nonexistent Main Path (Error)`, Labrat.expectFailure(['onUnhandledRejection', 'onUncaughtException'], { expect, label: 'mainPath' }, Tester.valNonexistentMainPath));
-  lab.test(`${plan}: Empty DB In Main Path`, Tester.valNMainPathEmpty);
-  lab.test(`${plan}: Custom Private Path`, Tester.valNPrivatePath);
+  lab.test(`${plan}: Empty DB In Main Path`, Tester.valMainPathEmpty);
+  lab.test(`${plan}: Custom Private Path`, Tester.valPrivatePath);
+  lab.test(`${plan}: Init Error Return`, Tester.valInitErrorReturn);
   lab.test(`${plan}: Reinitialize Manager (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections duplicate' }, Tester.valReinit));
   lab.test(`${plan}: Debug`, Tester.valDebug);
 });

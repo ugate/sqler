@@ -4,9 +4,9 @@
   "description": "Turn SQL files into executable functions",
   "main": "index.js",
   "scripts": {
-    "test": "lab -v -c --coverage-exclude lib -t 86 -e prod",
-    "testing": "lab -v -c --coverage-exclude lib -t 86 -e test",
-    "test-debug": "lab -v -c --coverage-exclude lib -t 86 -e dev",
+    "test": "lab -v -c --coverage-exclude lib -t 85 -e prod",
+    "testing": "lab -v -c --coverage-exclude lib -t 85 -e test",
+    "test-debug": "lab -v -c --coverage-exclude lib -t 85 -e dev",
     "jsdocp": "jsdocp ./jsdocp/jsdoc.json",
     "jsdocp-deploy": "jsdocp -D ./jsdocp/jsdoc.json"
   },
@@ -34,7 +34,7 @@
   "devDependencies": {
     "@hapi/code": "^8.0.1",
     "@hapi/lab": "^22.0.3",
-    "@ugate/labrat": "^2.0.1",
+    "@ugate/labrat": "^2.0.2",
     "jsdoc": "^3.6.3",
     "jsdocp": "^1.0.3",
     "minami": "^1.2.3"
