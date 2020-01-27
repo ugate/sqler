@@ -123,12 +123,13 @@ class UtilSql {
       if (noPrefix) readRslt = await pfunc(opts, frags, returnErrors);
       else readRslt = await pfunc(opts, frags, returnErrors);
       const throwOpt = UtilOpts.driverOpt('throwExecError', opts, connOpts);
+      expect(readRslt, `${label} result`).to.be.object();
       if (returnErrors && throwOpt.source && throwOpt.value) {
-        expect(readRslt, `${label} results`).to.be.error();
+        expect(readRslt.rows, `${label} result rows`).to.be.error();
       } else {
         const rcdCntOpt = UtilOpts.driverOpt('recordCount', opts, connOpts);
-        expect(readRslt, `${label} results`).to.be.array();
-        expect(readRslt, `${label} results.length`).to.be.length((rcdCntOpt.source && rcdCntOpt.value) || 2);
+        expect(readRslt.rows, `${label} result rows`).to.be.array();
+        expect(readRslt.rows, `${label} result rows.length`).to.be.length((rcdCntOpt.source && rcdCntOpt.value) || 2);
       }
       if (LOGGER.info) LOGGER.info(label, readRslt);
     };
@@ -244,33 +245,39 @@ class UtilSql {
 
     cudRslt = await mgr.db[connName].finance.create.annual.report(xopts);
     label = `CREATE mgr.db.${connName}.finance.create.annual.report()`;
-    expect(cudRslt, `${label} result`).to.be.undefined();
+    expect(cudRslt, `${label} result`).to.be.object();
+    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
     await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
 
     cudRslt = await mgr.db[connName].finance.read.annual.report(xopts);
     label = `READ mgr.db.${connName}.finance.read.annual.report()`;
-    expect(cudRslt, `${label} result`).to.be.array();
-    expect(cudRslt, `${label} result length`).to.be.length(2); // two records should be returned w/o order by
+    expect(cudRslt, `${label} result`).to.be.object();
+    expect(cudRslt.rows, `${label} result rows`).to.be.array();
+    expect(cudRslt.rows, `${label} result rows.length`).to.be.length(2); // two records should be returned w/o order by
     await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, label);
     
     cudRslt = await mgr.db[connName].finance.ap.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ap.update.audits()`;
-    expect(cudRslt, `${label} result`).to.be.undefined();
+    expect(cudRslt, `${label} result`).to.be.object();
+    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
     await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
 
     cudRslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
     label = `DELETE mgr.db.${connName}.finance.ap.delete.audits()`;
-    expect(cudRslt, `${label} result`).to.be.undefined();
+    expect(cudRslt, `${label} result`).to.be.object();
+    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
     await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
 
     cudRslt = await mgr.db[connName].finance.ar.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ar.update.audits()`;
-    expect(cudRslt, `${label} result`).to.be.undefined();
+    expect(cudRslt, `${label} result`).to.be.object();
+    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
     await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
 
     cudRslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
     label = `DELETE mgr.db.${connName}.finance.ar.delete.audits()`;
-    expect(cudRslt, `${label} result`).to.be.undefined();
+    expect(cudRslt, `${label} result`).to.be.object();
+    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
     await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
 
     return pendCnt;

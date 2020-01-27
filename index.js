@@ -184,8 +184,15 @@ const COMPARE = Object.freeze({
  * @param {Manager~ExecOptions} [opts] The SQL execution options
  * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
  * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
- * @returns {(Object[] | undefined | Error)} The result set of dynamically generated result models, undefined when executing a non-read SQL statement or an `Error` when
- * `opts.returnErrors` is _true_.
+ * @returns {Manager~ExecResults} The result set of dynamically generated result models, undefined when executing a non-read SQL statement or an `Error` when
+ */
+
+/**
+ * Results returned from invoking a {@link Manager~PreparedFunction}
+ * @typedef {Object} Manager~ExecResults
+ * @property {(Object[] | null | undefined | Error)} rows The execution array of row model objects, undefined when executing a non-read SQL statement or an `Error` when the 
+ * {@link Manager~PreparedFunction} was invoked with the `returnErrors` flag set to a _truthy_ value.
+ * @property {Object} raw The raw results from the execution (driver-specific execution resuls).
  */
 
  /**
@@ -612,7 +619,7 @@ class DBS {
   * @param {Manager~ExecOptions} opts The eectution options
   * @param {String[]} frags The frament keys within the SQL that will be retained
   * @param {Boolean} [returnErrors] Truthy to return any errors thrown during execution rather than throwing them
-  * @returns {(Object[] | undefined | Error)} The execution results, `undefined` when not perfroming a read or an error when `returnErrors` is true
+  * @returns {Dialect~ExecResults} The execution results
   */
   async exec(fpth, sql, opts, frags, returnErrors) {
     const dbs = internal(this);
@@ -628,11 +635,11 @@ class DBS {
       if (dbs.at.errorLogging) {
         dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
       }
-      if (returnErrors) return err;
+      if (returnErrors) return { rows: err };
       throw err;
     }
     if (dbs.at.logging) {
-      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.length) || 0} records (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
+      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.rows && rslt.rows.length) || 0} records (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
     }
     return rslt;
   }

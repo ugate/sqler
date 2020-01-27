@@ -123,7 +123,8 @@ class TestDialect extends Dialect {
     expectSqlSubstitutes(sql, opts, this.connConf, frags);
 
     let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
-    if (!cols) return;
+    const rslt = { raw: {} };
+    if (!cols) return rslt;
     cols = cols[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
     const rcrd = {};
     let ci = 0;
@@ -132,13 +133,14 @@ class TestDialect extends Dialect {
     }
     // simple test output records (single record key overrides the record count)
     if (singleRecordKey.source && sql.includes(singleRecordKey.value)) {
-      return [rcrd];
+      rslt.rows = [rcrd];
+      return rslt;
     }
-    const rtn = [];
+    rslt.rows = [];
     for (let i = 0; i < (recordCount.value || 2); ++i) {
-     rtn.push(rcrd);
+     rslt.rows.push(rcrd);
     }
-    return rtn;
+    return rslt;
   }
 
   /**
