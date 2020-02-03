@@ -9,7 +9,8 @@ The [Manager](Manager.html) is the entry point for one or more databases/connect
   - [3️⃣ Dialect Substitutions](#ds)
   - [4️⃣ Version Susbstitutions](#vs)
   - [5️⃣ Raw Substitutions](#rs)
-  - [6️⃣ Caching SQL](#cache)
+- [🎬 Transactions](#tx)
+- [🗄️ Caching SQL](#cache)
 
 #### ⚙️ Setup &amp; Configuration <sub id="conf"></sub>:
 There are two types of configuration, _public_ and _private_. Public configurations contain one or more `connections` that will be established during initialization and typically vary depending upon the environment being used (e.g. development, test, ci, production, etc.). See the [manager.connections in the database manager constructor](Manager.html) for a complete listing of public configuration options. Private or _universal_ (`univ`) configuration, on the other hand, is intended to carry sensitive information like connection credentials. Each public connection should contain a `conf.db.connections[].id` that matches a property name in the private configuration `conf.univ.db `. __Both public and private configurations are combined when passed into the [Manager](Manager.html), but shoud be loaded from separate sources__. The following example illustrates this using a matching `myId`:
@@ -263,5 +264,11 @@ SELECT ST.COME_COL
 FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
-#### 6️⃣ Caching SQL <sub id="cache"></sub>:
+#### 🎬 Transactions <sub id="tx"></sub>:
+[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialects](Dialect.html). Each generated [Prepared Function](Manager.html#~PreparedFunction) that is invoked will return a [result](Manager.html#~ExecResults) that contains two transactional functions:
+
+- `commit` - Commits any pending changes from one or more previously invoked SQL statements
+- `rollback` - Rolls back any pending changes from one or more previously invoked SQL statements
+
+#### 🗄️ Caching SQL <sub id="cache"></sub>:
 By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#Cache) container into the [Manager constructor](Manager.html#Manager).

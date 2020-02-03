@@ -7,6 +7,9 @@ AND DIALECT_SUB_TEST_COL = SUBSTR(SOME_COL1, 1, 1)
 [[! removeMeDialect]]
 AND DIALECT_SUB_REMOVE_ME_COL = SUBSTRING(SOME_COL1 FROM 1 FOR 1)
 [[!]]
+[[version < 0]]
+AND VERSION_SUB_TEST_COL1 = -1
+[[version]]
 [[version <= 1]]
 AND VERSION_SUB_TEST_COL1 = 0
 [[version]]
@@ -17,6 +20,9 @@ AND VERSION_SUB_TEST_COL1 = 1
 AND VERSION_SUB_TEST_COL1 = 2
 [[version]]
 [[version <> 1]]
-AND VERSION_SUB_TEST_COL2 = 3
+AND VERSION_SUB_TEST_COL1 = 3
+[[version]]
+[[version >= 1]]
+AND VERSION_SUB_TEST_COL1 = 4
 [[version]]
 [[? myFragKey]] AND FRAG_SUB_TEST_COL IS NOT NULL [[?]]

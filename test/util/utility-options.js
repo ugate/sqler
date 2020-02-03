@@ -4,6 +4,8 @@
 const { format } = require('util');
 // TODO : import { format } from 'util';
 
+const TEST_DATE = new Date();
+
 // TODO : ESM uncomment the following line...
 // export
 class UtilOpts {
@@ -33,7 +35,6 @@ class UtilOpts {
             "dialect": "test",
             "driverOptions": {
               "numOfPreparedStmts": 0,
-              "autocommit": false,
               "throwExecError": false
             }
           }
@@ -57,7 +58,7 @@ class UtilOpts {
    * @returns {Object} The test execution options to pass into {@link Manager.execute}
    */
   static createConnectionBinds() {
-    return { someCol1: 1, someCol2: 2, someCol3: 3, someCol4: 4 };
+    return { someCol1: 1, someCol2: 2, someCol3: 3, someCol4: 4, someColDate: TEST_DATE };
   }
 
   /**
@@ -79,16 +80,23 @@ class UtilOpts {
   }
 
   /**
-   * @param {Number} presentVersion The version that should be present in the SQL being executed
-   * @param {Number} absentVersion The version that should __not__ be present in the SQL being executed
+   * @param {(Number | Number[])} presentVersion One or more versions that should be present in the SQL being executed
+   * @param {(Number | Number[])} absentVersion The version that should __not__ be present in the SQL being executed
    * @returns {Object} The test driver options to handle substitutions for versioning
    */
   static createSubstituteDriverOptsVersions(presentVersion, absentVersion) {
     const rtn = {
-      present: [`VERSION_SUB_TEST_COL1 = ${presentVersion}`],
-      absent: [`VERSION_SUB_TEST_COL1 = ${absentVersion}`]
+      present: [],
+      absent: []
     };
-    if (presentVersion !== 1) rtn.present.push('VERSION_SUB_TEST_COL2 = 3');
+    const pvers = Array.isArray(presentVersion) ? presentVersion : [presentVersion];
+    for (let pver of pvers) {
+      rtn.present.push(`VERSION_SUB_TEST_COL1 = ${pver}`);
+    }
+    const avers = Array.isArray(absentVersion) ? absentVersion : [absentVersion];
+    for (let aver of avers) {
+      rtn.absent.push(`VERSION_SUB_TEST_COL1 = ${aver}`);
+    }
     return rtn;
   }
 
@@ -102,12 +110,12 @@ class UtilOpts {
   }
 
   /**
-   * Gets a connection by name in a specified configuration
+   * Extracts a connection configuration by name in a specified configuration
    * @param {Object} conf The {@link UtilOpts.getConf} object
    * @param {String} name The connection name to find
    * @returns {Object} The connection configuration object that matches the specified name
    */
-  static getConnConf(conf, name) {
+  static extractConnConf(conf, name) {
     for (let conn of conf.db.connections) {
       if (conn.name === name) return conn;
     }

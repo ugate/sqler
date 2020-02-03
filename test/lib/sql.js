@@ -96,12 +96,16 @@ class Tester {
     });
   }
 
+  static async readWithSubstitutionsVersionNegative1() {
+    return UtilSql.testVersions(priv, -1, [-1, 0, 3], 1, 2, 4);
+  }
+
   static async readWithSubstitutionsVersion1() {
-    return UtilSql.testVersions(priv, 1, 2);
+    return UtilSql.testVersions(priv, 1, [0, 1, 4], -1, 2, 3);
   }
 
   static async readWithSubstitutionsVersion2() {
-    return UtilSql.testVersions(priv, 2, 1);
+    return UtilSql.testVersions(priv, 2, [2, 3, 4], -1, 0, 1);
   }
 
   static async intervalCache() {
@@ -112,13 +116,15 @@ class Tester {
     try {
       await UtilSql.testRead(priv.mgr, connName, { cache: priv.cache, cacheOpts });
 
-      let xopts = UtilOpts.createExecOpts(), pendingCount;
-      pendingCount = await UtilSql.testCUD(priv.mgr, connName, conf, xopts);
-      await UtilSql.testOperation('commit', priv.mgr, connName, pendingCount);
+      const xopts = UtilOpts.createExecOpts();
 
-      if (LOGGER.info) LOGGER.info('>> CUD tests using autocommit = true');
-      xopts.driverOptions = { autocommit: true };
-      pendingCount = await UtilSql.testCUD(priv.mgr, connName, conf, xopts);
+      if (LOGGER.info) LOGGER.info('>> CUD tests using autoCommit = true (default)');
+      xopts.autoCommit = true;
+      await UtilSql.testCUD(priv.mgr, connName, conf, xopts);
+
+      if (LOGGER.info) LOGGER.info('>> CUD tests using autoCommit = false');
+      xopts.autoCommit = false;
+      await UtilSql.testCUD(priv.mgr, connName, conf, xopts);
     } catch (err) {
       priv.error = err;
       throw err;

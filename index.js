@@ -167,36 +167,42 @@ const COMPARE = Object.freeze({
  * @typedef {Object} Manager~ExecOptions
  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
  * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
- * @property {Object} [binds] The key/value pair of replacement parameters that will be bound in the SQL statement
+ * @property {Object} [binds] The key/value pair of binding parameters that will be bound in the SQL statement.
+ * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
+ * until the returned {@link Manager~ExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
  * @property {Integer} [numOfIterations] The number of times the SQL should be executed. When supported, should take less round-trips back to the DB
  * rather than calling generated SQL functions multiple times.
  * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
  * perform `date.toISOString()`. __Overrides the same option set on {@link Manager~ConnectionOptions}__.
- * @property {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned rather then thrown
  * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
  */
  // TODO : @property {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
 
 /**
- * Generated/prepared SQL function
+ * Prepared functions are auto-generated `async` functions that execute an SQL statement from an SQL file source.
  * @async
  * @callback {Function} Manager~PreparedFunction
  * @param {Manager~ExecOptions} [opts] The SQL execution options
  * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
  * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
- * @returns {Manager~ExecResults} The result set of dynamically generated result models, undefined when executing a non-read SQL statement or an `Error` when
+ * @param {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned in the {@link Manager~ExecResults} rather then being thrown.
+ * @returns {Manager~ExecResults} The execution results
  */
 
 /**
  * Results returned from invoking a {@link Manager~PreparedFunction}
  * @typedef {Object} Manager~ExecResults
- * @property {(Object[] | null | undefined | Error)} rows The execution array of row model objects, undefined when executing a non-read SQL statement or an `Error` when the 
- * {@link Manager~PreparedFunction} was invoked with the `returnErrors` flag set to a _truthy_ value.
- * @property {Object} raw The raw results from the execution (driver-specific execution resuls).
+ * @property {Object[]} [rows] The execution array of model objects representing each row or `undefined` when executing a non-read SQL statement.
+ * @property {Function} [commit] A no-argument _async_ function that commits any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_.
+ * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ to ensue underlying connections are persisted and closed.__
+ * @property {Function} [rollback] A no-argument _async_ function that rollbacks any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_.
+ * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ to ensue underlying connections are persisted and closed.__
+ * @property {Error} [error] Any caught error that occurred when a {@link Manager~PreparedFunction} was invoked with the `returnErrors` flag set to a _truthy_ value.
+ * @property {Object} raw The raw results from the execution (driver-specific execution results).
  */
 
 /**
- * Operational options for {@link Manager} methods
+ * Options for operational methods on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.state}, {@link Manager.close}, etc.).
  * @typedef {Object} Manager~OperationOptions
  * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `returnErrors` and/or `executeInSeries`
  * that will override any global options set directly on the {@link Manager~OperationOptions}. For example, `opts.connections.myConnection.executeInseries` would override
@@ -206,12 +212,26 @@ const COMPARE = Object.freeze({
  */
 
 /**
- * Results returned from invoking an operational method on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.commit}, {@link Manager.rollback}, {@link Manager.pendingCommit},
- * {@link Manager.close}, etc.).
+ * Results returned from invoking an operational method on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.state}, {@link Manager.close}, etc.).
  * @typedef {Object} Manager~OperationResults
  * @property {Object} result An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection).
  * @property {Error[]} errors Any errors that may have occurred on the operational methods. Should only be populated when {@link Manager~OperationOptions} are used with a truthy value set on
  * `returnErrors`. Each will contain meta properties set by [Asynchro](https://ugate.github.io/asynchro).
+ */
+
+/**
+ * Options that are used during initialization
+ * @typedef {Object} Manager~InitOptions
+ * @property {Integer} numOfPreparedStmts The total number of prepared statements registered to the {@link Dialect}
+ */
+
+/**
+ * The current state of the managed {@link Dialect}
+ * @typedef {Object} Manager~State
+ * @property {Integer} pending The number of transactions that are pending `commit` or `roolback`
+ * @property {Object} [connections] The connection state
+ * @property {Integer} [connections.count] The number of connections
+ * @property {Integer} [connections.inUse] The number of connections that are in use
  */
 
 /**
@@ -297,34 +317,14 @@ class Manager {
     return rslt;
   }
 
-  /**
-   * Commit the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
-   * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
-   * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
-   * @returns {Manager~OperationResults} The results
-   */
-  async commit(opts, ...connNames) {
-    return operation(internal(this), 'commit', opts, connNames);
-  }
-
-  /**
-   * Rollback the current transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
-   * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
-   * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
-   * @returns {Manager~OperationResults} The results
-   */
-  async rollback(opts, ...connNames) {
-    return operation(internal(this), 'rollback', opts, connNames);
-  }
-
    /**
-   * Determines the number of pending transaction(s) in progress on either all the connections used by the manager or on the specified connection names.
+   * Composes the {@link Manager~State} on either all the connections used by the manager or on the specified connection names.
    * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
-   * @param {...String} [connNames] The connection names to perform the commit on (defaults to all connections)  
+   * @param {...String} [connNames] The connection names to perform the check on (defaults to all connections)  
    * @returns {Manager~OperationResults} The results
    */
-  async pendingCommit(opts, ...connNames) {
-    return operation(internal(this), 'pendingCommit', opts, connNames);
+  async state(opts, ...connNames) {
+    return operation(internal(this), 'state', opts, connNames);
   }
  
   /**
@@ -349,7 +349,7 @@ class Manager {
  * @param {Manager} mgr The _internal_/private {@link Manager} store
  * @param {String} funcName The async function name to call on each {@link SQLS} instance
  * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
- * @param {String[]} [connNames] The connection names to perform the commit on (defaults to all connections)
+ * @param {String[]} [connNames] The connection names to perform the opearion on (defaults to all connections)
  * @returns {Manager~OperationResults} The results
  */
 async function operation(mgr, funcName, opts, connNames) {
@@ -519,53 +519,44 @@ class SQLS {
       }
       if (sqls.at.conn.binds) for (let i in sqls.at.conn.binds) {
         if (!opts || !opts.binds || !opts.binds.hasOwnProperty(i)) {
-          binds[i] = sqls.at.conn.binds[i]; // add per connection static parameters when not overridden
+          // add per connection static parameters when not overridden
+          if (sqls.at.conn.binds[i] instanceof Date) {
+            binds[i] = sqls.this.formatDate(sqls.at.conn.binds[i], (opts && opts.dateFormatter) || sqls.at.dateFormatter);
+          } else {
+            binds[i] = sqls.at.conn.binds[i]; 
+          }
         }
       }
       if (opts && opts.binds) {
-        let dfunc;
         for (let i in opts.binds) {
           if (opts.binds[i] instanceof Date) {
-            dfunc = opts.dateFormatter || sqls.at.dateFormatter;
-            if (dfunc === true) {
-              binds[i] = opts.binds[i].toISOString(); // convert dates to ANSI format for use in SQL
-              continue;
-            } else if (dfunc && typeof dfunc === 'function') {
-              dfunc = dfunc(opts.binds[i]);
-              if (typeof dfunc === 'string') {
-                binds[i] = dfunc;
-                continue;
-              }
-            }
+            binds[i] = sqls.this.formatDate(opts.binds[i], opts.dateFormatter || sqls.at.dateFormatter);
+          } else {
+            binds[i] = opts.binds[i];
           }
-          binds[i] = opts.binds[i];
         }
       }
       const driverOptions = opts && opts.driverOptions ? opts.driverOptions : undefined;
       const numOfIterations = (opts && opts.numOfIterations) || 1;
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, type, numOfIterations, binds, frags, driverOptions, returnErrors));
+      const autoCommit = opts && opts.hasOwnProperty('autoCommit') ? opts.autoCommit : true;
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, { type, autoCommit, numOfIterations, binds, driverOptions }, frags, returnErrors));
     };
   }
 
-  genExecSqlFromFileFunction(fpth, type, numOfIterations, binds, frags, driverOptions, returnErrors) {
-    const sqls = internal(this), opts = { type, numOfIterations, binds, driverOptions };
+  formatDate(bind, dfunc) {
+    if (dfunc === true) {
+      return bind.toISOString(); // convert dates to ANSI format for use in SQL
+    } else if (dfunc && typeof dfunc === 'function') {
+      dfunc = dfunc(bind);
+      return typeof dfunc === 'string' ? dfunc : bind;
+    } else return bind;
+  }
+
+  genExecSqlFromFileFunction(fpth, opts, frags, returnErrors) {
+    const sqls = internal(this);
     return async function execSqlFromFile(sql) {
       return await sqls.at.dbs.exec(fpth, sql, opts, frags, returnErrors);
     };
-  }
-
-  /**
-   * Iterates through and commits the different database connection transactions
-   */
-  async commit() {
-    return internal(this).at.dbs.commit();
-  }
-
-  /**
-   * Iterates through and rollback the different database connection transactions
-   */
-  async rollback() {
-    return internal(this).at.dbs.rollback();
   }
 
   /**
@@ -576,10 +567,10 @@ class SQLS {
   }
 
   /**
-   * @returns {Integer} The number of executed transactions that are pending commit
+   * @returns {Manager~State} The current managed state of the {@link DBS}
    */
-  get pendingCommit() {
-    return internal(this).at.dbs.pendingCommit;
+  get state() {
+    return internal(this).at.dbs.state;
   }
 
   /**
@@ -616,7 +607,6 @@ class DBS {
     dbs.at.errorLogging = conn.errorLogging;
     dbs.at.logging = conn.logging;
     dbs.at.version = conn.version || 0;
-    dbs.at.pending = 0;
   }
 
   /**
@@ -647,16 +637,16 @@ class DBS {
     }
     let rslt;
     try {
-      rslt = await dbs.at.dialect.exec(sqlf, generateDbsOpts(dbs, 'exec', opts), frags); // execute the prepared SQL statement
+      rslt = await dbs.at.dialect.exec(sqlf, opts, frags); // execute the prepared SQL statement
     } catch (err) {
       if (dbs.at.errorLogging) {
-        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
+        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, state: ${dbs.at.dialect.state})`);
       }
-      if (returnErrors) return { rows: err };
+      if (returnErrors) return { error: err };
       throw err;
     }
     if (dbs.at.logging) {
-      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.rows && rslt.rows.length) || 0} records (options: ${JSON.stringify(opts)}, connections: ${dbs.at.dialect.lastConnectionCount || 'N/A'}, in use: ${dbs.at.dialect.lastConnectionInUseCount || 'N/A'})`);
+      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.rows && rslt.rows.length) || 0} records (options: ${JSON.stringify(opts)}, state: ${dbs.at.dialect.state})`);
     }
     return rslt;
   }
@@ -711,59 +701,20 @@ class DBS {
   }
 
   /**
-   * Iterates through and commits the different database connection transactions
-   */
-  async commit() {
-    const dbs = internal(this);
-    const rslt = await dbs.at.dialect.commit(generateDbsOpts(dbs, 'commit'));
-    dbs.at.pending = 0;
-    return rslt;
-  }
-
-  /**
-   * Iterates through and rollback the different database connection transactions
-   */
-  async rollback() {
-    const dbs = internal(this);
-    const rslt = dbs.at.dialect.rollback(generateDbsOpts(dbs, 'rollback'));
-    dbs.at.pending = 0;
-    return rslt;
-  }
-
-  /**
    * Iterates through and terminates the different database connection pools
    */
   async close() {
     const dbs = internal(this);
-    const rslt = await dbs.at.dialect.close(generateDbsOpts(dbs, 'close'));
-    dbs.at.pending = 0;
-    return rslt;
+    return dbs.at.dialect.close();
   }
 
   /**
-   * @returns {Integer} The number of executed transactions that are pending commit
+   * @returns {Manager~State} The managed state of the {@link Dialect}
    */
-  get pendingCommit() {
+  get state() {
     const dbs = internal(this);
-    return dbs.at.pending;
+    return dbs.at.dialect.state;
   }
-}
-
-/**
- * Generates options for {@link DBS}
- * @private
- * @param {DBS} dbs The {@link DBS} state instance
- * @param {String} operation The operaion for whcih the generated options are generated for (e.g. exec, commit, rollback, close, etc.)
- * @param {DialectOptions} [opts] Optional options where additional options will be set
- * @returns {DialectOptions} The {@link Dialect} options
- */
-function generateDbsOpts(dbs, operation, opts) {
-  const ropts = opts || {};
-  if (operation === 'exec') {
-    dbs.at.pending += opts.type === 'READ' || dbs.at.dialect.isAutocommit(opts) ? 0 : 1;
-  }
-  ropts.tx = { pending: dbs.at.pending };
-  return ropts;
 }
 
 /**

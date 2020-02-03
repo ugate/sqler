@@ -152,7 +152,7 @@ class UtilSql {
       const throwOpt = UtilOpts.driverOpt('throwExecError', opts, connOpts);
       expect(readRslt, `${label} result`).to.be.object();
       if (returnErrors && throwOpt.source && throwOpt.value) {
-        expect(readRslt.rows, `${label} result rows`).to.be.error();
+        expect(readRslt.error, `${label} result rows`).to.be.error();
       } else {
         const rcdCntOpt = UtilOpts.driverOpt('recordCount', opts, connOpts);
         expect(readRslt.rows, `${label} result rows`).to.be.array();
@@ -196,10 +196,7 @@ class UtilSql {
       opts.driverOptions.recordCount = origRcdCnt;
 
       // no commits, only reads
-      await UtilSql.testOperation('pendingCommit', mgr, connName, 0, label);
-      await UtilSql.testOperation('commit', mgr, connName, 0, label);
-      // rollback test
-      await UtilSql.testOperation('rollback', mgr, connName, 0, label);
+      await UtilSql.testOperation('state', mgr, connName, { pending: 0 }, label);
     } finally {
       try {
         await UtilSql.sqlFile(sql);
@@ -213,20 +210,21 @@ class UtilSql {
    * Tests for version substitutions using the `version` defined in the {@link Manager~ConnectionOptions}.
    * @param {Object} priv The private dataspace
    * @param {Manager} priv.mgr The {@link Manager} to use
-   * @param {Number} presentVersion The version that should be present in the executing SQL statement
-   * @param {Number} absentVersion The version that should __not__ be present in the executing SQL statement
+   * @param {Number} version The version that will be set on the connection options
+   * @param {(Number | Number[])} presentVersion The version that should be present in the executing SQL statement
+   * @param {...Number} absentVersion The version that should __not__ be present in the executing SQL statement
    * @returns {(Error | undefined)} The result from {@link #testRead}
    */
-  static async testVersions(priv, presentVersion, absentVersion) {
+  static async testVersions(priv, version, presentVersion, ...absentVersion) {
     const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
 
-    conn.version = presentVersion;
+    conn.version = version;
 
     await UtilSql.initManager(priv, conf);
 
     const execOpts = UtilOpts.createExecOpts();
     execOpts.driverOptions = execOpts.driverOptions || {};
-    execOpts.driverOptions.versions = UtilOpts.createSubstituteDriverOptsVersions(conn.version, absentVersion);
+    execOpts.driverOptions.versions = UtilOpts.createSubstituteDriverOptsVersions(presentVersion, absentVersion);
     const testOpts = {
       execOpts,
       prepFuncPaths: { read: 'finance.read.annual.report' }
@@ -240,79 +238,96 @@ class UtilSql {
    * @param {String} connName The connection name to use
    * @param {Object} conf The {@link UtilOpts.getConf} object
    * @param {Manager~ExecOptions} xopts The execution options
-   * @returns {Integer} The number of pending commits
    */
   static async testCUD(mgr, connName, conf, xopts) {
-    let autocommit = xopts && xopts.driverOptions && xopts.driverOptions.autocommit;
-    if (!xopts || !xopts.driverOptions || !xopts.driverOptions.hasOwnProperty('autocommit')) {
-      const tconf = UtilOpts.getConnConf(conf, connName);
-      autocommit = tconf.driverOptions && tconf.driverOptions.autocommit;
-    }
-    
-    let pendCnt = 0;
+    const testState = { pending: 0 };
+    const autoCommit = xopts && xopts.hasOwnProperty('autoCommit') ? xopts.autoCommit : true;
 
     let fakeConnError, fakeConnLabel = `Connection "${connName}" (w/fake connection name)`;
     try {
-      await UtilSql.testOperation('pendingCommit', mgr, 'fakeConnectionNameToTest', undefined, fakeConnLabel);
+      await UtilSql.testOperation('state', mgr, 'fakeConnectionNameToTest', undefined, fakeConnLabel);
     } catch (err) {
       fakeConnError = err;
     }
     expect(fakeConnError, `ERROR ${fakeConnLabel}`).to.be.error();
 
-    await UtilSql.testOperation('pendingCommit', mgr, 'fakeConnectionNameToTest', undefined, 'All connections (w/fake connection name)', null, true);
-    await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, 'All connections', null, true);
-    await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, 'All connections (w/empty options)', {}, true);
-    await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, 'All connections (w/empty connections)', { connections: { } }, true);
-    await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, 'All connections (w/boolean connections name)', { connections: { [connName]: true } }, true);
-    await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, 'All connections (w/empty connections name)', { connections: { [connName]: { } } }, true);
-    await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, 'All connections (w/explicit parallel options)', { connections: { [connName]: { executeInSeries: false } } }, true);
-    await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, 'All connections (w/series execution)', { connections: { [connName]: { executeInSeries: true } } }, true);
+    await UtilSql.testOperation('state', mgr, 'fakeConnectionNameToTest', undefined, 'All connections (w/fake connection name)', null, true);
+    await UtilSql.testOperation('state', mgr, connName, testState, 'All connections', null, true);
+    await UtilSql.testOperation('state', mgr, connName, testState, 'All connections (w/empty options)', {}, true);
+    await UtilSql.testOperation('state', mgr, connName, testState, 'All connections (w/empty connections)', { connections: { } }, true);
+    await UtilSql.testOperation('state', mgr, connName, testState, 'All connections (w/boolean connections name)', { connections: { [connName]: true } }, true);
+    await UtilSql.testOperation('state', mgr, connName, testState, 'All connections (w/empty connections name)', { connections: { [connName]: { } } }, true);
+    await UtilSql.testOperation('state', mgr, connName, testState, 'All connections (w/explicit parallel options)', { connections: { [connName]: { executeInSeries: false } } }, true);
+    await UtilSql.testOperation('state', mgr, connName, testState, 'All connections (w/series execution)', { connections: { [connName]: { executeInSeries: true } } }, true);
 
-    let cudRslt, label;
+    let rslt, label;
 
-    cudRslt = await mgr.db[connName].finance.create.annual.report(xopts);
+    rslt = await mgr.db[connName].finance.create.annual.report(xopts);
     label = `CREATE mgr.db.${connName}.finance.create.annual.report()`;
-    expect(cudRslt, `${label} result`).to.be.object();
-    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
-    await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+    expect(rslt, `${label} result`).to.be.object();
+    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    UtilSql.expectTransaction(rslt, autoCommit, label);
+    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
 
-    cudRslt = await mgr.db[connName].finance.read.annual.report(xopts);
+    rslt = await mgr.db[connName].finance.read.annual.report(xopts);
     label = `READ mgr.db.${connName}.finance.read.annual.report()`;
-    expect(cudRslt, `${label} result`).to.be.object();
-    expect(cudRslt.rows, `${label} result rows`).to.be.array();
-    expect(cudRslt.rows, `${label} result rows.length`).to.be.length(2); // two records should be returned w/o order by
-    await UtilSql.testOperation('pendingCommit', mgr, connName, pendCnt, label);
+    expect(rslt, `${label} result`).to.be.object();
+    expect(rslt.rows, `${label} result rows`).to.be.array();
+    expect(rslt.rows, `${label} result rows.length`).to.be.length(2); // two records should be returned w/o order by
+    UtilSql.expectTransaction(rslt, autoCommit, label);
+    await UtilSql.testOperation('state', mgr, connName, testState, label);
     
-    cudRslt = await mgr.db[connName].finance.ap.update.audits(xopts);
+    rslt = await mgr.db[connName].finance.ap.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ap.update.audits()`;
-    expect(cudRslt, `${label} result`).to.be.object();
-    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
-    await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+    expect(rslt, `${label} result`).to.be.object();
+    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    UtilSql.expectTransaction(rslt, autoCommit, label);
+    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
 
-    cudRslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
+    rslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
     label = `DELETE mgr.db.${connName}.finance.ap.delete.audits()`;
-    expect(cudRslt, `${label} result`).to.be.object();
-    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
-    await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+    expect(rslt, `${label} result`).to.be.object();
+    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    UtilSql.expectTransaction(rslt, autoCommit, label);
+    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
 
-    cudRslt = await mgr.db[connName].finance.ar.update.audits(xopts);
+    rslt = await mgr.db[connName].finance.ar.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ar.update.audits()`;
-    expect(cudRslt, `${label} result`).to.be.object();
-    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
-    await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+    expect(rslt, `${label} result`).to.be.object();
+    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    UtilSql.expectTransaction(rslt, autoCommit, label);
+    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
 
-    cudRslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
+    rslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
     label = `DELETE mgr.db.${connName}.finance.ar.delete.audits()`;
-    expect(cudRslt, `${label} result`).to.be.object();
-    expect(cudRslt.rows, `${label} result rows`).to.be.undefined();
-    await UtilSql.testOperation('pendingCommit', mgr, connName, autocommit ? pendCnt : ++pendCnt, label);
+    expect(rslt, `${label} result`).to.be.object();
+    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    UtilSql.expectTransaction(rslt, autoCommit, label);
+    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
 
-    return pendCnt;
+    if (!autoCommit) await rslt.commit();
+  }
+
+  /**
+   * Expects a transaction (or `undefined` when not a transaction)
+   * @param {Manager~ExecResults} rslt The results from a {@link Manager~PreparedFunction} for a CUD invocation
+   * @param {Boolean} notExpected Flag indicating the transaction should __NOT__ be expected
+   * @param {String} [label] The label to use for the expect
+   */
+  static expectTransaction(rslt, notExpected, label = '') {
+    if (notExpected) {
+      expect(rslt.commit,`${label} result commit`).to.be.undefined();
+      expect(rslt.rollback,`${label} result rollback`).to.be.undefined();
+    } else {
+      expect(rslt.commit,`${label} result commit`).to.be.function();
+      expect(rslt.rollback,`${label} result rollback`).to.be.function();
+    }
   }
 
   /**
    * Tests if the specified operation and operation result
-   * @param {String} type The type of manager operation to test (e.g. `rollback`, `commit`, `close`, etc.)
+   * @param {String} type The type of manager operation to test (e.g. `close`, etc.)
+   * @param {(Manager | Object)} opd Either the {@link Manager} or a {@link Manager~ExecResults}
    * @param {String} connName The connection name to use
    * @param {*} expected The expected result
    * @param {String} [label] A label to use for the operation
@@ -320,11 +335,22 @@ class UtilSql {
    * @param {Boolean} [allConnections] Truthy to perform on all connections rather than just the passed connection
    * @returns {Object} The operation result
    */
-  static async testOperation(type, mgr, connName, expected, label, opts, allConnections) {
-    const rslt = allConnections ? await mgr[type](opts) : await mgr[type](opts, connName);
+  static async testOperation(type, opd, connName, expected, label, opts, allConnections) {
+    const forMgr = opd instanceof Manager;
+    const rslt = !forMgr || allConnections ? await opd[type](opts) : await opd[type](opts, connName);
     expect(rslt, `${label || 'DB'} ${type} returned`).to.be.object();
     expect(rslt.result, `${label || 'DB'} ${type} result`).to.be.object();
-    expect(rslt.result[connName], `${label || 'DB'} ${type} result.${connName}`).to.equal(expected);
+    
+    if (typeof expected === 'object') {
+      expect(rslt.result[connName], `${label || 'DB'} ${type} result.${connName}`).to.be.object();
+      for (let exp in expected) {
+        if (!expected.hasOwnProperty(exp)) continue;
+        expect(rslt.result[connName][exp], `${label || 'DB'} ${type} result.${connName}.${exp}`).to.equal(expected[exp]);
+      }
+    } else {
+      expect(rslt.result[connName], `${label || 'DB'} ${type} result.${connName}`).to.equal(expected);
+    }
+
     return rslt;
   } 
 

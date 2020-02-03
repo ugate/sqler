@@ -38,12 +38,6 @@ class TestDialect extends Dialect {
     expect(connConf.dialect, 'connConf.dialect').to.be.string();
     expect(connConf.dialect, 'connConf.dialect.length').to.not.be.empty();
 
-    if (connConf.driverOptions) {
-      expect(connConf.driverOptions, 'connConf.driverOptions').to.be.object();
-      expect(connConf.driverOptions.numOfPreparedStmts, 'connConf.driverOptions.numOfPreparedStmts').to.be.number();
-      expect(connConf.driverOptions.autocommit, 'connConf.driverOptions.autocommit').to.be.boolean();
-    }
-
     if (connConf.substitutes) {
       expect(connConf.substitutes, 'connConf.substitutes').to.be.object();
     }
@@ -125,8 +119,19 @@ class TestDialect extends Dialect {
 
     expectSqlSubstitutes(sql, opts, this.connConf, frags);
 
-    let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
     const rslt = { raw: {} };
+
+    if (opts.hasOwnProperty('autoCommit') && !opts.autoCommit) {
+      rslt.commit = async () => {
+        this.testPending = 0;
+      };
+      rslt.rollback = async () => {
+        this.testPending = 0;
+      };
+    }
+
+    // set rows
+    let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
     if (!cols) return rslt;
     cols = cols[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
     const rcrd = {};
@@ -149,26 +154,7 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  async commit(opts) {
-    expectOpts(this, opts, 'commit');
-    const committed = this.testPending;
-    this.testPending = 0;
-    return committed;
-  }
-
-  /**
-   * @inheritdoc
-   */
-  async rollback(opts) {
-    expectOpts(this, opts, 'rollback');
-    return this.testPending = 0;
-  }
-
-  /**
-   * @inheritdoc
-   */
-  async close(opts) {
-    expectOpts(this, opts, 'close');
+  async close() {
     this.testPending = 0;
     return 1;
   }
@@ -176,16 +162,17 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  isAutocommit(opts) {
-    return opts && opts.driverOptions && opts.driverOptions.hasOwnProperty('autocommit') ? 
-      opts.driverOptions.autocommit : this.connConf && this.connConf.driverOptions && this.connConf.driverOptions.autocommit;
+  get state() {
+    return {
+      pending: this.testPending
+    }
   }
 }
 
 /**
  * Expects options
  * @param {TestDialect} dialect The dialect instance being tested
- * @param {(DialectOptions | ExecOptions)} opts The expected options
+ * @param {Manager~ExecOptions} opts The expected options
  * @param {String} operation The operation origin
  */
 function expectOpts(dialect, opts, operation) {
@@ -193,7 +180,7 @@ function expectOpts(dialect, opts, operation) {
 
   if (operation === 'exec') {
     expect(Manager.OPERATION_TYPES, `opts.type from "${operation}"`).to.have.part.include(opts.type);
-    dialect.testPending += opts.type === 'READ' || dialect.isAutocommit(opts) ? 0 : 1;
+    dialect.testPending += opts.type === 'READ' || opts.autoCommit ? 0 : 1;
 
     expect(opts.numOfIterations, 'opts.numOfIterations').to.be.number();
     if (opts.driverOptions && opts.driverOptions.hasOwnProperty('numOfIterations')) {
@@ -202,9 +189,6 @@ function expectOpts(dialect, opts, operation) {
       expect(opts.numOfIterations, 'opts.numOfIterations').to.be.greaterThan(0);
     }
   }
-
-  expect(opts.tx, `opts.tx from "${operation}"`).to.be.object();
-  expect(opts.tx.pending, `opts.tx.pending from "${operation}"`).to.equal(dialect.testPending);
 }
 
 /**
