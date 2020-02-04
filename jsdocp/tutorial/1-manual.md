@@ -270,5 +270,142 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 - `commit` - Commits any pending changes from one or more previously invoked SQL statements
 - `rollback` - Rolls back any pending changes from one or more previously invoked SQL statements
 
+ Calling the the forementioned `commit` is not always necessary since there are a few different techniques for handling transactions. The simplest form is when executing a single SQL statement where the _default_ setting is used for `autoCommit = true`.
+
+ ```js
+ // autoCommit = true is the default
+const coOpts = {
+  binds: {
+    id: 123,
+    name: 'Company 1'
+  }
+};
+
+// starts/commits a transaction in a
+// single step (i.e. autoCommit === true)
+const exec1 = await mgr.db.fin.create.ap.company(coOpts);
+ ```
+
+ Lets say there are multiple SQL statements that need to be included in a single transaction. To do so, the `autoCommit` flag could be set to _true_ on the last transaction being executed.
+
+```js
+// autCommit = false will cause a transaction to be started
+const coOpts = {
+  autoCommit: false,
+  binds: {
+    id: 123,
+    name: 'Company 1'
+  }
+};
+// autCommit = true will cause the transaction to be
+// automatically committed
+const acctOpts = {
+  autoCommit: true,
+  binds: {
+    id: 456,
+    name: 'Account 1'
+  }
+};
+
+let exc1, exc1;
+try {
+  // start a transaction (i.e. autoCommit === false) by creating a new company
+  exc1 = await mgr.db.fin.create.ap.company(coOpts);
+
+  // commit the transaction (i.e. autoCommit === true)
+  // after creating the account
+  exc2 = await mgr.db.fin.create.ap.account(acctOpts);
+} catch (err) {
+  if (exc1) {
+    // when a transaction has been created, rollback
+    // any changes
+    await exc1.rollback();
+  }
+}
+```
+
+We could of explicity called commit instead of setting `autoCommit` to _true_ on the final SQL statement execution:
+
+```js
+// autCommit = false will cause a transaction to be started
+const coOpts = {
+  autoCommit: false,
+  binds: {
+    id: 123,
+    name: 'Company 1'
+  }
+};
+// autCommit = false will cause a transaction to be continued
+const acctOpts = {
+  autoCommit: false,
+  binds: {
+    id: 456,
+    name: 'Account 1'
+  }
+};
+
+let exc1, exc2;
+try {
+  // start a transaction (i.e. autoCommit === false) by creating a new company
+  exc1 = await mgr.db.fin.create.ap.company(coOpts);
+
+  // continue the transaction (i.e. autoCommit === false) by creating an account
+  exc2 = await mgr.db.fin.create.ap.account(acctOpts);
+
+  // can commit using either exc1.commit() or exc2.commit()
+  await exc1.commit();
+} catch (err) {
+  if (exc1) {
+    // when a transaction has been created, rollback
+    // any changes
+    await exc1.rollback();
+  }
+}
+```
+
+The previous transaction examples execute the SQL statements in _series_, but they can also be executed in _parallel_. However, doing so requires that all the SQL executions use `autoCommit = false` since executing in _parallel_ does not guarantee the order in which the SQL statements are executed.
+
+```js
+// autCommit = false will cause a transaction to be started
+const coOpts = {
+  autoCommit: false,
+  binds: {
+    id: 123,
+    name: 'Company 1'
+  }
+};
+// autCommit = false will cause a transaction to be continued
+const acctOpts = {
+  autoCommit: false,
+  binds: {
+    id: 456,
+    name: 'Account 1'
+  }
+};
+
+let exc1, exc2;
+try {
+  // start a transaction (i.e. autoCommit === false) by creating a new company
+  const coProm = mgr.db.fin.create.ap.company(xopts);
+
+  // continue the transaction (i.e. autoCommit === false) by creating an account
+  const acctProm = mgr.db.fin.create.ap.account(xopts);
+
+  // wait for the transaction to complete
+  exc1 = await coProm;
+  exc2 = await acctProm;
+
+  // can commit using either exc1.commit() or exc2.commit()
+  await exc1.commit();
+} catch (err) {
+  if (exc1) {
+    // when a transaction has been created, rollback
+    // any changes
+    await exc1.rollback();
+  }
+}
+```
+> __It's imperative that `commit` or `rollback` be called when using `autoCommit = false` on all statements within a transaction since the underlying connection is typically left open until one of those functions is invoked. Not doing so could quickly starve available connections!__
+
 #### 🗄️ Caching SQL <sub id="cache"></sub>:
 By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#Cache) container into the [Manager constructor](Manager.html#Manager).
