@@ -262,7 +262,12 @@ class UtilSql {
 
     let rslt, label;
 
-    if (!autoCommit) await mgr.db[connName].beginTransaction();
+    if (!autoCommit) {
+      xopts = xopts || {};
+      xopts.transactionId = await mgr.db[connName].beginTransaction();
+      expect(xopts.transactionId, 'xopts.transactionId').to.be.string();
+      expect(xopts.transactionId, 'xopts.transactionId').to.not.be.empty();
+    }
 
     rslt = await mgr.db[connName].finance.create.annual.report(xopts);
     label = `CREATE mgr.db.${connName}.finance.create.annual.report()`;

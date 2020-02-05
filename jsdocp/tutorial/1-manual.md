@@ -265,7 +265,7 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
 #### 🎬 Transactions <sub id="tx"></sub>:
-[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and is accessible via `manager.db[myConnectionName].beginTransaction`. Each generated [Prepared Function](Manager.html#~PreparedFunction) that is invoked will return a [result](Manager.html#~ExecResults) that contains two functions used to finalize a transaction:
+[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` returns a unique transaction ID that can be passed as the `transactionId` option in subsequent [Prepared Function](Manager.html#~PreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Each generated [Prepared Function](Manager.html#~PreparedFunction) that is invoked will return a [result](Manager.html#~ExecResults) that contains two functions used to finalize a transaction:
 
 - `commit` - Commits any pending changes from one or more previously invoked SQL statements
 - `rollback` - Rolls back any pending changes from one or more previously invoked SQL statements
@@ -310,7 +310,13 @@ const acctOpts = {
 let exc1, exc1;
 try {
   // start a transaction
-  await mgr.db.fin.beginTransaction();
+  const txId = await mgr.db.fin.beginTransaction();
+
+  // set the transaction ID on the execution options
+  // so the company/account SQL execution uses the
+  // correct connection
+  coOpts.transactionId = txId;
+  acctOpts.transactionId = txId;
 
   // execute within the transaction scope (i.e. autoCommit === false)
   exc1 = await mgr.db.fin.create.ap.company(coOpts);
@@ -351,7 +357,13 @@ const acctOpts = {
 let exc1, exc2;
 try {
   // start a transaction
-  await mgr.db.fin.beginTransaction();
+  const txId = await mgr.db.fin.beginTransaction();
+
+  // set the transaction ID on the execution options
+  // so the company/account SQL execution uses the
+  // correct connection
+  coOpts.transactionId = txId;
+  acctOpts.transactionId = txId;
 
   // execute within the transaction scope (i.e. autoCommit === false)
   exc1 = await mgr.db.fin.create.ap.company(coOpts);
@@ -394,7 +406,13 @@ const acctOpts = {
 let exc1, exc2;
 try {
   // start a transaction
-  await mgr.db.fin.beginTransaction();
+  const txId = await mgr.db.fin.beginTransaction();
+
+  // set the transaction ID on the execution options
+  // so the company/account SQL execution uses the
+  // correct connection
+  coOpts.transactionId = txId;
+  acctOpts.transactionId = txId;
 
   // execute within the transaction scope (i.e. autoCommit === false)
   const coProm = mgr.db.fin.create.ap.company(xopts);
@@ -417,7 +435,7 @@ try {
   throw err;
 }
 ```
-> __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and `autoCommit = false` is set on all statements within a transaction since the underlying connection is typically left open until one of those functions is invoked. Not doing so could quickly starve available connections!__
+> __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and `autoCommit = false` is set on all statements within a transaction since the underlying connection is typically left open until one of those functions is invoked. Not doing so could quickly starve available connections! It's equally important not to have more transactions in progress than what is available in the connection pool being used by the underlying dialect.__
 
 #### 🗄️ Caching SQL <sub id="cache"></sub>:
 By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#Cache) container into the [Manager constructor](Manager.html#Manager).

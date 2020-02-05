@@ -170,6 +170,9 @@ const COMPARE = Object.freeze({
  * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
  * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
  * until the returned {@link Manager~ExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
+ * @property {String} [transactionId] The transaction identifier returned from a prior call to `manager.db.myConnectionName.beginTransaction()` that will be used when executing
+ * the {@link Manager~PreparedFunction}. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections
+ * used by other transactions that may also be in progress. The ID is ignored when there is no transaction in progress with the specified ID.
  * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
  * perform `date.toISOString()`. __Overrides the same option set on {@link Manager~ConnectionOptions}__.
  * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
@@ -535,9 +538,14 @@ class SQLS {
           }
         }
       }
-      const driverOptions = opts && opts.driverOptions ? opts.driverOptions : undefined;
-      const autoCommit = opts && opts.hasOwnProperty('autoCommit') ? opts.autoCommit : true;
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, { type, autoCommit, binds, driverOptions }, frags, returnErrors));
+      const xopts = {
+        type,
+        binds,
+        autoCommit: opts && opts.hasOwnProperty('autoCommit') ? opts.autoCommit : true
+      };
+      if (opts && opts.transactionId) xopts.transactionId = opts.transactionId;
+      if (opts && opts.driverOptions) xopts.driverOptions = opts.driverOptions;
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, xopts, frags, returnErrors));
     };
   }
 
@@ -619,10 +627,13 @@ class DBS {
 
   /**
    * Begins a transaction
+   * @returns {String} The transaction identifier
    */
   async beginTransaction() {
     const dbs = internal(this);
-    return dbs.at.dialect.beginTransaction();
+    const txId = generateTransactionId();
+    await dbs.at.dialect.beginTransaction(txId);
+    return txId;
   }
 
   /**
@@ -736,6 +747,22 @@ function generateLogger(log, tags) {
       log(`[${tags ? tags.join() : ''}] ${logs[i]}`);
     }
   };
+}
+
+/**
+ * Generates formats a GUID formatted transaction identifier
+ * @private
+ * @param {String} [value] when present, will add any missing hyphens (if `hyphenate=true`) instead of generating a new value
+ * @param {Boolean} [hyphenate=true] true to include hyphens in generated result
+ * @returns {String} the generated GUID formatted transaction identifier
+ */
+function generateTransactionId(value, hyphenate = true) {
+  const hyp = hyphenate ? '-' : '';
+  if (value) return hyphenate ? value.replace(/(.{8})-?(.{4})-?(.{4})-?(.{4})-?(.{12})/gi, `$1${hyp}$2${hyp}$3${hyp}$4${hyp}$5`) : value;
+  return `xxxxxxxx${hyp}xxxx${hyp}4xxx${hyp}yxxx${hyp}xxxxxxxxxxxx`.replace(/[xy]/g, function (c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
 
 module.exports = Object.freeze({ Manager, Dialect });

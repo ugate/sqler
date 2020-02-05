@@ -15,6 +15,7 @@ class TestDialect extends Dialect {
   constructor(priv, connConf, track, errorLogger, logger, debug) {
     super(priv, connConf, track, errorLogger, logger, debug);
     this.testPending = 0;
+    this.connections = {};
 
     expect(priv, 'priv').to.be.object();
     expect(priv.host, 'priv.host').to.be.string();
@@ -65,8 +66,8 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  async beginTransaction() {
-    this.connection = {};
+  async beginTransaction(txId) {
+    if (!this.connections.hasOwnProperty(txId)) this.connections[txId] = {};
   }
 
   /**
@@ -129,16 +130,20 @@ class TestDialect extends Dialect {
     const rslt = { raw: {} };
 
     if (opts.hasOwnProperty('autoCommit') && !opts.autoCommit) {
-      expect(this.connection, 'this.connection (beginTransaction called?)').to.not.be.undefined();
-      expect(this.connection, 'this.connection (beginTransaction called?)').to.not.be.null();
+      expect(opts.transactionId, 'opts.transactionId').to.be.string();
+      expect(opts.transactionId, 'opts.transactionId').to.not.be.empty();
+
+      const connLabel = `this.connections.${opts.transactionId} (beginTransaction called?)`;
+      expect(this.connections[opts.transactionId], connLabel).to.not.be.undefined();
+      expect(this.connections[opts.transactionId], connLabel).to.not.be.null();
       
       rslt.commit = async () => {
         this.testPending = 0;
-        this.connection = null;
+        delete this.connections[opts.transactionId];
       };
       rslt.rollback = async () => {
         this.testPending = 0;
-        this.connection = null;
+        delete this.connections[opts.transactionId];
       };
     }
 
