@@ -402,7 +402,6 @@ class SQLS {
   constructor(sqlBasePth, cache, conn, db, dbs) {
     const sqls = internal(this);
     sqls.at.numOfPreparedStmts = 0;
-    sqls.at.connectionName = conn.name;
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
     sqls.at.cache = cache;
     sqls.at.conn = conn;
@@ -442,6 +441,7 @@ class SQLS {
           ext = ns.pop();
           nm = `${sqls.at.conn.dialect}_${sqls.at.conn.name}_${pnm ? `${pnm}_` : ''}${ns.join('_')}`;
           for (let ni = 0, nl = ns.length, so = cont; ni < nl; ++ni) {
+            if (ns[ni] === 'beginTransaction') throw new Error(`SQL "${fpth}" cannot contain reserved "beginTransaction"`);
             so[ns[ni]] = so[ns[ni]] || (ni < nl - 1 ? {} : await sqls.this.prepared(nm, pth, ext));
             so = so[ns[ni]];
           }
@@ -453,6 +453,7 @@ class SQLS {
       }
     };
     await prepare();
+    sqls.at.db.beginTransaction = () => sqls.at.dbs.beginTransaction();
     return sqls.at.dbs.init({ numOfPreparedStmts: sqls.at.numOfPreparedStmts });
   }
 
@@ -584,7 +585,7 @@ class SQLS {
    * @returns {String} the connection name associated with the {@link SQLS} instance
    */
   get connectionName() {
-    return internal(this).at.connectionName;
+    return internal(this).at.conn.name;
   }
 }
 
@@ -612,11 +613,19 @@ class DBS {
   /**
    * Initializes the database service
    * @param {Object} [opts] initializing options passed into the underlying database implementation/executor
-   * @returns {Object} the connection pool
+   * @returns {*} Any truthy value that indicates the initialization was successful
    */
   async init(opts) {
     const dbs = internal(this);
     return await dbs.at.dialect.init(opts);
+  }
+
+  /**
+   * Begins a transaction
+   */
+  async beginTransaction() {
+    const dbs = internal(this);
+    return dbs.at.dialect.beginTransaction();
   }
 
   /**

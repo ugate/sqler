@@ -265,7 +265,7 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
 #### 🎬 Transactions <sub id="tx"></sub>:
-[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialects](Dialect.html). Each generated [Prepared Function](Manager.html#~PreparedFunction) that is invoked will return a [result](Manager.html#~ExecResults) that contains two transactional functions:
+[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and is accessible via `manager.db[myConnectionName].beginTransaction`. Each generated [Prepared Function](Manager.html#~PreparedFunction) that is invoked will return a [result](Manager.html#~ExecResults) that contains two functions used to finalize a transaction:
 
 - `commit` - Commits any pending changes from one or more previously invoked SQL statements
 - `rollback` - Rolls back any pending changes from one or more previously invoked SQL statements
@@ -281,7 +281,7 @@ const coOpts = {
   }
 };
 
-// starts/commits a transaction in a
+// begins/commits a transaction in a
 // single step (i.e. autoCommit === true)
 const exec1 = await mgr.db.fin.create.ap.company(coOpts);
  ```
@@ -309,7 +309,10 @@ const acctOpts = {
 
 let exc1, exc1;
 try {
-  // start a transaction (i.e. autoCommit === false) by creating a new company
+  // start a transaction
+  await mgr.db.fin.beginTransaction();
+
+  // execute within the transaction scope (i.e. autoCommit === false)
   exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
   // commit the transaction (i.e. autoCommit === true)
@@ -321,6 +324,7 @@ try {
     // any changes
     await exc1.rollback();
   }
+  throw err;
 }
 ```
 
@@ -346,10 +350,13 @@ const acctOpts = {
 
 let exc1, exc2;
 try {
-  // start a transaction (i.e. autoCommit === false) by creating a new company
+  // start a transaction
+  await mgr.db.fin.beginTransaction();
+
+  // execute within the transaction scope (i.e. autoCommit === false)
   exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
-  // continue the transaction (i.e. autoCommit === false) by creating an account
+  // continue the transaction (i.e. autoCommit === false)
   exc2 = await mgr.db.fin.create.ap.account(acctOpts);
 
   // can commit using either exc1.commit() or exc2.commit()
@@ -360,6 +367,7 @@ try {
     // any changes
     await exc1.rollback();
   }
+  throw err;
 }
 ```
 
@@ -385,10 +393,13 @@ const acctOpts = {
 
 let exc1, exc2;
 try {
-  // start a transaction (i.e. autoCommit === false) by creating a new company
+  // start a transaction
+  await mgr.db.fin.beginTransaction();
+
+  // execute within the transaction scope (i.e. autoCommit === false)
   const coProm = mgr.db.fin.create.ap.company(xopts);
 
-  // continue the transaction (i.e. autoCommit === false) by creating an account
+  // continue the transaction (i.e. autoCommit === false)
   const acctProm = mgr.db.fin.create.ap.account(xopts);
 
   // wait for the transaction to complete
@@ -403,9 +414,10 @@ try {
     // any changes
     await exc1.rollback();
   }
+  throw err;
 }
 ```
-> __It's imperative that `commit` or `rollback` be called when using `autoCommit = false` on all statements within a transaction since the underlying connection is typically left open until one of those functions is invoked. Not doing so could quickly starve available connections!__
+> __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and `autoCommit = false` is set on all statements within a transaction since the underlying connection is typically left open until one of those functions is invoked. Not doing so could quickly starve available connections!__
 
 #### 🗄️ Caching SQL <sub id="cache"></sub>:
 By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#Cache) container into the [Manager constructor](Manager.html#Manager).

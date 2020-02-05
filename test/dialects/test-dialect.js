@@ -65,6 +65,13 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
+  async beginTransaction() {
+    this.connection = {};
+  }
+
+  /**
+   * @inheritdoc
+   */
   async exec(sql, opts, frags) {
     if (UtilOpts.driverOpt('throwExecError', opts, this.connConf).value) {
       throw new Error(`Test error due to "opts.driverOptions.throwExecError" = ${
@@ -122,11 +129,16 @@ class TestDialect extends Dialect {
     const rslt = { raw: {} };
 
     if (opts.hasOwnProperty('autoCommit') && !opts.autoCommit) {
+      expect(this.connection, 'this.connection (beginTransaction called?)').to.not.be.undefined();
+      expect(this.connection, 'this.connection (beginTransaction called?)').to.not.be.null();
+      
       rslt.commit = async () => {
         this.testPending = 0;
+        this.connection = null;
       };
       rslt.rollback = async () => {
         this.testPending = 0;
+        this.connection = null;
       };
     }
 

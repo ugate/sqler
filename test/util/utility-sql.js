@@ -262,6 +262,8 @@ class UtilSql {
 
     let rslt, label;
 
+    if (!autoCommit) await mgr.db[connName].beginTransaction();
+
     rslt = await mgr.db[connName].finance.create.annual.report(xopts);
     label = `CREATE mgr.db.${connName}.finance.create.annual.report()`;
     expect(rslt, `${label} result`).to.be.object();
