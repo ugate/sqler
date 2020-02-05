@@ -167,11 +167,9 @@ const COMPARE = Object.freeze({
  * @typedef {Object} Manager~ExecOptions
  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
  * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
- * @property {Object} [binds] The key/value pair of binding parameters that will be bound in the SQL statement.
+ * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
  * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
  * until the returned {@link Manager~ExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
- * @property {Integer} [numOfIterations] The number of times the SQL should be executed. When supported, should take less round-trips back to the DB
- * rather than calling generated SQL functions multiple times.
  * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
  * perform `date.toISOString()`. __Overrides the same option set on {@link Manager~ConnectionOptions}__.
  * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
@@ -516,7 +514,7 @@ class SQLS {
     return async function execSqlPublic(opts, frags, returnErrors) {
       const binds = {}, mopt = { binds, opts: frags }, type = (opts && opts.type && opts.type.toUpperCase()) || crud;
       if (!type || !CRUD_TYPES.includes(type)) {
-        throw new Error(`Statement execution must include "opts.type" set to one of ${CRUD_TYPES.join(',')} since the SQL file path was not prefixed with a type (found: ${type})`);
+        throw new Error(`Statement execution at "${fpth}" must include "opts.type" set to one of ${CRUD_TYPES.join(',')} since the SQL file path was not prefixed with a type (found: ${type})`);
       }
       if (sqls.at.conn.binds) for (let i in sqls.at.conn.binds) {
         if (!opts || !opts.binds || !opts.binds.hasOwnProperty(i)) {

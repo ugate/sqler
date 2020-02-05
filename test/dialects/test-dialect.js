@@ -193,13 +193,6 @@ function expectOpts(dialect, opts, operation) {
   if (operation === 'exec') {
     expect(Manager.OPERATION_TYPES, `opts.type from "${operation}"`).to.have.part.include(opts.type);
     dialect.testPending += opts.type === 'READ' || opts.autoCommit ? 0 : 1;
-
-    expect(opts.numOfIterations, 'opts.numOfIterations').to.be.number();
-    if (opts.driverOptions && opts.driverOptions.hasOwnProperty('numOfIterations')) {
-      expect(opts.numOfIterations, 'opts.numOfIterations = opts.driverOptions.numOfIterations').to.equal(opts.driverOptions.numOfIterations);
-    } else {
-      expect(opts.numOfIterations, 'opts.numOfIterations').to.be.greaterThan(0);
-    }
   }
 }
 
