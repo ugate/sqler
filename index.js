@@ -536,9 +536,8 @@ class SQLS {
         }
       }
       const driverOptions = opts && opts.driverOptions ? opts.driverOptions : undefined;
-      const numOfIterations = (opts && opts.numOfIterations) || 1;
       const autoCommit = opts && opts.hasOwnProperty('autoCommit') ? opts.autoCommit : true;
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, { type, autoCommit, numOfIterations, binds, driverOptions }, frags, returnErrors));
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, { type, autoCommit, binds, driverOptions }, frags, returnErrors));
     };
   }
 
