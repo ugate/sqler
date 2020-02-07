@@ -675,7 +675,7 @@ class DBS {
         options: opts,
         fragments: frags
       };
-      err.message = `${err.message}\n${JSON.stringify(err.sqler)}`;
+      err.message = `${err.message}\n${JSON.stringify(err.sqler, null, ' ')}`;
       if (returnErrors) return { error: err };
       throw err;
     }
