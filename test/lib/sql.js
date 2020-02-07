@@ -108,6 +108,16 @@ class Tester {
     return UtilSql.testVersions(priv, 2, [2, 3, 4], -1, 0, 1);
   }
 
+  static async execOptsAutoCommitFalseTransactionIdMissing() {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
+    await UtilSql.initManager(priv, conf);
+
+    const xopts = UtilOpts.createExecOpts();
+    xopts.autoCommit = false;
+    // no transaction started should throw error
+    await UtilSql.testCUD(priv.mgr, connName, conf, xopts, true);
+  }
+
   static async intervalCache() {
     const cacheOpts = { expiresIn: 100 };
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;

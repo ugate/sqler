@@ -298,7 +298,7 @@ class Manager {
       // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
       if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
       //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
-      mgr.at.sqls[i] = new SQLS(mainPath, cache, conn, (mgr.this[ns][conn.name] = {}), new DBS(dialect, conn));
+      mgr.at.sqls[i] = new SQLS(ns, mainPath, cache, conn, (mgr.this[ns][conn.name] = {}), new DBS(dialect, conn));
       mgr.at.dbCount++;
     }
   }
@@ -394,14 +394,16 @@ class SQLS {
   /**
    * Reads all the prepared SQL definition files for a specified name directory and adds a function to execute the SQL file contents
    * @constructs SQLS
+   * @param {String} ns The namespace on the {@link Manager} where all {@link Manager~PreparedFunction} will be added
    * @param {String} sqlBasePth the absolute path that SQL files will be included
    * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
    * @param {Manager~ConnectionOptions} conn options for the prepared statements
    * @param {Object} db the object where SQL retrieval methods will be stored (by file name parts separated by a period- except the file extension)
    * @param {DBS} dbs the database service to use
    */
-  constructor(sqlBasePth, cache, conn, db, dbs) {
+  constructor(ns, sqlBasePth, cache, conn, db, dbs) {
     const sqls = internal(this);
+    sqls.at.ns = ns;
     sqls.at.numOfPreparedStmts = 0;
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
     sqls.at.cache = cache;
@@ -517,7 +519,8 @@ class SQLS {
     return async function execSqlPublic(opts, frags, returnErrors) {
       const binds = {}, mopt = { binds, opts: frags }, type = (opts && opts.type && opts.type.toUpperCase()) || crud;
       if (!type || !CRUD_TYPES.includes(type)) {
-        throw new Error(`Statement execution at "${fpth}" must include "opts.type" set to one of ${CRUD_TYPES.join(',')} since the SQL file path was not prefixed with a type (found: ${type})`);
+        throw new Error(`Statement execution at "${fpth}" must include "opts.type" set to one of ${
+          CRUD_TYPES.join(',')} since the SQL file name was not prefixed with a valid type (found: ${type})`);
       }
       if (sqls.at.conn.binds) for (let i in sqls.at.conn.binds) {
         if (!opts || !opts.binds || !opts.binds.hasOwnProperty(i)) {
@@ -545,6 +548,10 @@ class SQLS {
       };
       if (opts && opts.transactionId) xopts.transactionId = opts.transactionId;
       if (opts && opts.driverOptions) xopts.driverOptions = opts.driverOptions;
+      if (!xopts.autoCommit && !xopts.transactionId) {
+        throw new Error(`Statement execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = ${
+          xopts.autoCommit}". Try setting "opts.transactionId = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
+      }
       return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, xopts, frags, returnErrors));
     };
   }

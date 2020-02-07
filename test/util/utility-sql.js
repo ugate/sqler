@@ -238,8 +238,9 @@ class UtilSql {
    * @param {String} connName The connection name to use
    * @param {Object} conf The {@link UtilOpts.getConf} object
    * @param {Manager~ExecOptions} xopts The execution options
+   * @param {Boolean} noTransaction Truthy to skip `beginTransaction` (should throw an error)
    */
-  static async testCUD(mgr, connName, conf, xopts) {
+  static async testCUD(mgr, connName, conf, xopts, noTransaction) {
     const testState = { pending: 0 };
     const autoCommit = xopts && xopts.hasOwnProperty('autoCommit') ? xopts.autoCommit : true;
 
@@ -264,9 +265,11 @@ class UtilSql {
 
     if (!autoCommit) {
       xopts = xopts || {};
-      xopts.transactionId = await mgr.db[connName].beginTransaction();
-      expect(xopts.transactionId, 'xopts.transactionId').to.be.string();
-      expect(xopts.transactionId, 'xopts.transactionId').to.not.be.empty();
+      if (!noTransaction) {
+        xopts.transactionId = await mgr.db[connName].beginTransaction();
+        expect(xopts.transactionId, 'xopts.transactionId').to.be.string();
+        expect(xopts.transactionId, 'xopts.transactionId').to.not.be.empty();
+      }
     }
 
     rslt = await mgr.db[connName].finance.create.annual.report(xopts);

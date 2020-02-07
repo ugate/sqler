@@ -286,10 +286,10 @@ const coOpts = {
 const exec1 = await mgr.db.fin.create.ap.company(coOpts);
  ```
 
- Lets say there are multiple SQL statements that need to be included in a single transaction. To do so, the `autoCommit` flag could be set to _true_ on the last transaction being executed.
+ Lets say there are multiple SQL statements that need to be included in a single transaction. To do so, the `autoCommit` flag can be set to _true_ on the last transaction being executed. Also, to ensure every statement that is executed be performed within the same transaction scope, a `transactionId` should be set to the same value for every statement execution that needs to be included within the same transaction. Calling `manager.db.myConnectionName.beginTransaction()` will generate/return a unique tranaction identifier that can be passed into each [prepared function](Manager.html#~PreparedFunction) [options](Manager.html#~ExecOptions).
 
 ```js
-// autCommit = false will cause a transaction to be started
+// autCommit = false requires a transactionId to be set
 const coOpts = {
   autoCommit: false,
   binds: {
@@ -298,7 +298,7 @@ const coOpts = {
   }
 };
 // autCommit = true will cause the transaction to be
-// automatically committed
+// automatically committed after execution
 const acctOpts = {
   autoCommit: true,
   binds: {
@@ -313,21 +313,22 @@ try {
   const txId = await mgr.db.fin.beginTransaction();
 
   // set the transaction ID on the execution options
-  // so the company/account SQL execution uses the
-  // correct connection
+  // so the company/account SQL execution is invoked
+  // within the same transaction scope
   coOpts.transactionId = txId;
   acctOpts.transactionId = txId;
 
-  // execute within the transaction scope (i.e. autoCommit === false)
+  // execute within a transaction scope
+  // (i.e. autoCommit === false and transactionId = txId)
   exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
-  // commit the transaction (i.e. autoCommit === true)
-  // after creating the account
+  // execute within the same transaction scope
+  // and commit after the satement has executed
+  // (i.e. autoCommit === true and transactionId = txId)
   exc2 = await mgr.db.fin.create.ap.account(acctOpts);
 } catch (err) {
   if (exc1) {
-    // when a transaction has been created, rollback
-    // any changes
+    // can rollback using either exc1.rollback() or exc2.rollback()
     await exc1.rollback();
   }
   throw err;
@@ -360,30 +361,31 @@ try {
   const txId = await mgr.db.fin.beginTransaction();
 
   // set the transaction ID on the execution options
-  // so the company/account SQL execution uses the
-  // correct connection
+  // so the company/account SQL execution is invoked
+  // within the same transaction scope
   coOpts.transactionId = txId;
   acctOpts.transactionId = txId;
 
-  // execute within the transaction scope (i.e. autoCommit === false)
+  // execute within the a transaction scope
+  // (i.e. autoCommit === false and transactionId = txId)
   exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
-  // continue the transaction (i.e. autoCommit === false)
+  // execute within the same transaction scope
+  // (i.e. autoCommit === false and transactionId = txId)
   exc2 = await mgr.db.fin.create.ap.account(acctOpts);
 
   // can commit using either exc1.commit() or exc2.commit()
   await exc1.commit();
 } catch (err) {
   if (exc1) {
-    // when a transaction has been created, rollback
-    // any changes
+    // can rollback using either exc1.rollback() or exc2.rollback()
     await exc1.rollback();
   }
   throw err;
 }
 ```
 
-The previous transaction examples execute the SQL statements in _series_, but they can also be executed in _parallel_. However, doing so requires that all the SQL executions use `autoCommit = false` since executing in _parallel_ does not guarantee the order in which the SQL statements are executed.
+The previous transaction examples execute the SQL statements in _series_, but they can also be executed in _parallel_. However, doing so requires that all the SQL executions use the same `transactionId` and that `autoCommit` is set to _false_ since executing in _parallel_ does not guarantee the order in which the SQL statements are executed.
 
 ```js
 // autCommit = false will cause a transaction to be started
@@ -409,18 +411,20 @@ try {
   const txId = await mgr.db.fin.beginTransaction();
 
   // set the transaction ID on the execution options
-  // so the company/account SQL execution uses the
-  // correct connection
+  // so the company/account SQL execution is invoked
+  // within the same transaction scope
   coOpts.transactionId = txId;
   acctOpts.transactionId = txId;
 
-  // execute within the transaction scope (i.e. autoCommit === false)
+  // execute within the same transaction scope
+  // (i.e. autoCommit === false and transactionId = txId)
   const coProm = mgr.db.fin.create.ap.company(xopts);
 
-  // continue the transaction (i.e. autoCommit === false)
+  // execute within the same transaction scope
+  // (i.e. autoCommit === false and transactionId = txId)
   const acctProm = mgr.db.fin.create.ap.account(xopts);
 
-  // wait for the transaction to complete
+  // wait for the parallel executions to complete
   exc1 = await coProm;
   exc2 = await acctProm;
 
@@ -428,14 +432,13 @@ try {
   await exc1.commit();
 } catch (err) {
   if (exc1) {
-    // when a transaction has been created, rollback
-    // any changes
+    // can rollback using either exc1.rollback() or exc2.rollback()
     await exc1.rollback();
   }
   throw err;
 }
 ```
-> __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and `autoCommit = false` is set on all statements within a transaction since the underlying connection is typically left open until one of those functions is invoked. Not doing so could quickly starve available connections! It's equally important not to have more transactions in progress than what is available in the connection pool being used by the underlying dialect.__
+> __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and `autoCommit = false` is set on all statements within a transaction since the underlying connection is typically left open until one of those functions is invoked. Not doing so could quickly starve available connections! It's also equally important not to have more transactions in progress than what is available in the connection pool being used by the underlying dialect.__
 
 #### 🗄️ Caching SQL <sub id="cache"></sub>:
 By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#Cache) container into the [Manager constructor](Manager.html#Manager).
