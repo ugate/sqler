@@ -148,10 +148,13 @@ const COMPARE = Object.freeze({
  * perform `date.toISOString()`. __Gets overridden by the same option set on {@link Manager~ExecOptions}__.
  * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
  * @property {Object} [pool] The connection pool options (__overrides any `driverOptions` that may pertain the pool__)
- * @property {Integer} [pool.max] The maximum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool max__)
- * @property {Integer} [pool.min] The minumum number of connections in the pool (__overrides any `driverOptions` that may pertain the pool min__)
+ * @property {Integer} [pool.max] The maximum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
+ * (__overrides any `driverOptions` that may pertain the pool max__)
+ * @property {Integer} [pool.min] The minumum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
+ * (__overrides any `driverOptions` that may pertain the pool min__)
  * @property {Integer} [pool.idle] The maximum time, in milliseconds, that a connection can be idle before being released (__overrides any `driverOptions` that may pertain the pool idle__)
- * @property {Integer} [pool.increment] The number of connections that are opened whenever a connection request exceeds the number of currently open connections
+ * @property {Integer} [pool.increment] The number of connections that are opened whenever a connection request exceeds the number of currently open connections.
+ *  When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
  * (__overrides any `driverOptions` that may pertain the pool increment__)
  * @property {Integer} [pool.timeout] The number of milliseconds that a connection request should wait in the queue before the request is terminated
  * (__overrides any `driverOptions` that may pertain the pool timeout__)
