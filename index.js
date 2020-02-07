@@ -666,6 +666,13 @@ class DBS {
       if (dbs.at.errorLogging) {
         dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, state: ${dbs.at.dialect.state})`);
       }
+      err.sqler = {
+        file: fpth,
+        sql: sqlf,
+        options: opts,
+        fragments: frags
+      };
+      err.message = `${err.message}\n${JSON.stringify(err.sqler)}`;
       if (returnErrors) return { error: err };
       throw err;
     }
