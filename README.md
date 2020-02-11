@@ -29,9 +29,9 @@ For more details check out the tutorials and API docs!
 #### Usage <sub id="usage"></sub>:
 In order to use `sqler` a simple implementation of [Dialect](https://ugate.github.io/sqler/Dialect.html) should be supplied. There are a few that have already been written for a few enteprise level applications that make use of `sqler`<sub id="dialects"></sub>:
 
-- [SQL Server](https://github.com/ugate/sqler-mssql)
-- [Oracle](https://github.com/ugate/sqler-oracle)
-- [ODBC](https://github.com/ugate/sqler-odbc)
+- [SQL Server](https://ugate.github.io/sqler-mssql)
+- [Oracle](https://ugate.github.io/sqler-oracle)
+- [ODBC](https://ugate.github.io/sqler-odbc)
 
 Example<sub id="example"></sub>:
 ```sql
