@@ -43,7 +43,8 @@ class TestDialect extends Dialect {
       expect(connConf.substitutes, 'connConf.substitutes').to.be.object();
     }
 
-    expect(track, 'track').to.be.object();
+    expectTrack(track);
+
     expect(errorLogger, 'errorLogger').to.satisfy(value => typeof value === 'boolean' || typeof value === 'function');
     expect(logger, 'logger').to.satisfy(value => typeof value === 'boolean' || typeof value === 'function');
     expect(debug, 'debug').to.be.boolean();
@@ -184,6 +185,90 @@ class TestDialect extends Dialect {
       pending: this.testPending
     }
   }
+}
+
+/**
+ * Expects a track to contain the implmented fields
+ * @param {Manager~Track} track The track to expect
+ */
+function expectTrack(track) {
+  expect(track, 'track').to.be.object();
+  expect(track.interpolate, 'track.interpolate').to.be.function();
+  const ipoles = [
+    {
+      dest: {},
+      src: {
+        staticProp: '${TEST_PROP}',
+        someObj: {
+          someProp: '${someProp}',
+          someDate: '${someDate}',
+          someRegExp: '${someRegExp}'
+        },
+        excludeProp: '${excludeProp}',
+        excludeObj: {
+          excludeProp1: '${excludeProp1}',
+          excludeProp2: '${excludeProp2}'
+        }
+      },
+      interpolator: {
+        TEST_PROP: 'STATIC PROP',
+        someProp: 'TEST OBJECT PROP',
+        someDate: new Date(),
+        someRegExp: /[a-z]/,
+        excludeProp: 'SHOULD NOT BE INTERPOLATED',
+        excludeProp1: 'SHOULD NOT BE INTERPOLATED',
+        excludeProp2: 'ALSO SHOULD NOT BE INTERPOLATED'
+      }
+    },
+    {
+      dest: {},
+      src: {
+        staticProp: '${TEST_PROP}',
+        someObj: {
+          someProp: '${someProp}',
+          someDate: '${someDate}',
+          someRegExp: '${someRegExp}'
+        },
+        excludeProp: '${excludeProp}',
+        excludeObj: {
+          excludeProp1: '${excludeProp1}',
+          excludeProp2: '${excludeProp2}'
+        }, // source is the inerpolator
+        TEST_PROP: 'STATIC PROP',
+        someProp: 'TEST OBJECT PROP',
+        someDate: new Date(),
+        someRegExp: /[a-z]/,
+        excludeProp1: 'SHOULD NOT BE INTERPOLATED',
+        excludeProp2: 'ALSO SHOULD NOT BE INTERPOLATED'
+      },
+      get interpolator() {
+        return this.src;
+      }
+    }
+  ];
+  let ipoled;
+  for (let ipole of ipoles) {
+    ipoled = track.interpolate(ipole.dest, ipole.src, ipole.interpolator, props => props[0] !== 'excludeProp' && props[0] !== 'excludeObj');
+    expect(ipoled, 'track.interpolate() return value').to.equal(ipole.dest);
+    expect(ipoled.staticProp, 'track.interpolate() static property').to.equal(ipole.interpolator.TEST_PROP);
+    expect(ipoled.someObj, 'track.interpolate() object property').to.be.object();
+    expect(ipoled.someObj.someProp, 'track.interpolate() object property string value').to.equal(ipole.interpolator.someProp);
+    expect(ipoled.someObj.someDate, 'track.interpolate() object property date value').to.equal(ipole.interpolator.someDate);
+    expect(ipoled.someObj.someRegExp, 'track.interpolate() object property regular expression value').to.equal(ipole.interpolator.someRegExp);
+    expect(ipoled.excludeObj, 'track.interpolate() exclude object properties').to.be.object();
+    expect(ipoled.excludeObj.excludeProp1, 'track.interpolate() exclude object property 1 (untouched)').to.equal(ipole.src.excludeObj.excludeProp1);
+    expect(ipoled.excludeObj.excludeProp2, 'track.interpolate() exclude object property 2 (untouched)').to.equal(ipole.src.excludeObj.excludeProp2);
+  }
+
+  const interpolateFunc = track.interpolate;
+  let trackInterpolateError;
+  try {
+    track.interpolate = () => false;
+  } catch (err){
+    trackInterpolateError = err;
+  }
+  expect(track.interpolate, 'track.interpolate immutable').to.equal(interpolateFunc);
+  expect(trackInterpolateError, 'track.interpolate immutable (error)').to.be.error();
 }
 
 /**

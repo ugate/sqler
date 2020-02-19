@@ -239,6 +239,44 @@ const COMPARE = Object.freeze({
  */
 
 /**
+ * A validation
+ * @async
+ * @callback {Function} Manager~InterpolateValidationFunction
+ * @param {String[]} srcPropNames Property path(s) to the value being validated (e.g. `source.my.path = 123` would equate to 
+ * a invocation to `validator(['my','path'], 123)`).
+ * @param {*} srcPropValue The value being validated for interpolation
+ * @returns {Boolean} Flag indicating whether or not to include the interpolated property/value
+ */
+
+/**
+ * Interpolates values from a _source_ object to a _destination_ object.
+ * When a value is a string surrounded by `${}`, it will be assumed to be a interpolated property that resides on _another_ property on the `source`
+ * or an interpolated property on the `interpolator`.
+ * For example `source.someProp = '${SOME_VALUE}'` will be interpreted as `dest.someProp = dest.SOME_VALUE` when the `interpolator` is omitted and
+ * `dest.someProp = interpolator.SOME_VALUE` when an `interpolator` is specified.
+ * __Typically only used by implementing {@link Dialect} constructors within a {@link Manager~Track}.__
+ * @async
+ * @callback {Function} Manager~InterpolateFunction
+ * @param {Object} dest The destination where the sources will be set (also the interpolated source when `interpolator` is omitted).
+ * @param {Object} source The source of the values to interpolate (e.g. {@link Manager~ConnectionOptions}, {@link Manager~ExecOptions}, etc.).
+ * @param {Object} [interpolator=dest] An alternative source to use for extracting interpolated values from.
+ * @param {Manager~InterpolateValidationFunction} [validator] A validation function for each property/value being interpolated to determine
+ * if it will be interolated.
+ * @param {String[]} [_vpths] Internal recursion use only
+ * @returns {Object} The passed destination
+ */
+
+/**
+ * A tracking mechanism that is shared between all {@link Dialect} implementations for a given {@link Manager}. A track provides a means to share
+ * data, etc. from one {@link Dialect} to another. Properties can also be _added_ by a {@link Dialect} for use in other {@link Dialect}s.
+ * __Typically only used by implementing {@link Dialect} constructors.__
+ * @typedef {Object} Manager~Track
+ * @property {Manager~InterpolateFunction} interpolate An interpolation function that can be used by {@link Dialect} implementations to interpolate
+ * configuration option values from underlying drivers within a {@link Dialect} (immutable). The convenience of doing so negates the need for an
+ * application that uses a {@link Manager} to import/require a database driver just to access driver constants, etc.
+ */
+
+/**
  * The database(s) manager entry point that autogenerates/manages SQL execution functions from underlying SQL statement files.
  * Vendor-specific implementations should implement {@link Dialect} and pass the class or module path into the constructor as `conf.db.dialects.myDialectClassOrModulePath`.
  * See [README.md](index.html) for more details about SQL related features.
@@ -262,13 +300,18 @@ class Manager {
     const mainPath = conf.mainPath || (require.main && require.main.filename.replace(/([^\\\/]*)$/, '')) || process.cwd();
     const privatePath = conf.privatePath || process.cwd();
     const ns = 'db';
+    const track = {};
+    Object.defineProperty(track, 'interpolate', {
+      value: interpolate,
+      writable: false
+    });
     mgr.this[ns] = {};
     mgr.at.sqls = new Array(connCnt);
     mgr.at.logError = logging === true ? generateLogger(console.error, ['db', 'error']) : logging && logging(['db', 'error']);
     mgr.at.log = logging === true ? generateLogger(console.log, ['db']) : logging && logging(['db']);
     mgr.at.dbCount = 0;
     //const reserved = Object.getOwnPropertyNames(Manager.prototype);
-    for (let i = 0, conn, priv, dialect, dlct, track = {}; i < connCnt; ++i) {
+    for (let i = 0, conn, priv, dialect, dlct; i < connCnt; ++i) {
       conn = conf.db.connections[i];
       if (!conn.id) throw new Error(`Connection at index ${i} must have an "id"`);
       if (!conn.name) throw new Error(`Connection at index ${i}/ID ${conn.id} must have have a valid "name"`);
@@ -780,6 +823,48 @@ function generateTransactionId(value, hyphenate = true) {
     var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+/**
+ * @see Manager~InterpolateFunction
+ * @private
+ */
+function interpolate(dest, source, interpolator, validator, _vpths) {
+  let val, typ, vfunc = typeof validator === 'function' && validator, pole = interpolator || dest;
+  for (let srcProp in source) {
+    if (!source.hasOwnProperty(srcProp)) continue;
+    typ = typeof source[srcProp];
+    if (typ === 'object' && !(source[srcProp] instanceof Date) && !(source[srcProp] instanceof RegExp)) {
+      if (_vpths) _vpths.push(srcProp);
+      else if (vfunc) _vpths = [srcProp];
+      dest[srcProp] = interpolate(source[srcProp], source[srcProp], interpolator, validator, _vpths);
+      if (_vpths) _vpths.shift();
+      continue;
+    }
+    if (typ === 'string') {
+      // actual interpolation
+      val = undefined;
+      source[srcProp].replace(/\${\s*([A-Z_]+)\s*}/i, (match, interpolated) => {
+        val = interpolated in pole ? pole[interpolated] : interpolated;
+      });
+      if (typeof val === 'undefined') {
+        val = source[srcProp];
+      }
+    } else {
+      val = source[srcProp];
+    }
+    if (vfunc) {
+      if (_vpths) _vpths.push(srcProp);
+      else _vpths = [srcProp];
+      if (!vfunc(_vpths, val)) {
+        _vpths.pop();
+        continue;
+      }
+    }
+    dest[srcProp] = val;
+    if (_vpths) _vpths.pop();
+  }
+  return dest;
 }
 
 module.exports = Object.freeze({ Manager, Dialect });
