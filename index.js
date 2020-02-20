@@ -94,8 +94,8 @@ const COMPARE = Object.freeze({
 /**
  * Private options for global {@link Manager} use
  * @typedef {Object} Manager~PrivateOptions
- * @property {String} username The username to connect to the database
- * @property {String} password The password to connect to the database
+ * @property {String} [username] The username to connect to the database
+ * @property {String} [password] The password to connect to the database
  * @property {String} [host] The host to connect to for the database
  * @property {String} [port] The port to connect to for the database (when not included in the host)
  * @property {String} [protocol] The protocol to use when connecting to the database
