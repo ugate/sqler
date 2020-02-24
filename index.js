@@ -262,7 +262,9 @@ const COMPARE = Object.freeze({
  * @param {Object} [interpolator=dest] An alternative source to use for extracting interpolated values from.
  * @param {Manager~InterpolateValidationFunction} [validator] A validation function for each property/value being interpolated to determine
  * if it will be interolated.
- * @param {String[]} [_vpths] Internal recursion use only
+ * @param {Boolean} [onlyInterpolated] Truthy to indicate that the only values that will be set from the `source`/`interpolator` will be values that
+ * have been interpolated. __NOTE: Truthy values will not prevent `source`/`interpolator` objects from getting set on `dest`, just non-interpoalted
+ * property values will be skipped__ (i.e. property values that do not contain `${}` interpolation designations).
  * @returns {Object} The passed destination
  */
 
@@ -829,15 +831,16 @@ function generateTransactionId(value, hyphenate = true) {
  * @see Manager~InterpolateFunction
  * @private
  */
-function interpolate(dest, source, interpolator, validator, _vpths) {
-  let val, typ, vfunc = typeof validator === 'function' && validator, pole = interpolator || dest;
+function interpolate(dest, source, interpolator, validator, onlyInterpolated, _vpths) {
+  let val, typ, vfunc = typeof validator === 'function' && validator, pole = interpolator || dest, isPole;
   for (let srcProp in source) {
     if (!source.hasOwnProperty(srcProp)) continue;
+    isPole = false;
     typ = typeof source[srcProp];
     if (typ === 'object' && !(source[srcProp] instanceof Date) && !(source[srcProp] instanceof RegExp)) {
       if (_vpths) _vpths.push(srcProp);
       else if (vfunc) _vpths = [srcProp];
-      dest[srcProp] = interpolate(source[srcProp], source[srcProp], interpolator, validator, _vpths);
+      dest[srcProp] = interpolate(source[srcProp], source[srcProp], interpolator, validator, onlyInterpolated, _vpths);
       if (_vpths) _vpths.shift();
       continue;
     }
@@ -845,7 +848,12 @@ function interpolate(dest, source, interpolator, validator, _vpths) {
       // actual interpolation
       val = undefined;
       source[srcProp].replace(/\${\s*([A-Z_]+)\s*}/i, (match, interpolated) => {
-        val = interpolated in pole ? pole[interpolated] : interpolated;
+        if (interpolated in pole) {
+          isPole = true;
+          val = pole[interpolated];
+        } else {
+          val = match; // leave as is
+        }
       });
       if (typeof val === 'undefined') {
         val = source[srcProp];
@@ -861,7 +869,7 @@ function interpolate(dest, source, interpolator, validator, _vpths) {
         continue;
       }
     }
-    dest[srcProp] = val;
+    if (!onlyInterpolated || isPole) dest[srcProp] = val;
     if (_vpths) _vpths.pop();
   }
   return dest;

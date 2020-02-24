@@ -223,6 +223,7 @@ function expectTrack(track) {
     {
       dest: {},
       src: {
+        notInterpolated: 'SHOW WHEN NOT ONLY INTERPOLATED',
         staticProp: '${TEST_PROP}',
         someObj: {
           someProp: '${someProp}',
@@ -246,18 +247,27 @@ function expectTrack(track) {
       }
     }
   ];
-  let ipoled;
+  let ipoled, onlyIpoled;
   for (let ipole of ipoles) {
-    ipoled = track.interpolate(ipole.dest, ipole.src, ipole.interpolator, props => props[0] !== 'excludeProp' && props[0] !== 'excludeObj');
-    expect(ipoled, 'track.interpolate() return value').to.equal(ipole.dest);
-    expect(ipoled.staticProp, 'track.interpolate() static property').to.equal(ipole.interpolator.TEST_PROP);
-    expect(ipoled.someObj, 'track.interpolate() object property').to.be.object();
-    expect(ipoled.someObj.someProp, 'track.interpolate() object property string value').to.equal(ipole.interpolator.someProp);
-    expect(ipoled.someObj.someDate, 'track.interpolate() object property date value').to.equal(ipole.interpolator.someDate);
-    expect(ipoled.someObj.someRegExp, 'track.interpolate() object property regular expression value').to.equal(ipole.interpolator.someRegExp);
-    expect(ipoled.excludeObj, 'track.interpolate() exclude object properties').to.be.object();
-    expect(ipoled.excludeObj.excludeProp1, 'track.interpolate() exclude object property 1 (untouched)').to.equal(ipole.src.excludeObj.excludeProp1);
-    expect(ipoled.excludeObj.excludeProp2, 'track.interpolate() exclude object property 2 (untouched)').to.equal(ipole.src.excludeObj.excludeProp2);
+    onlyIpoled = ipole.src.hasOwnProperty('notInterpolated');
+    for (let i = 0; i <= onlyIpoled ? 1 : 0; ++i) { // loop 2x for only interpoalted values to ensure they are not set when the opeion is true (i.e. i !== 0)
+      ipoled = track.interpolate(ipole.dest, ipole.src, ipole.interpolator, props => props[0] !== 'excludeProp' && props[0] !== 'excludeObj', i !== 0);
+      expect(ipoled, 'track.interpolate() return value').to.equal(ipole.dest);
+      expect(ipoled.staticProp, 'track.interpolate() static property').to.equal(ipole.interpolator.TEST_PROP);
+      expect(ipoled.someObj, 'track.interpolate() object property').to.be.object();
+      expect(ipoled.someObj.someProp, 'track.interpolate() object property string value').to.equal(ipole.interpolator.someProp);
+      expect(ipoled.someObj.someDate, 'track.interpolate() object property date value').to.equal(ipole.interpolator.someDate);
+      expect(ipoled.someObj.someRegExp, 'track.interpolate() object property regular expression value').to.equal(ipole.interpolator.someRegExp);
+      expect(ipoled.excludeObj, 'track.interpolate() exclude object properties').to.be.object();
+      expect(ipoled.excludeObj.excludeProp1, 'track.interpolate() exclude object property 1 (untouched)').to.equal(ipole.src.excludeObj.excludeProp1);
+      expect(ipoled.excludeObj.excludeProp2, 'track.interpolate() exclude object property 2 (untouched)').to.equal(ipole.src.excludeObj.excludeProp2);
+      if (i === 0) { // interpolated values should only be set on the destination when 
+        expect(ipoled.notInterpolated, 'track.interpolate() not interpolated property').to.equal(ipole.src.notInterpolated);
+        if (onlyIpoled) ipole.dest = {}; // reset dest for only interpolated
+      } else {
+        expect(ipoled.notInterpolated, 'track.interpolate() not interpolated property').to.be.undefined();
+      }
+    }
   }
 
   const interpolateFunc = track.interpolate;
