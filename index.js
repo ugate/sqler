@@ -720,7 +720,7 @@ class DBS {
     }
     let rslt;
     try {
-      rslt = await dbs.at.dialect.exec(sqlf, opts, frags); // execute the prepared SQL statement
+      rslt = await dbs.at.dialect.exec(sqlf, opts, frags, errorOpts); // execute the prepared SQL statement
     } catch (err) {
       try {
         const eopts = JSON.parse(JSON.stringify(opts));
