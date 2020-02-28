@@ -55,6 +55,9 @@ class Tester {
     const execOpts = UtilOpts.createExecOpts();
     execOpts.driverOptions = execOpts.driverOptions || {};
     execOpts.driverOptions.throwExecError = true;
+    execOpts.driverOptions.throwProperties = {
+      testErrorProp: 123
+    };
     let errorOpts = true;
     await UtilSql.testRead(priv.mgr, connName, { execOpts, errorOpts });
     errorOpts = {

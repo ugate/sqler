@@ -728,12 +728,11 @@ class DBS {
         if (dbs.at.errorLogging) {
           dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(eopts)}, state: ${dbs.at.dialect.state})`);
         }
-        err[MOD_KEY] = {
-          file: fpth,
-          sql: sqlf,
-          options: eopts,
-          fragments: frags
-        };
+        err[MOD_KEY] = err[MOD_KEY] || {};
+        err[MOD_KEY].file = fpth;
+        err[MOD_KEY].sql = sqlf;
+        err[MOD_KEY].options = eopts;
+        err[MOD_KEY].fragments = frags;
         err.message = `${err.message}\n${JSON.stringify(err[MOD_KEY], null, ' ')}`;
       } catch (frmtErr) {
         if (dbs.at.errorLogging) {

@@ -76,8 +76,16 @@ class TestDialect extends Dialect {
    */
   async exec(sql, opts, frags) {
     if (UtilOpts.driverOpt('throwExecError', opts, this.connConf).value) {
-      throw new Error(`Test error due to "opts.driverOptions.throwExecError" = ${
+      const error = new Error(`Test error due to "opts.driverOptions.throwExecError" = ${
         opts.driverOptions.throwExecError} and "this.connConf.driverOptions.throwExecError" = ${this.connConf.driverOptions.throwExecError}`);
+      const throwProps = UtilOpts.driverOpt('throwProperties', opts, this.connConf).value;
+      if (throwProps) {
+        error.sqler = {};
+        for (let prop in throwProps) {
+          error.sqler[prop] = throwProps[prop];
+        }
+      }
+      throw error;
     }
 
     const xopts = UtilOpts.createExecOpts();

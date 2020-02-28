@@ -161,6 +161,12 @@ class UtilSql {
       if ((errorOpts === true || (errorOpts && errorOpts.returnErrors)) && throwOpt.source && throwOpt.value) {
         expect(readRslt.error, `${label} result error`).to.be.error();
         expect(readRslt.error.sqler, `${label} result error.sqler`).to.be.object();
+        const throwPropOpt = UtilOpts.driverOpt('throwProperties', opts, connOpts);
+        if (throwPropOpt.source && throwPropOpt.value) {
+          for (let prop in throwPropOpt.value) {
+            expect(readRslt.error.sqler[prop], `${label} result error.sqler.${prop}`).to.equal(throwPropOpt.value[prop]);
+          }
+        }
         if (errHandled) {
           expect(readRslt.error, `${label} result error = errorOpts.handler error`).to.equal(errCalled);
         }
