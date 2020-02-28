@@ -15,6 +15,7 @@ const COMPARE = Object.freeze({
   '>=': function gteq(x, y) { return x >= y; },
   '<>': function noteq(x, y) { return x !== y; }
 });
+const MOD_KEY = 'sqler';
 
 /**
  * The `cache` client responsible for regulating the frequency in which a SQL file is read by a {@link Manager}.
@@ -183,13 +184,22 @@ const COMPARE = Object.freeze({
  // TODO : @property {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
 
 /**
+ * Options for handling any errors that occur during execution.
+ * @typedef {Object} Manager~ExecErrorOptions
+ * @param {Function} [handler] A `function(error)` that will handle any errors thrown. The errors should contain a `sqler` property containing
+ * @param {Boolean} [includeBindValues] Truthy to include the bind parameter values `error.sqler`.
+ * @param {Boolean} [returnErrors] Truthy to return any errors that may occur. Otherwise, throw any errors that may occur.
+ */
+
+/**
  * Prepared functions are auto-generated `async` functions that execute an SQL statement from an SQL file source.
  * @async
  * @callback {Function} Manager~PreparedFunction
  * @param {Manager~ExecOptions} [opts] The SQL execution options
  * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
  * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
- * @param {Boolean} [returnErrors] A flag indicating that any errors that occur during execution should be returned in the {@link Manager~ExecResults} rather then being thrown.
+ * @param {(Manager~ExecErrorOptions | Boolean)} [errorOpts] Either the error handling options or a boolean flag indicating that any errors that occur during execution should be returned in
+ * the {@link Manager~ExecResults} rather then being thrown.
  * @returns {Manager~ExecResults} The execution results
  */
 
@@ -201,18 +211,18 @@ const COMPARE = Object.freeze({
  * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ to ensue underlying connections are persisted and closed.__
  * @property {Function} [rollback] A no-argument _async_ function that rollbacks any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_.
  * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ to ensue underlying connections are persisted and closed.__
- * @property {Error} [error] Any caught error that occurred when a {@link Manager~PreparedFunction} was invoked with the `returnErrors` flag set to a _truthy_ value.
+ * @property {Error} [error] Any caught error that occurred when a {@link Manager~PreparedFunction} was invoked with the `errorOpts` flag set to a _truthy_ value.
  * @property {Object} raw The raw results from the execution (driver-specific execution results).
  */
 
 /**
  * Options for operational methods on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.state}, {@link Manager.close}, etc.).
  * @typedef {Object} Manager~OperationOptions
- * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `returnErrors` and/or `executeInSeries`
+ * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `errorOpts` and/or `executeInSeries`
  * that will override any global options set directly on the {@link Manager~OperationOptions}. For example, `opts.connections.myConnection.executeInseries` would override
  * `opts.executeInSeries` for the connection named `myConnection`, but would use `opts.executeInSeries` for any other connections that ae not overridden.
  * @property {Boolean} [executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel.
- * @property {Boolean} [returnErrors] Set to truthy to return any errors. Otherise throw any errors as they are encountered.
+ * @property {(Manager~ExecErrorOptions | Boolean)} [errorOpts] Set to truthy to return any errors. Otherise throw any errors as they are encountered. options can also be set instead.
  */
 
 /**
@@ -220,7 +230,7 @@ const COMPARE = Object.freeze({
  * @typedef {Object} Manager~OperationResults
  * @property {Object} result An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection).
  * @property {Error[]} errors Any errors that may have occurred on the operational methods. Should only be populated when {@link Manager~OperationOptions} are used with a truthy value set on
- * `returnErrors`. Each will contain meta properties set by [Asynchro](https://ugate.github.io/asynchro).
+ * `errorOpts`. Each will contain meta properties set by [Asynchro](https://ugate.github.io/asynchro).
  */
 
 /**
@@ -309,8 +319,8 @@ class Manager {
     });
     mgr.this[ns] = {};
     mgr.at.sqls = new Array(connCnt);
-    mgr.at.logError = logging === true ? generateLogger(console.error, ['db', 'error']) : logging && logging(['db', 'error']);
-    mgr.at.log = logging === true ? generateLogger(console.log, ['db']) : logging && logging(['db']);
+    mgr.at.logError = logging === true ? generateLogger(console.error, [MOD_KEY, 'db', 'error']) : logging && logging([MOD_KEY, 'db', 'error']);
+    mgr.at.log = logging === true ? generateLogger(console.log, [MOD_KEY, 'db']) : logging && logging([MOD_KEY, 'db']);
     mgr.at.dbCount = 0;
     //const reserved = Object.getOwnPropertyNames(Manager.prototype);
     for (let i = 0, conn, priv, dialect, dlct; i < connCnt; ++i) {
@@ -335,11 +345,11 @@ class Manager {
       if (conn.log !== false && !conn.log) conn.log = [];
       if (conn.logError !== false && !conn.logError) conn.logError = [];
       if (conn.log !== false) {
-        let ltags = [...conn.log, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
+        let ltags = [...conn.log, MOD_KEY, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
         conn.logging = logging === true ? generateLogger(console.log, ltags) : logging && logging(ltags); // override dialect non-error logging
       }
       if (conn.logError !== false) {
-        let ltags = [...conn.logError, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
+        let ltags = [...conn.logError, MOD_KEY, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
         conn.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dialect error logging
       }
       dialect = new conf.db.dialects[dlct](priv, conn, track, conn.errorLogging || false, conn.logging || false, conf.debug || false);
@@ -528,7 +538,7 @@ class SQLS {
     sqls.at.stms = sqls.at.stms || { methods: {} };
     sqls.at.stms.methods[name] = {};
     if (sqls.at.cache) {
-      const id = `sqler:db:${name}:${ext}`;
+      const id = `${MOD_KEY}:db:${name}:${ext}`;
       sqls.at.stms.methods[name][ext] = async function cachedSql(opts, execFn) { // execute the SQL statement with cached statements
         let sql;
         const cached = await sqls.at.cache.get(id);
@@ -564,7 +574,7 @@ class SQLS {
     * Sets/formats SQL parameters and executes an SQL statement
     * @see Manager~PreparedFunction
     */
-    return async function execSqlPublic(opts, frags, returnErrors) {
+    return async function execSqlPublic(opts, frags, errorOpts) {
       const binds = {}, mopt = { binds, opts: frags }, type = (opts && opts.type && opts.type.toUpperCase()) || crud;
       if (!type || !CRUD_TYPES.includes(type)) {
         throw new Error(`Statement execution at "${fpth}" must include "opts.type" set to one of ${
@@ -600,7 +610,7 @@ class SQLS {
         throw new Error(`Statement execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = ${
           xopts.autoCommit}". Try setting "opts.transactionId = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
       }
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, xopts, frags, returnErrors));
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, xopts, frags, errorOpts));
     };
   }
 
@@ -613,10 +623,10 @@ class SQLS {
     } else return bind;
   }
 
-  genExecSqlFromFileFunction(fpth, opts, frags, returnErrors) {
+  genExecSqlFromFileFunction(fpth, opts, frags, errorOpts) {
     const sqls = internal(this);
     return async function execSqlFromFile(sql) {
-      return await sqls.at.dbs.exec(fpth, sql, opts, frags, returnErrors);
+      return await sqls.at.dbs.exec(fpth, sql, opts, frags, errorOpts);
     };
   }
 
@@ -697,10 +707,11 @@ class DBS {
   * @param {String} sql The SQL to execute with optional substitutions {@link DBS#frag}
   * @param {Manager~ExecOptions} opts The eectution options
   * @param {String[]} frags The frament keys within the SQL that will be retained
-  * @param {Boolean} [returnErrors] Truthy to return any errors thrown during execution rather than throwing them
+  * @param {(Manager~ExecErrorOptions | Boolean)} [errorOpts] Truthy to return any errors thrown during execution rather than throwing them.
+  * Can also pass {@link Manager~ExecErrorOptions} for more control over execution errors.
   * @returns {Dialect~ExecResults} The execution results
   */
-  async exec(fpth, sql, opts, frags, returnErrors) {
+  async exec(fpth, sql, opts, frags, errorOpts) {
     const dbs = internal(this);
     const sqlf = dbs.this.segmentSubs(sql, opts.binds, frags);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
@@ -711,17 +722,30 @@ class DBS {
     try {
       rslt = await dbs.at.dialect.exec(sqlf, opts, frags); // execute the prepared SQL statement
     } catch (err) {
-      if (dbs.at.errorLogging) {
-        dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(opts)}, state: ${dbs.at.dialect.state})`);
+      try {
+        const eopts = JSON.parse(JSON.stringify(opts));
+        eopts.binds = errorOpts && errorOpts.includeBindValues ? eopts.binds : Object.keys(opts.binds);
+        if (dbs.at.errorLogging) {
+          dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(eopts)}, state: ${dbs.at.dialect.state})`);
+        }
+        err[MOD_KEY] = {
+          file: fpth,
+          sql: sqlf,
+          options: eopts,
+          fragments: frags
+        };
+        err.message = `${err.message}\n${JSON.stringify(err[MOD_KEY], null, ' ')}`;
+      } catch (frmtErr) {
+        if (dbs.at.errorLogging) {
+          dbs.at.errorLogging(`Failed to set ${MOD_KEY} error properties for error at SQL: ${fpth}`, frmtErr);
+        }
       }
-      err.sqler = {
-        file: fpth,
-        sql: sqlf,
-        options: opts,
-        fragments: frags
-      };
-      err.message = `${err.message}\n${JSON.stringify(err.sqler, null, ' ')}`;
-      if (returnErrors) return { error: err };
+      if (errorOpts && errorOpts.handler && typeof errorOpts.handler === 'function') {
+        errorOpts.handler(err);
+      }
+      if (errorOpts === true || (errorOpts && errorOpts.returnErrors)){
+        return { error: err };
+      }
       throw err;
     }
     if (dbs.at.logging) {

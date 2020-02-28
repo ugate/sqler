@@ -120,7 +120,7 @@ class UtilSql {
    * @param {Object} [testReadOpts.cacheOpts] the options that were used on the specified {@link Cache}
    * @param {Manager~ConnectionOptions} [testReadOpts.connOpts] The {@link Manager~ConnectionOptions} that was used
    * @param {Manager~ExecOptions} [testReadOpts.execOpts] The {@link Manager~ExecOptions} to use (leave `undefined` to create)
-   * @param {Boolean} [testReadOpts.returnErrors] Value passed into the {@link Manager~PreparedFunction}
+   * @param {(Manager~ExecErrorOptions | Boolean)} [testReadOpts.errorOpts] Value passed into the {@link Manager~PreparedFunction}
    * @param {Object} [testReadOpts.prepFuncPaths] Override the path(s) to the prepared function that resides on the {@link Manager}
    * @param {String} [testReadOpts.prepFuncPaths.read='read.some.tables'] Override path from the `mgr.db[connName]` to the prepared function that will be executed for a file
    * that is prefixed with `read`
@@ -133,7 +133,7 @@ class UtilSql {
     if (LOGGER.info) LOGGER.info(`Begin basic test`);
 
     testReadOpts = testReadOpts || {};
-    const { cache, cacheOpts, connOpts, execOpts, returnErrors, frags, prepFuncPaths = { read: 'read.some.tables', readNoPrefix: 'no.prefix.some.tables' } } = testReadOpts;
+    const { cache, cacheOpts, connOpts, execOpts, errorOpts, frags, prepFuncPaths = { read: 'read.some.tables', readNoPrefix: 'no.prefix.some.tables' } } = testReadOpts;
     const opts = typeof execOpts === 'undefined' ? UtilOpts.createExecOpts() : execOpts;
     const label = `READ mgr.db.${connName}.${prepFuncPaths.read}`;
     const labelWithoutPrefix = `READ mgr.db.${connName}.${prepFuncPaths.readNoPrefix}`;
@@ -147,12 +147,23 @@ class UtilSql {
         else pfunc = mgr.db[connName][ppth];
       }
       expect(pfunc, noPrefix ? labelWithoutPrefix : label).to.be.function();
-      if (noPrefix) readRslt = await pfunc(opts, frags, returnErrors);
-      else readRslt = await pfunc(opts, frags, returnErrors);
+      let errHandled, errCalled;
+      if (errorOpts && errorOpts.returnErrors && !errorOpts.handler) {
+        errHandled = true;
+        errorOpts.handler = err => {
+          errCalled = err;
+        };
+      }
+      if (noPrefix) readRslt = await pfunc(opts, frags, errorOpts);
+      else readRslt = await pfunc(opts, frags, errorOpts);
       const throwOpt = UtilOpts.driverOpt('throwExecError', opts, connOpts);
       expect(readRslt, `${label} result`).to.be.object();
-      if (returnErrors && throwOpt.source && throwOpt.value) {
-        expect(readRslt.error, `${label} result rows`).to.be.error();
+      if ((errorOpts === true || (errorOpts && errorOpts.returnErrors)) && throwOpt.source && throwOpt.value) {
+        expect(readRslt.error, `${label} result error`).to.be.error();
+        expect(readRslt.error.sqler, `${label} result error.sqler`).to.be.object();
+        if (errHandled) {
+          expect(readRslt.error, `${label} result error = errorOpts.handler error`).to.equal(errCalled);
+        }
       } else {
         const rcdCntOpt = UtilOpts.driverOpt('recordCount', opts, connOpts);
         expect(readRslt.rows, `${label} result rows`).to.be.array();

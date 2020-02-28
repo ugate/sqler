@@ -33,7 +33,7 @@ In order to use `sqler` a simple implementation of [Dialect](https://ugate.githu
 - [Oracle](https://ugate.github.io/sqler-oracle)
 - [ODBC](https://ugate.github.io/sqler-odbc)
 
-Example<sub id="example"></sub>:
+Example Read<sub id="exampleread"></sub>:
 ```sql
 -- db/finance/read.ap.companies.sql
 SELECT CO.COMPANY AS "company", CO.R_NAME AS "name", CO.PAY_GROUP AS "payGroup", CO.TAX_ACCOUNT AS "taxAccount", CO.TAX_ACCT_UNIT AS "taxAcctUnit",
@@ -82,9 +82,74 @@ console.log('Manager is ready for use');
 // execute the SQL statement and capture the results
 const rslts = await mgr.db.fin.read.ap.companies({ binds: { invoiceAudit: 'Y' } });
 
+
+
 // after we're done using the manager we should close it
 process.on('SIGINT', async function sigintDB() {
   await mrg.close();
   console.log('Manager has been closed');
 });
+```
+
+Example Write<sub id="examplewrite"></sub>:
+```sql
+-- db/finance/create.ap.companies.sql
+INSERT INTO APCOMPANY (COMPANY, R_NAME, PAY_GROUP, TAX_ACCOUNT, TAX_ACCT_UNIT)
+VALUES (:company, :name, :payGroup, :taxAccount, :taxAcctUnit);
+```
+
+```js
+// using the same setup as the previous example...
+
+// autCommit = false will cause a transaction to be started
+const coOpts = {
+  autoCommit: false,
+  binds: {
+    company: 1,
+    name: 'Company 1',
+    payGroup: 'MYCO1',
+    taxAccount: 1234,
+    taxAcctUnit: 10000000
+  }
+};
+// autCommit = false will cause a transaction to be continued
+const acctOpts = {
+  autoCommit: false,
+  binds: {
+    company: 2,
+    name: 'Company 2',
+    payGroup: 'MYCO2',
+    taxAccount: 5678,
+    taxAcctUnit: 20000000
+  }
+};
+
+let exc1, exc2;
+try {
+  // start a transaction
+  const txId = await mgr.db.fin.beginTransaction();
+
+  // set the transaction ID on the execution options
+  // so the company/account SQL execution is invoked
+  // within the same transaction scope
+  coOpts.transactionId = txId;
+  acctOpts.transactionId = txId;
+
+  // execute within the a transaction scope
+  // (i.e. autoCommit === false and transactionId = txId)
+  exc1 = await mgr.db.fin.create.ap.company(coOpts);
+
+  // execute within the same transaction scope
+  // (i.e. autoCommit === false and transactionId = txId)
+  exc2 = await mgr.db.fin.create.ap.account(acctOpts);
+
+  // can commit using either exc1.commit() or exc2.commit()
+  await exc1.commit();
+} catch (err) {
+  if (exc1) {
+    // can rollback using either exc1.rollback() or exc2.rollback()
+    await exc1.rollback();
+  }
+  throw err;
+}
 ```

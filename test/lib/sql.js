@@ -40,7 +40,7 @@ class Tester {
     conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
     conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
     await UtilSql.initManager(priv, conf, {
-      logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateAbyssConsoleLogger
+      logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
     });
 
     return UtilSql.testRead(priv.mgr, connName);
@@ -48,12 +48,20 @@ class Tester {
 
   static async readErrorReturn() {
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(priv, conf);
+    await UtilSql.initManager(priv, conf, {
+      logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
+    });
 
     const execOpts = UtilOpts.createExecOpts();
     execOpts.driverOptions = execOpts.driverOptions || {};
     execOpts.driverOptions.throwExecError = true;
-    return UtilSql.testRead(priv.mgr, connName, { execOpts, returnErrors: true });
+    let errorOpts = true;
+    await UtilSql.testRead(priv.mgr, connName, { execOpts, errorOpts });
+    errorOpts = {
+      returnErrors: true,
+      includeBindValues: true
+    };
+    return UtilSql.testRead(priv.mgr, connName, { execOpts, errorOpts });
   }
 
   static async readErrorThrow() {
