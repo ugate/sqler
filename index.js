@@ -279,6 +279,17 @@ const MOD_KEY = 'sqler';
  */
 
 /**
+ * Converts a SQL statement that contains named bind parameters into a SQL statement that contains unnamed/positional bind parameters (using `?`).
+ * Each bound parameter is pushed to the array in the position that corresponds to the position within the SQL statement.
+ * @callback {Function} Manager~PositionalBindsFunction
+ * @param {String} sql The SQL statement that contains the bind parameters
+ * @param {Object} bindsObject An object that contains the bind parameters as property names/values
+ * @param {Array} bindsArray The array that will be populated with the bind parameters
+ * @returns {String} The converted SQL statement
+ * @throws {Error} Thrown when a bound parameter is not within the orgiginating SQL statement
+ */
+
+/**
  * A tracking mechanism that is shared between all {@link Dialect} implementations for a given {@link Manager}. A track provides a means to share
  * data, etc. from one {@link Dialect} to another. Properties can also be _added_ by a {@link Dialect} for use in other {@link Dialect}s.
  * __Typically only used by implementing {@link Dialect} constructors.__
@@ -286,6 +297,7 @@ const MOD_KEY = 'sqler';
  * @property {Manager~InterpolateFunction} interpolate An interpolation function that can be used by {@link Dialect} implementations to interpolate
  * configuration option values from underlying drivers within a {@link Dialect} (immutable). The convenience of doing so negates the need for an
  * application that uses a {@link Manager} to import/require a database driver just to access driver constants, etc.
+ * @property {Manager~PositionalBindsFunction} positionalBinds A function that will convert an SQL statement with named binds into positional binds
  */
 
 /**
@@ -315,6 +327,10 @@ class Manager {
     const track = {};
     Object.defineProperty(track, 'interpolate', {
       value: interpolate,
+      writable: false
+    });
+    Object.defineProperty(track, 'positionalBinds', {
+      value: positionalBinds,
       writable: false
     });
     mgr.this[ns] = {};
@@ -896,6 +912,18 @@ function interpolate(dest, source, interpolator, validator, onlyInterpolated, _v
     if (_vpths) _vpths.pop();
   }
   return dest;
+}
+
+/**
+ * @see Manager~PositionalBindsFunction
+ * @private
+ */
+function positionalBinds(sql, bindsObject, bindsArray) {
+  return sql.replace(/:(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g, (match, pname) => {
+    if (!bindsObject[pname]) throw new Error(`sqler: Unbound "${pname}" at position ${bindsArray.length}`);
+    bindsArray.push(bindsObject[pname]);
+    return '?';
+  });
 }
 
 module.exports = Object.freeze({ Manager, Dialect });

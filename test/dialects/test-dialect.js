@@ -201,6 +201,15 @@ class TestDialect extends Dialect {
  */
 function expectTrack(track) {
   expect(track, 'track').to.be.object();
+  expectPositionalBinds(track);
+  expectInterpolate(track);
+}
+
+/**
+ * Expects a track to contain the implmented `interpolate` field
+ * @param {Manager~Track} track The track to expect
+ */
+function expectInterpolate(track) {
   expect(track.interpolate, 'track.interpolate').to.be.function();
   const ipoles = [
     {
@@ -277,16 +286,57 @@ function expectTrack(track) {
       }
     }
   }
+  expectImmutable('track', track, 'interpolate');
+}
 
-  const interpolateFunc = track.interpolate;
-  let trackInterpolateError;
-  try {
-    track.interpolate = () => false;
-  } catch (err){
-    trackInterpolateError = err;
+/**
+ * Expects a track to contain the implmented `interpolate` field
+ * @param {Manager~Track} track The track to expect
+ */
+function expectPositionalBinds(track) {
+  expect(track.positionalBinds, 'track.positionalBinds').to.be.function();
+  const cols = [':col1', ':col2'], colVals = [1, 'two'], binds = {}, bindsArray = [];
+  const sql = `
+    SELECT * FROM TEST
+    WHERE COL1 = :col1
+    AND COL2 = :col2;
+  `;
+  for (let i = 0; i < colVals.length; i++) {
+    binds[cols[i].substr(1)] = colVals[i];
   }
-  expect(track.interpolate, 'track.interpolate immutable').to.equal(interpolateFunc);
-  expect(trackInterpolateError, 'track.interpolate immutable (error)').to.be.error();
+  const usql = track.positionalBinds(sql, binds, bindsArray);
+  expect(usql, 'track.positionalBinds SQL result').to.not.contain(cols);
+  const ucount = (usql.match(/\?/g) || []).length;
+  expect(ucount, 'track.positionalBinds SQL result unnamed parameter count').to.equal(cols.length);
+  expect(bindsArray, 'track.positionalBinds bindsArray = column values').to.equal(colVals);
+
+  let error;
+  try {
+    track.positionalBinds(sql, { col1: 1 }, bindsArray);
+  } catch (err) {
+    error = err;
+  }
+  expect(error, 'track.positionalBinds missing bind in SQL').to.be.error();
+
+  expectImmutable('track', track, 'positionalBinds');
+}
+
+/**
+ * Expects an object property to be immutable
+ * @param {String} name The name for the specified object
+ * @param {Object} obj The object container the use
+ * @param {String} prop The property on the object container to check for immutability
+ */
+function expectImmutable(name, obj, prop) {
+  const origFunc = obj[prop];
+  let error;
+  try {
+    obj.interpolate = () => false;
+  } catch (err){
+    error = err;
+  }
+  expect(obj[prop], `${name}.${prop} immutable setFunc === ${name}.${prop}`).to.equal(origFunc);
+  expect(error, `${name}.${prop} immutable (error)`).to.be.error();
 }
 
 /**
