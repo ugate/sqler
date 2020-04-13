@@ -12,13 +12,14 @@ script:
   - "npm test"
 deploy:
   - provider: script
-    skip_cleanup: true
+    cleanup: false
     script: npm run jsdocp-deploy
     on:
       tags: true # only on tagging commit
       branch:
         - /v(\d+\.)?(\d+\.)?(\*|\d+)$/
   - provider: npm
+    cleanup: true
     email: "ugate.public@gmail.com"
     api_key: $NPM_TOKEN  # Set in the settings page of your repository, as a secure variable
     on:
