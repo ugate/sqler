@@ -249,8 +249,7 @@ const MOD_KEY = 'sqler';
  */
 
 /**
- * A validation
- * @async
+ * A validation for validating interpolation used by a {@link Manager~InterpolateFunction}
  * @callback {Function} Manager~InterpolateValidationFunction
  * @param {String[]} srcPropNames Property path(s) to the value being validated (e.g. `source.my.path = 123` would equate to 
  * a invocation to `validator(['my','path'], 123)`).
@@ -265,7 +264,6 @@ const MOD_KEY = 'sqler';
  * For example `source.someProp = '${SOME_VALUE}'` will be interpreted as `dest.someProp = dest.SOME_VALUE` when the `interpolator` is omitted and
  * `dest.someProp = interpolator.SOME_VALUE` when an `interpolator` is specified.
  * __Typically only used by implementing {@link Dialect} constructors within a {@link Manager~Track}.__
- * @async
  * @callback {Function} Manager~InterpolateFunction
  * @param {Object} dest The destination where the sources will be set (also the interpolated source when `interpolator` is omitted).
  * @param {Object} source The source of the values to interpolate (e.g. {@link Manager~ConnectionOptions}, {@link Manager~ExecOptions}, etc.).
