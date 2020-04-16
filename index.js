@@ -184,11 +184,18 @@ const MOD_KEY = 'sqler';
  // TODO : @property {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
 
 /**
+ * Internally generated metadata that is passed into {@link Dialect.exec} by a {@link Manager} for determining SQL sources.
+ * @typedef {Object} Manager~ExecMeta
+ * @property {String} name The composed name given to a given SQL file
+ * @property {String} path The path to the SQL file
+ */
+
+/**
  * Options for handling any errors that occur during execution.
  * @typedef {Object} Manager~ExecErrorOptions
- * @param {Function} [handler] A `function(error)` that will handle any errors thrown. The errors should contain a `sqler` property containing
- * @param {Boolean} [includeBindValues] Truthy to include the bind parameter values `error.sqler`.
- * @param {Boolean} [returnErrors] Truthy to return any errors that may occur. Otherwise, throw any errors that may occur.
+ * @property {Function} [handler] A `function(error)` that will handle any errors thrown. The errors should contain a `sqler` property containing
+ * @property {Boolean} [includeBindValues] Truthy to include the bind parameter values `error.sqler`.
+ * @property {Boolean} [returnErrors] Truthy to return any errors that may occur. Otherwise, throw any errors that may occur.
  */
 
 /**
@@ -624,7 +631,7 @@ class SQLS {
         throw new Error(`Statement execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = ${
           xopts.autoCommit}". Try setting "opts.transactionId = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
       }
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(fpth, xopts, frags, errorOpts));
+      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(name, fpth, xopts, frags, errorOpts));
     };
   }
 
@@ -637,10 +644,10 @@ class SQLS {
     } else return bind;
   }
 
-  genExecSqlFromFileFunction(fpth, opts, frags, errorOpts) {
+  genExecSqlFromFileFunction(name, fpth, opts, frags, errorOpts) {
     const sqls = internal(this);
     return async function execSqlFromFile(sql) {
-      return await sqls.at.dbs.exec(fpth, sql, opts, frags, errorOpts);
+      return await sqls.at.dbs.exec(name, fpth, sql, opts, frags, errorOpts);
     };
   }
 
@@ -717,6 +724,7 @@ class DBS {
 
   /**
   * Executes SQL using the underlying framework API
+  * @param {String} name The name given to the SQL file
   * @param {String} fpth The originating file path where the SQL resides
   * @param {String} sql The SQL to execute with optional substitutions {@link DBS#frag}
   * @param {Manager~ExecOptions} opts The eectution options
@@ -725,7 +733,7 @@ class DBS {
   * Can also pass {@link Manager~ExecErrorOptions} for more control over execution errors.
   * @returns {Dialect~ExecResults} The execution results
   */
-  async exec(fpth, sql, opts, frags, errorOpts) {
+  async exec(name, fpth, sql, opts, frags, errorOpts) {
     const dbs = internal(this);
     const sqlf = dbs.this.segmentSubs(sql, opts.binds, frags);
     // framework that executes SQL may output SQL, so, we dont want to output it again if logging is on
@@ -734,7 +742,8 @@ class DBS {
     }
     let rslt;
     try {
-      rslt = await dbs.at.dialect.exec(sqlf, opts, frags, errorOpts); // execute the prepared SQL statement
+      const meta = { name, path: fpth };
+      rslt = await dbs.at.dialect.exec(sqlf, opts, frags, meta, errorOpts); // execute the prepared SQL statement
     } catch (err) {
       try {
         const eopts = JSON.parse(JSON.stringify(opts));
@@ -743,6 +752,7 @@ class DBS {
           dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(eopts)}, state: ${dbs.at.dialect.state})`);
         }
         err[MOD_KEY] = err[MOD_KEY] || {};
+        err[MOD_KEY].name = name;
         err[MOD_KEY].file = fpth;
         err[MOD_KEY].sql = sqlf;
         err[MOD_KEY].options = eopts;

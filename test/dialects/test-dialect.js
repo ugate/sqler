@@ -74,7 +74,13 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  async exec(sql, opts, frags) {
+  async exec(sql, opts, frags, meta) {
+    expect(meta, 'meta').to.be.object();
+    expect(meta.name, 'meta.name').to.be.string();
+    expect(meta.name, 'meta.name').to.not.be.empty();
+    expect(meta.path, 'meta.path').to.be.string();
+    expect(meta.path, 'meta.path').to.not.be.empty();
+
     if (UtilOpts.driverOpt('throwExecError', opts, this.connConf).value) {
       const error = new Error(`Test error due to "opts.driverOptions.throwExecError" = ${
         opts.driverOptions.throwExecError} and "this.connConf.driverOptions.throwExecError" = ${this.connConf.driverOptions.throwExecError}`);
