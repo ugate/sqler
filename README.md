@@ -31,6 +31,8 @@ In order to use `sqler` a simple implementation of [Dialect](https://ugate.githu
 
 - [SQL Server](https://ugate.github.io/sqler-mssql)
 - [Oracle](https://ugate.github.io/sqler-oracle)
+- [MriaDB and/or MySQL](https://ugate.github.io/sqler-mdb)
+- [PostgreSQL](https://ugate.github.io/sqler-postgres)
 - [ODBC](https://ugate.github.io/sqler-odbc)
 
 Example Read<sub id="exampleread"></sub>:
@@ -82,8 +84,6 @@ console.log('Manager is ready for use');
 // execute the SQL statement and capture the results
 const rslts = await mgr.db.fin.read.ap.companies({ binds: { invoiceAudit: 'Y' } });
 
-
-
 // after we're done using the manager we should close it
 process.on('SIGINT', async function sigintDB() {
   await mrg.close();
@@ -91,7 +91,7 @@ process.on('SIGINT', async function sigintDB() {
 });
 ```
 
-Example Write<sub id="examplewrite"></sub>:
+Example Write (with implicit transaction)<sub id="examplewrite1"></sub>:
 ```sql
 -- db/finance/create.ap.companies.sql
 INSERT INTO APCOMPANY (COMPANY, R_NAME, PAY_GROUP, TAX_ACCOUNT, TAX_ACCT_UNIT)
@@ -99,7 +99,31 @@ VALUES (:company, :name, :payGroup, :taxAccount, :taxAcctUnit);
 ```
 
 ```js
-// using the same setup as the previous example...
+// using the same setup as the read example...
+
+// execute within the an implicit transaction scope
+// (i.e. autoCommit === true w/o transactionId)
+const rslts = await mgr.db.fin.create.ap.company({
+  autoCommit: true, // <--- could omit since true is default
+  binds: {
+    company: 1,
+    name: 'Company 1',
+    payGroup: 'MYCO1',
+    taxAccount: 1234,
+    taxAcctUnit: 10000000
+  }
+});
+```
+
+Example Write (with explicit transaction)<sub id="examplewrite2"></sub>:
+```sql
+-- db/finance/create.ap.companies.sql
+INSERT INTO APCOMPANY (COMPANY, R_NAME, PAY_GROUP, TAX_ACCOUNT, TAX_ACCT_UNIT)
+VALUES (:company, :name, :payGroup, :taxAccount, :taxAcctUnit);
+```
+
+```js
+// using the same setup as the read example...
 
 // autCommit = false will cause a transaction to be started
 const coOpts = {
