@@ -290,6 +290,8 @@ const MOD_KEY = 'sqler';
  * @param {String} sql The SQL statement that contains the bind parameters
  * @param {Object} bindsObject An object that contains the bind parameters as property names/values
  * @param {Array} bindsArray The array that will be populated with the bind parameters
+ * @param {(String | Function)} [placeholder=?] Either a string value that will be used for the postional placeholder or a `function(name, index)` that
+ * returns a value that will be used as the positional placeholder.
  * @returns {String} The converted SQL statement
  * @throws {Error} Thrown when a bound parameter is not within the orgiginating SQL statement
  */
@@ -926,11 +928,12 @@ function interpolate(dest, source, interpolator, validator, onlyInterpolated, _v
  * @see Manager~PositionalBindsFunction
  * @private
  */
-function positionalBinds(sql, bindsObject, bindsArray) {
+function positionalBinds(sql, bindsObject, bindsArray, placeholder = '?') {
+  const func = typeof placeholder === 'function' ? placeholder : null;
   return sql.replace(/:(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g, (match, pname) => {
     if (!bindsObject[pname]) throw new Error(`sqler: Unbound "${pname}" at position ${bindsArray.length}`);
     bindsArray.push(bindsObject[pname]);
-    return '?';
+    return func ? func(pname, bindsArray.length - 1) : placeholder;
   });
 }
 
