@@ -29,11 +29,11 @@ For more details check out the tutorials and API docs!
 #### Usage <sub id="usage"></sub>:
 In order to use `sqler` a simple implementation of [Dialect](https://ugate.github.io/sqler/Dialect.html) should be supplied. There are a few that have already been written for a few enteprise level applications that make use of `sqler`<sub id="dialects"></sub>:
 
-- [SQL Server](https://ugate.github.io/sqler-mssql)
-- [Oracle](https://ugate.github.io/sqler-oracle)
-- [MriaDB and/or MySQL](https://ugate.github.io/sqler-mdb)
-- [PostgreSQL](https://ugate.github.io/sqler-postgres)
-- [ODBC](https://ugate.github.io/sqler-odbc)
+- [SQL Server - `sqler-mssql`](https://ugate.github.io/sqler-mssql)
+- [Oracle - `sqler-oracle`](https://ugate.github.io/sqler-oracle)
+- [MriaDB and/or MySQL - `sqler-mdb`](https://ugate.github.io/sqler-mdb)
+- [PostgreSQL - `sqler-postgres`](https://ugate.github.io/sqler-postgres)
+- [ODBC - `sqler-odbc`](https://ugate.github.io/sqler-odbc)
 
 Example Read<sub id="exampleread"></sub>:
 ```sql
