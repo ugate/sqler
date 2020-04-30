@@ -223,6 +223,12 @@ const MOD_KEY = 'sqler';
  */
 
 /**
+ * Transaction options that can be passed into a `manager.connectionName.beginTransaction(transactionOptions)` function.
+ * @typedef {Object} Manager~TransactionOptions
+ * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
+ */
+
+/**
  * Options for operational methods on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.state}, {@link Manager.close}, etc.).
  * @typedef {Object} Manager~OperationOptions
  * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `errorOpts` and/or `executeInSeries`
@@ -311,6 +317,13 @@ const MOD_KEY = 'sqler';
  * The database(s) manager entry point that autogenerates/manages SQL execution functions from underlying SQL statement files.
  * Vendor-specific implementations should implement {@link Dialect} and pass the class or module path into the constructor as `conf.db.dialects.myDialectClassOrModulePath`.
  * See [README.md](index.html) for more details about SQL related features.
+ * A manager will contain the following properties:
+ * - `db` - The database accessible object where all of the constructed connections reside. For example
+ * - `db.<CONN_NAME>` - There will be a property assigned for each database connection configured during construction. For example, when _<CONN_NAME>_ is _myConn_, the
+ * manager instance will be accessible via _manager.db.myConn_.
+ * - `db.<CONN_NAME>.<PREPARED_FUNC_PATHS>` The generated SQL executable {@link Manager~PreparedFunction}(s). Assuming a _<CONN_NAME>_ of _myConn_ and a path of
+ * _/db/myConn/read.my.table.sql_, the accessible {@link Manager~PreparedFunction} may be accessible via _db.myConn.read.my.table()_.
+ * - `db.<CONN_NAME>.beginTransaction` - A function that accepts a single {@link Manager~TransactionOptions} that begins a transaction for a given database connection pool.
  */
 class Manager {
 
@@ -537,7 +550,7 @@ class SQLS {
       }
     };
     await prepare();
-    sqls.at.db.beginTransaction = () => sqls.at.dbs.beginTransaction();
+    sqls.at.db.beginTransaction = opts => sqls.at.dbs.beginTransaction(opts);
     return sqls.at.dbs.init({ numOfPreparedStmts: sqls.at.numOfPreparedStmts });
   }
 
@@ -715,12 +728,13 @@ class DBS {
 
   /**
    * Begins a transaction
+   * @param {Manager~TransactionOptions} [opts={}] The passed transaction options
    * @returns {String} The transaction identifier
    */
-  async beginTransaction() {
+  async beginTransaction(opts) {
     const dbs = internal(this);
     const txId = generateTransactionId();
-    await dbs.at.dialect.beginTransaction(txId);
+    await dbs.at.dialect.beginTransaction(txId, opts || {});
     return txId;
   }
 

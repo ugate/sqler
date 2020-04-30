@@ -67,8 +67,9 @@ class TestDialect extends Dialect {
   /**
    * @inheritdoc
    */
-  async beginTransaction(txId) {
+  async beginTransaction(txId, opts) {
     if (!this.connections.hasOwnProperty(txId)) this.connections[txId] = {};
+    expect(opts, 'transaction options').to.be.object();
   }
 
   /**
