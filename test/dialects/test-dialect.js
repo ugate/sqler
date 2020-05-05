@@ -14,8 +14,8 @@ class TestDialect extends Dialect {
    */
   constructor(priv, connConf, track, errorLogger, logger, debug) {
     super(priv, connConf, track, errorLogger, logger, debug);
-    this.testPending = 0;
-    this.connections = {};
+    this.transactions = new Map();
+    this.preparedStatements = new Map();
 
     expect(priv, 'priv').to.be.object();
     expect(priv.host, 'priv.host').to.be.string();
@@ -68,24 +68,34 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async beginTransaction(txId, opts) {
-    if (!this.connections.hasOwnProperty(txId)) this.connections[txId] = {};
+    if (!this.transactions.has(txId)) this.transactions.set(txId, { pending: 0 });
     expect(opts, 'transaction options').to.be.object();
   }
 
   /**
    * @inheritdoc
    */
+  async prepare(psId, opts) {
+    if (!this.preparedStatements.has(psId)) this.preparedStatements.set(psId, { pending: 0 });
+    expect(opts, 'prepared statement options').to.be.object();
+  }
+
+  /**
+   * @inheritdoc
+   */
   async exec(sql, opts, frags, meta) {
+    const dialect = this;
+
     expect(meta, 'meta').to.be.object();
     expect(meta.name, 'meta.name').to.be.string();
     expect(meta.name, 'meta.name').to.not.be.empty();
     expect(meta.path, 'meta.path').to.be.string();
     expect(meta.path, 'meta.path').to.not.be.empty();
 
-    if (UtilOpts.driverOpt('throwExecError', opts, this.connConf).value) {
+    if (UtilOpts.driverOpt('throwExecError', opts, dialect.connConf).value) {
       const error = new Error(`Test error due to "opts.driverOptions.throwExecError" = ${
         opts.driverOptions.throwExecError} and "this.connConf.driverOptions.throwExecError" = ${this.connConf.driverOptions.throwExecError}`);
-      const throwProps = UtilOpts.driverOpt('throwProperties', opts, this.connConf).value;
+      const throwProps = UtilOpts.driverOpt('throwProperties', opts, dialect.connConf).value;
       if (throwProps) {
         error.sqler = {};
         for (let prop in throwProps) {
@@ -98,26 +108,26 @@ class TestDialect extends Dialect {
     const xopts = UtilOpts.createExecOpts();
 
     const xoptsNoExpandedBinds = UtilOpts.createExecOpts(true);
-    expectOpts(this, opts, 'exec');
+    expectOpts(dialect, opts, 'exec');
     expect(opts.binds, 'opts.binds').to.be.object();
     if (xoptsNoExpandedBinds.binds) {
       expect(opts.binds, 'opts.binds').to.contain(xoptsNoExpandedBinds.binds);
     }
-    if (this.connConf.binds) {
-      expect(opts.binds, 'opts.binds').to.contain(this.connConf.binds);
+    if (dialect.connConf.binds) {
+      expect(opts.binds, 'opts.binds').to.contain(dialect.connConf.binds);
     }
     expectExpansionBinds(sql, opts, xopts);
 
-    if (this.connConf.substitutes) {
-      for (let sub in this.connConf.substitutes) {
+    if (dialect.connConf.substitutes) {
+      for (let sub in dialect.connConf.substitutes) {
         if (!this.connConf.substitutes.hasOwnProperty(sub)) continue;
-        if (!sql.includes(sub) && !sql.includes(this.connConf.substitutes[sub])) continue; // SQL may not be using the substitute
+        if (!sql.includes(sub) && !sql.includes(dialect.connConf.substitutes[sub])) continue; // SQL may not be using the substitute
         expect(sql, `SQL raw substitute`).to.not.contain(sub);
-        expect(sql, `SQL raw substitute`).to.contain(this.connConf.substitutes[sub]);
+        expect(sql, `SQL raw substitute`).to.contain(dialect.connConf.substitutes[sub]);
       }
     }
 
-    const singleRecordKey = UtilOpts.driverOpt('singleRecordKey', opts, this.connConf), recordCount = UtilOpts.driverOpt('recordCount', opts, this.connConf);
+    const singleRecordKey = UtilOpts.driverOpt('singleRecordKey', opts, dialect.connConf), recordCount = UtilOpts.driverOpt('recordCount', opts, dialect.connConf);
 
     if (frags) {
       const fragLabel = `frags`;
@@ -131,7 +141,7 @@ class TestDialect extends Dialect {
       }
 
       // check to make sure the expected fragments are included in the SQL statement
-      const fragSqlSnip = UtilOpts.driverOpt('fragSqlSnippets', opts, this.connConf);
+      const fragSqlSnip = UtilOpts.driverOpt('fragSqlSnippets', opts, dialect.connConf);
       if (fragSqlSnip.source && fragSqlSnip.value) {
         for (let fkey in fragSqlSnip.value) {
           if (frags.includes(fkey)) {
@@ -141,25 +151,40 @@ class TestDialect extends Dialect {
       }
     }
 
-    expectSqlSubstitutes(sql, opts, this.connConf, frags);
+    expectSqlSubstitutes(sql, opts, dialect.connConf, frags);
 
     const rslt = { raw: {} };
 
-    if (opts.hasOwnProperty('autoCommit') && !opts.autoCommit) {
+    // transaction checks
+    if (!opts.hasOwnProperty('autoCommit') || !opts.autoCommit) {
       expect(opts.transactionId, 'opts.transactionId').to.be.string();
       expect(opts.transactionId, 'opts.transactionId').to.not.be.empty();
 
-      const connLabel = `this.connections.${opts.transactionId} (beginTransaction called?)`;
-      expect(this.connections[opts.transactionId], connLabel).to.not.be.undefined();
-      expect(this.connections[opts.transactionId], connLabel).to.not.be.null();
+      const connLabel = `this.transactions.get('${opts.transactionId}') (beginTransaction called?)`;
+      const tx = dialect.transactions.get(opts.transactionId);
+      expect(tx, connLabel).to.not.be.undefined();
+      expect(tx, connLabel).to.not.be.null();
+
+      tx.pending++;
       
       rslt.commit = async () => {
-        this.testPending = 0;
-        delete this.connections[opts.transactionId];
+        dialect.transactions.delete(opts.transactionId);
       };
       rslt.rollback = async () => {
-        this.testPending = 0;
-        delete this.connections[opts.transactionId];
+        dialect.transactions.delete(opts.transactionId);
+      };
+    }
+
+    if (opts.prepareStatement) {
+      const connLabel = `this.preparedStatements.get('${meta.name}') (prepare called?)`;
+      const ps = dialect.preparedStatements.get(meta.name);
+      expect(ps, connLabel).to.not.be.undefined();
+      expect(ps, connLabel).to.not.be.null();
+      
+      ps.pending++;
+
+      rslt.unprepare = async () => {
+        dialect.preparedStatements.delete(meta.name);
       };
     }
 
@@ -188,7 +213,8 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async close() {
-    this.testPending = 0;
+    this.transactions = new Map();
+    this.preparedStatements = new Map();
     return 1;
   }
 
@@ -196,9 +222,14 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   get state() {
-    return {
-      pending: this.testPending
+    const rtn = { pending: 0 };
+    for (let [id, tx] of this.transactions) {
+      rtn.pending += tx.pending;
     }
+    for (let [id, ps] of this.preparedStatements) {
+      rtn.pending += ps.pending;
+    }
+    return rtn;
   }
 }
 
@@ -357,7 +388,6 @@ function expectOpts(dialect, opts, operation) {
 
   if (operation === 'exec') {
     expect(Manager.OPERATION_TYPES, `opts.type from "${operation}"`).to.have.part.include(opts.type);
-    dialect.testPending += opts.type === 'READ' || opts.autoCommit ? 0 : 1;
   }
 }
 

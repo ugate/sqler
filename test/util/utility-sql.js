@@ -254,10 +254,11 @@ class UtilSql {
    * @param {Manager} mgr The manager
    * @param {String} connName The connection name to use
    * @param {Object} conf The {@link UtilOpts.getConf} object
-   * @param {Manager~ExecOptions} xopts The execution options
-   * @param {Boolean} noTransaction Truthy to skip `beginTransaction` (should throw an error)
+   * @param {Manager~ExecOptions} [xopts] The execution options
+   * @param {Object} [testOpts={}] The test options
+   * @param {Boolean} [testOpts.noTransaction] Truthy to skip `beginTransaction` (should throw an error)
    */
-  static async testCUD(mgr, connName, conf, xopts, noTransaction) {
+  static async testCUD(mgr, connName, conf, xopts, testOpts = {}) {
     const testState = { pending: 0 };
     const autoCommit = xopts && xopts.hasOwnProperty('autoCommit') ? xopts.autoCommit : true;
 
@@ -282,8 +283,8 @@ class UtilSql {
 
     if (!autoCommit) {
       xopts = xopts || {};
-      if (!noTransaction) {
-        xopts.transactionId = await mgr.db[connName].beginTransaction();
+      if (!testOpts.noTransaction) {
+        xopts.transactionId = await mgr.db[connName].beginTransaction(testOpts.transactionOptions);
         expect(xopts.transactionId, 'xopts.transactionId').to.be.string();
         expect(xopts.transactionId, 'xopts.transactionId').to.not.be.empty();
       }
@@ -294,7 +295,8 @@ class UtilSql {
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
-    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
+    UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
+    await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     rslt = await mgr.db[connName].finance.read.annual.report(xopts);
     label = `READ mgr.db.${connName}.finance.read.annual.report()`;
@@ -302,35 +304,40 @@ class UtilSql {
     expect(rslt.rows, `${label} result rows`).to.be.array();
     expect(rslt.rows, `${label} result rows.length`).to.be.length(2); // two records should be returned w/o order by
     UtilSql.expectTransaction(rslt, autoCommit, label);
-    await UtilSql.testOperation('state', mgr, connName, testState, label);
+    UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
+    await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
     
     rslt = await mgr.db[connName].finance.ap.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ap.update.audits()`;
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
-    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
+    UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
+    await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     rslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
     label = `DELETE mgr.db.${connName}.finance.ap.delete.audits()`;
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
-    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
+    UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
+    await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     rslt = await mgr.db[connName].finance.ar.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ar.update.audits()`;
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
-    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
+    UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
+    await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     rslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
     label = `DELETE mgr.db.${connName}.finance.ar.delete.audits()`;
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
-    await UtilSql.testOperation('state', mgr, connName, autoCommit ? testState : ++testState.pending && testState, label);
+    UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
+    await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     if (!autoCommit) await rslt.commit();
   }
@@ -338,7 +345,7 @@ class UtilSql {
   /**
    * Expects a transaction (or `undefined` when not a transaction)
    * @param {Manager~ExecResults} rslt The results from a {@link Manager~PreparedFunction} for a CUD invocation
-   * @param {Boolean} notExpected Flag indicating the transaction should __NOT__ be expected
+   * @param {Boolean} [notExpected] Flag indicating the transaction should __NOT__ be expected
    * @param {String} [label] The label to use for the expect
    */
   static expectTransaction(rslt, notExpected, label = '') {
@@ -348,6 +355,20 @@ class UtilSql {
     } else {
       expect(rslt.commit,`${label} result commit`).to.be.function();
       expect(rslt.rollback,`${label} result rollback`).to.be.function();
+    }
+  }
+
+  /**
+   * Expects a prepared statement (or `undefined` when not a prepared statement)
+   * @param {Manager~ExecResults} rslt The results from a {@link Manager~PreparedFunction} for a CUD invocation
+   * @param {Boolean} [notExpected] Flag indicating the transaction should __NOT__ be expected
+   * @param {String} [label] The label to use for the expect
+   */
+  static expectPreparedStatement(rslt, notExpected, label = '') {
+    if (notExpected) {
+      expect(rslt.unprepare,`${label} result unprepare`).to.be.undefined();
+    } else {
+      expect(rslt.unprepare,`${label} result unprepare`).to.be.function();
     }
   }
 
@@ -379,7 +400,7 @@ class UtilSql {
     }
 
     return rslt;
-  } 
+  }
 
   /**
    * Reads/writes test SQL file
@@ -427,6 +448,17 @@ class UtilSql {
     }
     return conf;
   }
+}
+
+/**
+ * Updates the test state (when needed)
+ * @private
+ * @param {Object} state The test state to determine if it needs to be updated
+ * @param {Boolean} autoCommit Truthy to indicate the test should be auto-committed
+ * @returns {Object} The passed state
+ */
+function updateTestState(state, autoCommit) {
+  return autoCommit ? state : ++state.pending && state;
 }
 
 // TODO : ESM comment the following line...

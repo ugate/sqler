@@ -126,7 +126,15 @@ class Tester {
     const xopts = UtilOpts.createExecOpts();
     xopts.autoCommit = false;
     // no transaction started should throw error
-    await UtilSql.testCUD(priv.mgr, connName, conf, xopts, true);
+    await UtilSql.testCUD(priv.mgr, connName, conf, xopts, { noTransaction: true });
+  }
+
+  static async execOptsPreparedStatements() {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
+    await UtilSql.initManager(priv, conf);
+
+    const xopts = UtilOpts.createExecOpts();
+    await UtilSql.testCUD(priv.mgr, connName, conf, xopts, { prepare: true });
   }
 
   static async intervalCache() {

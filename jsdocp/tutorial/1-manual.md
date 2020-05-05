@@ -10,6 +10,7 @@ The [Manager](Manager.html) is the entry point for one or more databases/connect
   - [4️⃣ Version Susbstitutions](#vs)
   - [5️⃣ Raw Substitutions](#rs)
 - [🎬 Transactions](#tx)
+- [🍽️ Prepared Statements](#ps)
 - [🗄️ Caching SQL](#cache)
 
 #### ⚙️ Setup &amp; Configuration <sub id="conf"></sub>:
@@ -66,7 +67,7 @@ await mgr.init();
 
 console.log('Manager is ready for use');
 
-// execute the SQL statement and capture the results
+// execute the SQL source and capture the results
 const rslts = await mgr.db.fin.read.ap.companies({ binds: { invoiceAudit: 'Y' } });
 
 // after we're done using the manager we should close it
@@ -77,10 +78,10 @@ process.on('SIGINT', async function sigintDB() {
 ```
 Each `conf.db.dialect` property should contain all of the [Dialect](Dialect.html) vendor/driver implmentations used by the manager and can be set to either an extending Dialect class or a _path_ to an extended Dialect module. Many Dialects have already been implemented in separate modules that [listed in the README.md](index.html#dialects). The prior example calls `mgr.db.fin.ap.list.companies()` that uses the `conf.db.connections[].name = "fin"` as the property namespace under `db` on the manager instance.
 
-> 💡 TIP: Thrown errors from SQL statement execution will contain a property called `sqler` that will contain more descriptive error details pertaining to the SQL error.
+> 💡 TIP: Thrown errors from SQL execution will contain a property called `sqler` that will contain more descriptive error details pertaining to the SQL error.
 
 #### 🗃️ <u>SQL Files</u> <sub id="sqlf"></sub>:
-Every SQL file used by `sqler` should be organized in a directory under the directory assigned to `conf.mainPath` (defaults to `process.main` or `process.cwd()`). Each subdirectory used should be _unique_ to an individual `conf.db.connections[].name` (default) or `conf.db.connections[].dir`. When the [Manager](Manager.html) is initialized (i.e. [Manager.init](Manager.html#init)) the directory is scanned for files with an `.sql` extension and generates a [Prepared Statement](https://en.wikipedia.org/wiki/Prepared_statement)/`async Function` for each file that is found. Each [generated SQL function](Manager.html#~PreparedFunction}) will be accessible as a property path of the manager. For instance, a `mainPath` of `/some/sql/path` and a connection with a `conf.db.connections[].name` of `conn1` would look for SQL files under `/some/sql/path/conn1`. If `conf.db.connections[].dir` was set to `otherDir` then SQL files would be prepared from `some/sql/path/otherDir` instead. In either case the [generated prepared statement SQL function](Manager.html#~PreparedFunction}) would be accessible via `manager.db.conn1.read.something()`, assuming that `read.something.sql` resides in the forementioned directory path. To better visualize path computation, consider the following directory structure and the configuration from the previous example:
+Every SQL file used by `sqler` should be organized in a directory under the directory assigned to `conf.mainPath` (defaults to `process.main` or `process.cwd()`). Each subdirectory used should be _unique_ to an individual `conf.db.connections[].name` (default) or `conf.db.connections[].dir`. When the [Manager](Manager.html) is initialized (i.e. [Manager.init](Manager.html#init)) the directory is scanned for files with an `.sql` extension and generates an [Prepared Function](Manager.html#~PreparedFunction) for each file that is found. Each [generated SQL function](Manager.html#~PreparedFunction) will be accessible as a property path of the manager. For instance, a `mainPath` of `/some/sql/path` and a connection with a `conf.db.connections[].name` of `conn1` would look for SQL files under `/some/sql/path/conn1`. If `conf.db.connections[].dir` was set to `otherDir` then SQL files would be prepared from `some/sql/path/otherDir` instead. In either case the [generated prepared SQL function](Manager.html#~PreparedFunction) would be accessible via `manager.db.conn1.read.something()`, assuming that `read.something.sql` resides in the forementioned directory path. To better visualize path computation, consider the following directory structure and the configuration from the previous example:
 
 ```
 .
@@ -96,7 +97,7 @@ Every SQL file used by `sqler` should be organized in a directory under the dire
 |    |    + -- read.annual.report.sql
 ```
 
-The subsequent SQL prepared statement functions would be gernerated on the manager instance:
+The subsequent SQL prepared functions would be gernerated on the manager instance:
 
 - `mgr.db.fin.ap.delete.audits()`
 - `mgr.db.fin.ap.update.audits()`
@@ -112,7 +113,7 @@ Functions are always added to the `db` object within the manager instance. There
 
 Defining the _type_ of CRUD operation helps assist implementing [Dialect](Dialect.html) to determine any supplemental processing that may need to take place (like transactional state).
 
-Most RDMS drivers support [prepared statement variable substitutions](https://en.wikipedia.org/wiki/Prepared_statement) in some form or fashion. The most common of which is the typical syntax commonly associated with unamed or named bind parameters within prepared statements. However, `sqler` provides a few substitutional encapsulators that help with SQL statement composition. Each SQL file can define multiple encapsulators that indicates what portions of an SQL statement will be present before execution takes place. Substitutions use an openening `[[` and closing `]]` that can also be optionally prefixed with a SQL line comment `--[[`. The following sections discuss the differnt type of substitutions in more detail.
+Most RDMS drivers support _bind variables_ in some form or fashion. The most common of which is the typical syntax commonly associated with unamed or named bind parameters within an SQL source. However, `sqler` provides a few substitutional encapsulators that help with SQL function composition. Each SQL file can define multiple encapsulators that indicates what portions of an SQL source will be present before execution takes place. Substitutions use an openening `[[` and closing `]]` that can also be optionally prefixed with a SQL line comment `--[[`. The following sections discuss the differnt type of substitutions in more detail.
 
 The order of precedence in which substitutions are made:
 
@@ -123,7 +124,7 @@ The order of precedence in which substitutions are made:
 1. __[Fragment Substitutions](#fs)__ - Set during [prepared function execution](Manager.html#~PreparedFunction)
 
 #### 1️⃣ Expanded SQL Substitutions <sub id="es"></sub>:
-Depending on the underlying dialect support, named parameters typically follow some form of syntactic grammar like `:someParam`, where `someParam` is a parameter passed in to the `sqler` [generated SQL function](Manager.html#~PreparedFunction}) as the [bind variables](Manager.html#~ExecOptions). There may be instances where _any_ number of variables need to be substituded when an SQL statement is executed, but the actual number of variables is unknown at the time the SQL statement is written. This can be accomplished in `sqler` by simply adding a single variable to the SQL statement and passing an array of values during execution. For instance, passing the following [bind variables](Manager.html#~ExecOptions) JSON into the `sqler` [generated SQL function](Manager.html#~PreparedFunction}):
+Depending on the underlying dialect support, named parameters typically follow some form of syntactic grammar like `:someParam`, where `someParam` is a parameter passed in to the `sqler` [generated SQL function](Manager.html#~PreparedFunction}) as the [bind variables](Manager.html#~ExecOptions). There may be instances where _any_ number of variables need to be substituded when an SQL function is executed, but the actual number of variables is unknown at the time the SQL script is written. This can be accomplished in `sqler` by simply adding a single variable to the SQL bind variables and passing them into the prepared function. For instance, passing the following [bind variables](Manager.html#~ExecOptions) JSON into the `sqler` [generated SQL function](Manager.html#~PreparedFunction}):
 <br/><br/>__[bind variables](Manager.html#~ExecOptions):__
 ```json
 {
@@ -155,21 +156,21 @@ WHERE SOME_COL IN (:someParam, :someParam1, :someParam2)
 The normal driver driven variable substitutions would then be handled/applied external to `sqler`.
 
 #### 2️⃣ Fragment Substitutions <sub id="fs"></sub>:
-The second type of replacement involves SQL statement segments that are fragmented by use case. An example would be where only a portion of the SQL statement will be included when `frags` is passed into the [generated SQL function](Manager.html#~PreparedFunction}) that matches a key found in the SQL statement that's surrounded by an open (e.g. `[[? someKey]]`) and closing (i.e. `[[?]]`) fragment definition. For instance if `frags` is passed into a managed SQL function that contains `['someKey']` for a SQL statement:
+The second type of replacement involves SQL script segments that are fragmented by use case. An example would be where only a portion of the SQL script will be included when `frags` is passed into the [generated SQL function](Manager.html#~PreparedFunction}) that matches a key found in the SQL script that's surrounded by an open (e.g. `[[? someKey]]`) and closing (i.e. `[[?]]`) fragment definition. For instance if `frags` is passed into a managed SQL function that contains `['someKey']` for a SQL script:
 ```sql
 SELECT SOME_COL
 FROM SOME_TABLE
 WHERE SOME_COL = 'test'
 [[? someKey]] AND SOME_COL2 IS NOT NULL [[?]]
 ```
-the resulting SQL statement will become:
+the resulting SQL script will become:
 ```sql
 SELECT SOME_COL
 FROM SOME_TABLE
 WHERE SOME_COL = 'test'
 AND SOME_COL2 IS NOT NULL
 ```
-When `frags` is omitted or `frags` contains an array that does not contain a `somekey` value, then the resulting SQL statement would become:
+When `frags` is omitted or `frags` contains an array that does not contain a `somekey` value, then the resulting SQL script would become:
 ```sql
 SELECT SOME_COL
 FROM SOME_TABLE
@@ -179,7 +180,7 @@ WHERE SOME_COL = 'test'
 > __NOTE: Fragment substitutions cannot be nested__
 
 #### 3️⃣ Dialect Substitutions <sub id="ds"></sub>:
-A third type of replacement is dialect specific and allows for SQL files that, for the most part are ANSI compliant, but may have slight deviations in syntax that's specific to an individual database vendor. SQL files can coexist between database vendors, but segments of the SQL statement will only be included when executed under a database within a defined dialect. An example would be the use of `SUBSTR` in Oracle versus the ANSI* use of `SUBSTRING`. A SQL file may contain:
+A third type of replacement is dialect specific and allows for SQL files that, for the most part are ANSI compliant, but may have slight deviations in syntax that's specific to an individual database vendor. SQL files can coexist between database vendors, but segments of the SQL script will only be included when executed under a database within a defined dialect. An example would be the use of `SUBSTR` in Oracle versus the ANSI* use of `SUBSTRING`. A SQL file may contain:
 ```sql
 SELECT SOME_COL
 FROM SOME_TABLE
@@ -209,7 +210,7 @@ SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1)
 > __NOTE: Dialect substitutions cannot be nested__
 
 #### 4️⃣ Version Susbstitutions <sub id="vs"></sub>:
-Sometimes programs connect to DBs that are shared accross one or more applications. Some portions of a program may need to execute SQL statements that are similar in nature, but have some versioning discrepancies between database instances. Say we have a database instance for an up-and-coming version that has some modifications made to it's structure, but is not enough to warrent two separate copies of the same SQL statement file. It may make more sense to maintain one copy of a SQL file/statement and account for the discrepancies within the SQL file. We can do so by encapsulating the SQL segment by surrounding it with an opening `[[version = 1]]` and closing `[[version]]` key (valid version quantifiers can be `=`, `<`, `>`, `<=`, `>=` or `<>`). So, if there were a SQL file that contained:
+Sometimes programs connect to DBs that are shared accross one or more applications. Some portions of a program may need to execute SQL scripts that are similar in nature, but have some versioning discrepancies between database instances. Say we have a database instance for an up-and-coming version that has some modifications made to it's structure, but is not enough to warrent two separate copies of the same SQL script file. It may make more sense to maintain one copy of a SQL file and account for the discrepancies within the SQL file. We can do so by encapsulating the SQL segment by surrounding it with an opening `[[version = 1]]` and closing `[[version]]` key (valid version quantifiers can be `=`, `<`, `>`, `<=`, `>=` or `<>`). So, if there were a SQL file that contained:
 ```sql
 SELECT
 [[version <= 1]]
@@ -267,12 +268,12 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
 #### 🎬 Transactions <sub id="tx"></sub>:
-[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](Manager.html#~TransactionOptions) arguement and returns a unique transaction ID that can be passed as the `transactionId` option in subsequent [Prepared Function](Manager.html#~PreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Each generated [Prepared Function](Manager.html#~PreparedFunction) that is invoked will return a [result](Manager.html#~ExecResults) that contains two functions used to finalize a transaction:
+[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](Manager.html#~TransactionOptions) argument and returns a unique transaction ID that can be passed as the `transactionId` option in subsequent [Prepared Function](Manager.html#~PreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Each generated [Prepared Function](Manager.html#~PreparedFunction) that is invoked will return a [result](Manager.html#~ExecResults) that contains two functions used to finalize a transaction:
 
-- `commit` - Commits any pending changes from one or more previously invoked SQL statements
-- `rollback` - Rolls back any pending changes from one or more previously invoked SQL statements
+- `commit` - Commits any pending changes from one or more previously invoked SQL script
+- `rollback` - Rolls back any pending changes from one or more previously invoked SQL script
 
- Calling the the forementioned `commit` is not always necessary since there are a few different techniques for handling transactions. The simplest form is when executing a single SQL statement where the _default_ setting is used for `autoCommit = true`.
+ Calling the the forementioned `commit` is not always necessary since there are a few different techniques for handling transactions. The simplest form is when executing a single SQL script where the _default_ setting is used for `autoCommit = true`.
 
  ```js
  // autoCommit = true is the default
@@ -284,11 +285,11 @@ const coOpts = {
 };
 
 // begins/commits a transaction in a
-// single step (i.e. autoCommit === true)
+// single step (i.e. autoCommit = true)
 const exec1 = await mgr.db.fin.create.ap.company(coOpts);
  ```
 
- Lets say there are multiple SQL statements that need to be included in a single transaction. To do so, the `autoCommit` flag can be set to _true_ on the last transaction being executed. Also, to ensure every statement that is executed be performed within the same transaction scope, a `transactionId` should be set to the same value for every statement execution that needs to be included within the same transaction. Calling `manager.db.myConnectionName.beginTransaction()` will generate/return a unique tranaction identifier that can be passed into each [prepared function](Manager.html#~PreparedFunction) [options](Manager.html#~ExecOptions).
+ Lets say there are multiple SQL scripts that need to be included in a single transaction. To do so, the `autoCommit` flag can be set to _true_ on the last transaction being executed. Also, to ensure every SQL script that is executed be performed within the same transaction scope, a `transactionId` should be set to the same value for every SQL execution that needs to be included within the same transaction. Calling `manager.db.myConnectionName.beginTransaction()` will generate/return a unique tranaction identifier that can be passed into each [prepared function](Manager.html#~PreparedFunction) [options](Manager.html#~ExecOptions).
 
 ```js
 // autCommit = false requires a transactionId to be set
@@ -321,12 +322,12 @@ try {
   acctOpts.transactionId = txId;
 
   // execute within a transaction scope
-  // (i.e. autoCommit === false and transactionId = txId)
+  // (i.e. autoCommit = false and transactionId = txId)
   exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
   // execute within the same transaction scope
   // and commit after the satement has executed
-  // (i.e. autoCommit === true and transactionId = txId)
+  // (i.e. autoCommit = true and transactionId = txId)
   exc2 = await mgr.db.fin.create.ap.account(acctOpts);
 } catch (err) {
   if (exc1) {
@@ -337,7 +338,7 @@ try {
 }
 ```
 
-We could of explicity called commit instead of setting `autoCommit` to _true_ on the final SQL statement execution:
+We could of explicity called commit instead of setting `autoCommit` to _true_ on the final SQL script execution:
 
 ```js
 // autCommit = false will cause a transaction to be started
@@ -369,11 +370,11 @@ try {
   acctOpts.transactionId = txId;
 
   // execute within the a transaction scope
-  // (i.e. autoCommit === false and transactionId = txId)
+  // (i.e. autoCommit = false and transactionId = txId)
   exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
   // execute within the same transaction scope
-  // (i.e. autoCommit === false and transactionId = txId)
+  // (i.e. autoCommit = false and transactionId = txId)
   exc2 = await mgr.db.fin.create.ap.account(acctOpts);
 
   // can commit using either exc1.commit() or exc2.commit()
@@ -387,7 +388,7 @@ try {
 }
 ```
 
-The previous transaction examples execute the SQL statements in _series_, but they can also be executed in _parallel_. However, doing so requires that all the SQL executions use the same `transactionId` and that `autoCommit` is set to _false_ since executing in _parallel_ does not guarantee the order in which the SQL statements are executed.
+The previous transaction examples execute the SQL script in _series_, but they can also be executed in _parallel_. However, doing so requires that all the SQL executions use the same `transactionId` and that `autoCommit` is set to _false_ since executing in _parallel_ does not guarantee the order in which the SQL scripts are executed.
 
 ```js
 // autCommit = false will cause a transaction to be started
@@ -419,12 +420,12 @@ try {
   acctOpts.transactionId = txId;
 
   // execute within the same transaction scope
-  // (i.e. autoCommit === false and transactionId = txId)
-  const coProm = mgr.db.fin.create.ap.company(xopts);
+  // (i.e. autoCommit = false and transactionId = txId)
+  const coProm = mgr.db.fin.create.ap.company(coOpts);
 
   // execute within the same transaction scope
-  // (i.e. autoCommit === false and transactionId = txId)
-  const acctProm = mgr.db.fin.create.ap.account(xopts);
+  // (i.e. autoCommit = false and transactionId = txId)
+  const acctProm = mgr.db.fin.create.ap.account(acctOpts);
 
   // wait for the parallel executions to complete
   exc1 = await coProm;
@@ -440,7 +441,109 @@ try {
   throw err;
 }
 ```
-> __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and `autoCommit = false` is set on all statements within a transaction since the underlying connection is typically left open until one of those functions is invoked. Not doing so could quickly starve available connections! It's also equally important not to have more transactions in progress than what is available in the connection pool being used by the underlying dialect.__
+> __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and [`autoCommit = false` option](Manager.html#~ExecOptions) is set within a transaction since the underlying connection is typically left open until one of those functions are invoked. Not doing so could quickly starve available connections! It's also equally important not to have more transactions in progress than what is available in the connection pool that is being used by the underlying dialect.__
+
+#### 🍽️ Prepared Statements <sub id="ps"></sub>
+[Prepared statements](https://en.wikipedia.org/wiki/Prepared_statement) __may__ optimize SQL execution when invoking the same SQL script multiple times. When bind parameters are used, different values can also be passed into the [prepared function](Manager.html#~PreparedFunction).
+
+In `sqler`, prepared statements are handled internally via a chosen [Dialect](Dialect.html) vendor implementation - only a [`prepareStatement = true` flag](Manager.html#~ExecOptions) needs to be set to indicate the underlying SQL script should be executed within a __dedicated connection__ from the pool. Once all of the SQL invokations are complete a call to `unprepare` from the [execution result](Manager.html#~ExecResults) will close the statement/connection.
+
+Lets consider the following examples:
+
+```js
+// prepareStatemnt = true will create a prepared statement
+const coOpts1 = {
+  prepareStatemnt: true,
+  binds: {
+    id: 123,
+    name: 'Company 1'
+  }
+};
+// prepareStatemnt = true will use the in-progress prepared statement
+const coOpts2 = {
+  prepareStatemnt: true,
+  binds: {
+    id: 456,
+    name: 'Company 2'
+  }
+};
+
+let exc1, exc2;
+try {
+  // prpare statement and execute the SQL script
+  // (i.e. prepareStatement = true)
+  const coProm1 = mgr.db.fin.create.ap.company(coOpts1);
+  const coProm2 = mgr.db.fin.create.ap.company(coOpts2);
+
+  // wait for the parallel executions to complete
+  exc1 = await coProm1;
+  exc2 = await coProm2;
+} finally {
+  if (exc1) {
+    // can call either exc1.unprepare() or exc2.unprepare()
+    await exc1.unprepare();
+  }
+}
+```
+
+Prepared statements can also be contained within a [transaction](#tx). When doing so, calls to `commit` or `rollback` will _implicitly_ call `unprepare` from the [execution result](Manager.html#~ExecResults).
+
+```js
+// autCommit = false will cause a transaction to be started
+// prepareStatemnt = true will create a prepared statement
+const coOpts1 = {
+  autoCommit: false,
+  prepareStatemnt: true,
+  binds: {
+    id: 123,
+    name: 'Company 1'
+  }
+};
+// autCommit = false will cause a transaction to be continued
+// prepareStatemnt = true will use the in-progress prepared statement
+const coOpts2 = {
+  autoCommit: false,
+  prepareStatemnt: true,
+  binds: {
+    id: 456,
+    name: 'Company 2'
+  }
+};
+
+let exc1, exc2;
+try {
+  // start a transaction
+  const txId = await mgr.db.fin.beginTransaction();
+
+  // set the transaction ID on the execution options
+  // so the company/account SQL execution is invoked
+  // within the same transaction scope
+  coOpts1.transactionId = txId;
+  coOpts2.transactionId = txId;
+
+  // execute within the same transaction scope
+  // (i.e. autoCommit === false, transactionId = txId, prepareStatement = true)
+  const coProm1 = mgr.db.fin.create.ap.company(coOpts1);
+  const coProm2 = mgr.db.fin.create.ap.account(coOpts2);
+
+  // wait for the parallel executions to complete
+  exc1 = await coProm1;
+  exc2 = await coProm2;
+
+  // can commit using either exc1.commit() or exc2.commit()
+  // (commit will implicitly invoke unprepare)
+  await exc1.commit();
+} catch (err) {
+  if (exc1) {
+    // can rollback using either exc1.rollback() or exc2.rollback()
+    // (rollback will implicitly invoke unprepare)
+    await exc1.rollback();
+  }
+  throw err;
+}
+```
+
+> __It's imperative that `unprepare` (or `commit`/`rollback` when using a [transaction](#tx)) is called when using [`prepareStatement = true` is set](Manager.html#~ExecOptions) since the underlying connection is typically left open until the `unprepare` function is invoked. Not doing so could quickly starve available connections! It's also equally important not to have more __active__ prepared statements in progress than what is available in the connection pool that is being used by the underlying dialect.__
 
 #### 🗄️ Caching SQL <sub id="cache"></sub>:
 By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#Cache) container into the [Manager constructor](Manager.html#Manager).

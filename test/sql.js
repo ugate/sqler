@@ -38,5 +38,6 @@ lab.experiment(plan, () => {
   lab.test(`${plan}: Read With SQL Fragment Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsFrags);
   lab.test(`${plan}: Execution Options Missing Transaction Error`, Labrat.expectFailure('onUnhandledRejection', {
     expect, label: 'autoCommit = false, transactionId = undefined' }, Tester.execOptsAutoCommitFalseTransactionIdMissing));
+  lab.test(`${plan}: Prepared Statements`, { timeout: TEST_TKO }, Tester.execOptsPreparedStatements);
   lab.test(`${plan}: Interval Cache`, { timeout: TEST_TKO }, Tester.intervalCache);
 });

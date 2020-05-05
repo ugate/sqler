@@ -174,9 +174,13 @@ const MOD_KEY = 'sqler';
  * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
  * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
  * until the returned {@link Manager~ExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
- * @property {String} [transactionId] The transaction identifier returned from a prior call to `manager.db.myConnectionName.beginTransaction()` that will be used when executing
+ * @property {String} [transactionId] A transaction identifier returned from a prior call to `manager.db.myConnectionName.beginTransaction()` that will be used when executing
  * the {@link Manager~PreparedFunction}. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections
  * used by other transactions that may also be in progress. The ID is ignored when there is no transaction in progress with the specified ID.
+ * @property {Boolean} [prepareStatement] Truthy to generate or use an existing prepared statement for the SQL being executed via the {@link Manager~PreparedFunction}.
+ * Prepared statements _may_ help optimize SQL that is executed many times across the same connection with similar or different bind values.
+ * __Care must be taken not to drain the connection pool since the connection remains open until the SQL executions have completed and `unprepare` has been called on the {@link Manager~ExecResults}.__
+ * returned from the {@link Manager~PreparedFunction} call.
  * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
  * perform `date.toISOString()`. __Overrides the same option set on {@link Manager~ConnectionOptions}__.
  * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
@@ -214,10 +218,15 @@ const MOD_KEY = 'sqler';
  * Results returned from invoking a {@link Manager~PreparedFunction}
  * @typedef {Object} Manager~ExecResults
  * @property {Object[]} [rows] The execution array of model objects representing each row or `undefined` when executing a non-read SQL statement.
- * @property {Function} [commit] A no-argument _async_ function that commits any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_.
- * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ to ensue underlying connections are persisted and closed.__
- * @property {Function} [rollback] A no-argument _async_ function that rollbacks any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_.
- * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ to ensue underlying connections are persisted and closed.__
+ * @property {Function} [commit] A no-argument _async_ function that commits any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_
+ * or when the {@link Manager~PreparedFunction} is called without a valid `transactionId`.
+ * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transactionId` is supplied to ensue underlying connections are completed and closed.__
+ * @property {Function} [rollback] A no-argument _async_ function that rollbacks any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_
+ * or when the {@link Manager~PreparedFunction} is called without a valid `transactionId`.
+ * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transactionId` is supplied to ensue underlying connections are completed and closed.__
+ * @property {Function} [unprepare] A no-argument _async_ function that unprepares an outstanding prepared statement. Will not be available when the {@link Manager~PreparedFunction} is called
+ * when the specified `prepareStatement` is _falsy_ on the {@link Manager~ExecOptions} passed into the {@link Manager~PreparedFunction}.
+ * __NOTE: A call to `unprepare` must be invoked when a `prepareStatement` is _truthy_ to ensue underlying statements and/or connections are completed and closed.__
  * @property {Error} [error] Any caught error that occurred when a {@link Manager~PreparedFunction} was invoked with the `errorOpts` flag set to a _truthy_ value.
  * @property {Object} raw The raw results from the execution (driver-specific execution results).
  */
@@ -249,13 +258,14 @@ const MOD_KEY = 'sqler';
 /**
  * Options that are used during initialization
  * @typedef {Object} Manager~InitOptions
- * @property {Integer} numOfPreparedStmts The total number of prepared statements registered to the {@link Dialect}
+ * @property {Integer} numOfPreparedStmts The total number of {@link Manager~PreparedFunction}(s) registered on the {@link Dialect}
  */
 
 /**
  * The current state of the managed {@link Dialect}
  * @typedef {Object} Manager~State
- * @property {Integer} pending The number of transactions that are pending `commit` or `roolback`
+ * @property {Integer} pending The number of transactions that are pending `commit` or `roolback` plus any prepared statements that are pending
+ * `unprepare`.
  * @property {Object} [connections] The connection state
  * @property {Integer} [connections.count] The number of connections
  * @property {Integer} [connections.inUse] The number of connections that are in use
@@ -640,10 +650,11 @@ class SQLS {
         binds,
         autoCommit: opts && opts.hasOwnProperty('autoCommit') ? opts.autoCommit : true
       };
-      if (opts && opts.transactionId) xopts.transactionId = opts.transactionId;
       if (opts && opts.driverOptions) xopts.driverOptions = opts.driverOptions;
+      if (opts && opts.prepareStatement) xopts.prepareStatement = !!opts.prepareStatement;
+      if (opts && opts.transactionId) xopts.transactionId = opts.transactionId;
       if (!xopts.autoCommit && !xopts.transactionId) {
-        throw new Error(`Statement execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = ${
+        throw new Error(`SQL execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = ${
           xopts.autoCommit}". Try setting "opts.transactionId = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
       }
       return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(name, fpth, xopts, frags, errorOpts));
@@ -733,7 +744,7 @@ class DBS {
    */
   async beginTransaction(opts) {
     const dbs = internal(this);
-    const txId = generateTransactionId();
+    const txId = generateGUID();
     await dbs.at.dialect.beginTransaction(txId, opts || {});
     return txId;
   }
@@ -875,13 +886,13 @@ function generateLogger(log, tags) {
 }
 
 /**
- * Generates formats a GUID formatted transaction identifier
+ * Generates formats a GUID formatted identifier
  * @private
  * @param {String} [value] when present, will add any missing hyphens (if `hyphenate=true`) instead of generating a new value
  * @param {Boolean} [hyphenate=true] true to include hyphens in generated result
- * @returns {String} the generated GUID formatted transaction identifier
+ * @returns {String} the generated GUID formatted identifier
  */
-function generateTransactionId(value, hyphenate = true) {
+function generateGUID(value, hyphenate = true) {
   const hyp = hyphenate ? '-' : '';
   if (value) return hyphenate ? value.replace(/(.{8})-?(.{4})-?(.{4})-?(.{4})-?(.{12})/gi, `$1${hyp}$2${hyp}$3${hyp}$4${hyp}$5`) : value;
   return `xxxxxxxx${hyp}xxxx${hyp}4xxx${hyp}yxxx${hyp}xxxxxxxxxxxx`.replace(/[xy]/g, function (c) {

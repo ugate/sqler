@@ -18,6 +18,7 @@ Skip the ORM and simplify your SQL execution plans using plain 💯% SQL systax.
 - Debugging options that allow for near real time updates to [SQL files](https://ugate.github.io/sqler/tutorial-1-manual.html#sqlf) without restarting an application
 - [Expanded SQL substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#es), [fragment substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#fs), [dialect specific substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#ds) and [version specific substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#vs)
 - [Simplified transaction management](https://ugate.github.io/sqler/tutorial-1-manual.html#tx)
+- [Simplified prepared statement management](https://ugate.github.io/sqler/tutorial-1-manual.html#ps)
 - Using SQL vs ORM/API solutions minimizes overhead and maximizes optimal utilization of SQL syntax and DBA interaction and reduces over-fetching that is commonly assocaited with ORM
 - Unlike strict ORM/API based solutions, models are generated on the fly- lending itself to a more function centric design
 
