@@ -59,7 +59,7 @@ class TestDialect extends Dialect {
       if (this.connConf.driverOptions.throwInitError) {
         throw new Error(`Test error due to "this.connConf.driverOptions.throwInitError" = ${this.connConf.driverOptions.throwInitError}`);
       }
-      expect(opts.numOfPreparedStmts, `Number of prepared statements`).to.equal(this.connConf.driverOptions && this.connConf.driverOptions.numOfPreparedStmts);
+      expect(opts.numOfPreparedFuncs, `Number of prepared functions`).to.equal(this.connConf.driverOptions && this.connConf.driverOptions.numOfPreparedFuncs);
     }
     return true;
   }

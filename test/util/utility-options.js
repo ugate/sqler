@@ -34,7 +34,7 @@ class UtilOpts {
             "service": "TESTSRV",
             "dialect": "test",
             "driverOptions": {
-              "numOfPreparedStmts": 0,
+              "numOfPreparedFuncs": 0,
               "throwExecError": false
             }
           }

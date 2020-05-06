@@ -182,7 +182,7 @@ class Tester {
 
   static async valMainPathEmpty() {
     const conf = await UtilSql.initConf('test/empty-db');
-    conf.db.connections[0].driverOptions.numOfPreparedStmts = 0; // prevent statement count mismatch error
+    conf.db.connections[0].driverOptions.numOfPreparedFuncs = 0; // prevent statement count mismatch error
     return UtilSql.initManager(priv, conf, { skipPrepFuncs: true }); // skip prepared function validation since they will be empty
   }
 

@@ -257,7 +257,7 @@ const MOD_KEY = 'sqler';
 /**
  * Options that are used during initialization
  * @typedef {Object} Manager~InitOptions
- * @property {Integer} numOfPreparedStmts The total number of {@link Manager~PreparedFunction}(s) registered on the {@link Dialect}
+ * @property {Integer} numOfPreparedFuncs The total number of {@link Manager~PreparedFunction}(s) registered on the {@link Dialect}
  */
 
 /**
@@ -507,7 +507,7 @@ class SQLS {
   constructor(ns, sqlBasePth, cache, conn, db, dbs) {
     const sqls = internal(this);
     sqls.at.ns = ns;
-    sqls.at.numOfPreparedStmts = 0;
+    sqls.at.numOfPreparedFuncs = 0;
     sqls.at.basePath = Path.join(sqlBasePth, conn.dir || conn.name);
     sqls.at.cache = cache;
     sqls.at.conn = conn;
@@ -526,7 +526,7 @@ class SQLS {
    */
   async init() {
     const sqls = internal(this);
-    sqls.at.numOfPreparedStmts = 0;
+    sqls.at.numOfPreparedFuncs = 0;
     const prepare = async (cont, pnm, pdir) => {
       let pth, proms = [];
       try {
@@ -560,7 +560,7 @@ class SQLS {
     };
     await prepare();
     sqls.at.db.beginTransaction = opts => sqls.at.dbs.beginTransaction(opts);
-    return sqls.at.dbs.init({ numOfPreparedStmts: sqls.at.numOfPreparedStmts });
+    return sqls.at.dbs.init({ numOfPreparedFuncs: sqls.at.numOfPreparedFuncs });
   }
 
   /**
@@ -601,7 +601,7 @@ class SQLS {
         return await execFn(sql);
       };
     }
-    sqls.at.numOfPreparedStmts++;
+    sqls.at.numOfPreparedFuncs++;
 
     /**
      * @returns {String} the SQL contents from the SQL file
@@ -693,8 +693,8 @@ class SQLS {
   /**
    * @returns {Integer} the number of prepared statements found in SQL files
    */
-  get numOfPreparedStmts() {
-    return internal(this).at.numOfPreparedStmts;
+  get numOfPreparedFuncs() {
+    return internal(this).at.numOfPreparedFuncs;
   }
 
   /**

@@ -446,7 +446,7 @@ class UtilSql {
       conn.driverOptions = conn.driverOptions || {};
       conn.driverOptions.sqlPaths = [];
       await UtilSql.sqlFilePaths(conn.driverOptions.sqlPaths, Path.join(basePath, conn.dir || conn.name));
-      conn.driverOptions.numOfPreparedStmts = conn.driverOptions.sqlPaths.length;
+      conn.driverOptions.numOfPreparedFuncs = conn.driverOptions.sqlPaths.length;
     }
     return conf;
   }
