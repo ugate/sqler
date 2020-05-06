@@ -232,9 +232,8 @@ const MOD_KEY = 'sqler';
  */
 
 /**
- * Transaction options that can be passed into a `manager.connectionName.beginTransaction(transactionOptions)` function.
+ * Transaction options that can be passed into a `manager.connectionName.beginTransaction(transactionDriverOptions)` function.
  * @typedef {Object} Manager~TransactionOptions
- * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
  */
 
 /**
