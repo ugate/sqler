@@ -446,7 +446,7 @@ try {
 #### 🍽️ Prepared Statements <sub id="ps"></sub>
 [Prepared statements](https://en.wikipedia.org/wiki/Prepared_statement) __may__ optimize SQL execution when invoking the same SQL script multiple times. When bind parameters are used, different values can also be passed into the [prepared function](Manager.html#~PreparedFunction).
 
-In `sqler`, prepared statements are handled internally via a chosen [Dialect](Dialect.html) vendor implementation - only a [`prepareStatement = true` flag](Manager.html#~ExecOptions) needs to be set to indicate the underlying SQL script should be executed within a __dedicated connection__ from the pool. Once all of the SQL invokations are complete a call to `unprepare` from the [execution result](Manager.html#~ExecResults) will close the statement/connection.
+In `sqler`, prepared statements are handled internally via a chosen [Dialect](Dialect.html) vendor implementation. Only the [`prepareStatement = true` flag](Manager.html#~ExecOptions) needs to be set to indicate the underlying SQL script should be executed within a __dedicated request and/or connection__ from the pool. Once all of the SQL invokations are complete a call to `unprepare` from the [execution result](Manager.html#~ExecResults) will ensure the statement/connection is closed.
 
 Lets consider the following examples:
 
@@ -455,7 +455,7 @@ Lets consider the following examples:
 const coOpts1 = {
   prepareStatemnt: true,
   binds: {
-    id: 123,
+    id: 1,
     name: 'Company 1'
   }
 };
@@ -463,7 +463,7 @@ const coOpts1 = {
 const coOpts2 = {
   prepareStatemnt: true,
   binds: {
-    id: 456,
+    id: 2,
     name: 'Company 2'
   }
 };
@@ -495,7 +495,7 @@ const coOpts1 = {
   autoCommit: false,
   prepareStatemnt: true,
   binds: {
-    id: 123,
+    id: 1,
     name: 'Company 1'
   }
 };
@@ -505,7 +505,7 @@ const coOpts2 = {
   autoCommit: false,
   prepareStatemnt: true,
   binds: {
-    id: 456,
+    id: 2,
     name: 'Company 2'
   }
 };

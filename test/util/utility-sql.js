@@ -307,6 +307,8 @@ class UtilSql {
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
     
+    if (xopts.prepareStatement) await rslt.unprepare();
+
     rslt = await mgr.db[connName].finance.ap.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ap.update.audits()`;
     expect(rslt, `${label} result`).to.be.object();

@@ -155,33 +155,37 @@ class TestDialect extends Dialect {
 
     const rslt = { raw: {} };
 
+    let tx, ps;
+
     // transaction checks
     if (!opts.hasOwnProperty('autoCommit') || !opts.autoCommit) {
       expect(opts.transactionId, 'opts.transactionId').to.be.string();
       expect(opts.transactionId, 'opts.transactionId').to.not.be.empty();
 
       const connLabel = `this.transactions.get('${opts.transactionId}') (beginTransaction called?)`;
-      const tx = dialect.transactions.get(opts.transactionId);
+      tx = dialect.transactions.get(opts.transactionId);
       expect(tx, connLabel).to.not.be.undefined();
       expect(tx, connLabel).to.not.be.null();
 
       tx.pending++;
       
       rslt.commit = async () => {
+        if (ps) dialect.preparedStatements.delete(meta.name);
         dialect.transactions.delete(opts.transactionId);
       };
       rslt.rollback = async () => {
+        if (ps) dialect.preparedStatements.delete(meta.name);
         dialect.transactions.delete(opts.transactionId);
       };
     }
 
     if (opts.prepareStatement) {
       const connLabel = `this.preparedStatements.get('${meta.name}') (prepare called?)`;
-      const ps = dialect.preparedStatements.get(meta.name);
+      ps = dialect.preparedStatements.get(meta.name);
       expect(ps, connLabel).to.not.be.undefined();
       expect(ps, connLabel).to.not.be.null();
       
-      ps.pending++;
+      if (!tx) ps.pending++;
 
       rslt.unprepare = async () => {
         dialect.preparedStatements.delete(meta.name);
