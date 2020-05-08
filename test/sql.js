@@ -32,7 +32,7 @@ lab.experiment(plan, () => {
   lab.test(`${plan}: Read Return Error`, { timeout: TEST_TKO }, Tester.readErrorReturn);
   lab.test(`${plan}: Read Throw Error`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'read throw' }, Tester.readErrorThrow));
   lab.test(`${plan}: Read With SQL Dialect Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsDialects);
-  lab.test(`${plan}: Read With SQL Version = 1 Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsVersionNegative1);
+  lab.test(`${plan}: Read With SQL Version = -1 Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsVersionNegative1);
   lab.test(`${plan}: Read With SQL Version = 1 Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsVersion1);
   lab.test(`${plan}: Read With SQL Version = 2 Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsVersion2);
   lab.test(`${plan}: Read With SQL Fragment Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsFrags);
@@ -40,4 +40,5 @@ lab.experiment(plan, () => {
     expect, label: 'autoCommit = false, transactionId = undefined' }, Tester.execOptsAutoCommitFalseTransactionIdMissing));
   lab.test(`${plan}: Prepared Statements`, { timeout: TEST_TKO }, Tester.execOptsPreparedStatements);
   lab.test(`${plan}: Interval Cache`, { timeout: TEST_TKO }, Tester.intervalCache);
+  lab.test(`${plan}: No Execution Options`, { timeout: TEST_TKO }, Tester.execOptsNone);
 });

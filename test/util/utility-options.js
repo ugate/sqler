@@ -10,6 +10,10 @@ const TEST_DATE = new Date();
 // export
 class UtilOpts {
 
+  static get TEST_DIALECT() {
+    return require('../dialects/test-dialect');
+  }
+
   static getConf(mainPath) {
     const conf = {
       "mainPath": mainPath || 'test',

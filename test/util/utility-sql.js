@@ -289,17 +289,20 @@ class UtilSql {
         expect(xopts.transactionId, 'xopts.transactionId').to.not.be.empty();
       }
     }
+    const orignalName = xopts && xopts.name;
 
-    rslt = await mgr.db[connName].finance.create.annual.report(xopts);
     label = `CREATE mgr.db.${connName}.finance.create.annual.report()`;
+    if (!orignalName && xopts) xopts.name = label;
+    rslt = await mgr.db[connName].finance.create.annual.report(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
-    rslt = await mgr.db[connName].finance.read.annual.report(xopts);
     label = `READ mgr.db.${connName}.finance.read.annual.report()`;
+    if (!orignalName && xopts) xopts.name = label;
+    rslt = await mgr.db[connName].finance.read.annual.report(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.array();
     expect(rslt.rows, `${label} result rows.length`).to.be.length(2); // two records should be returned w/o order by
@@ -309,37 +312,43 @@ class UtilSql {
     
     if (xopts.prepareStatement) await rslt.unprepare();
 
-    rslt = await mgr.db[connName].finance.ap.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ap.update.audits()`;
+    if (!orignalName && xopts) xopts.name = label;
+    rslt = await mgr.db[connName].finance.ap.update.audits(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
-    rslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
     label = `DELETE mgr.db.${connName}.finance.ap.delete.audits()`;
+    if (!orignalName && xopts) xopts.name = label;
+    rslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
-    rslt = await mgr.db[connName].finance.ar.update.audits(xopts);
     label = `UPDATE mgr.db.${connName}.finance.ar.update.audits()`;
+    if (!orignalName && xopts) xopts.name = label;
+    rslt = await mgr.db[connName].finance.ar.update.audits(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
-    rslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
     label = `DELETE mgr.db.${connName}.finance.ar.delete.audits()`;
+    if (!orignalName && xopts) xopts.name = label;
+    rslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
     UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
+
+    if (!xopts) xopts.name = orignalName;
 
     if (!autoCommit) await rslt.commit();
   }

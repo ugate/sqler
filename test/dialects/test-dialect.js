@@ -85,130 +85,44 @@ class TestDialect extends Dialect {
    */
   async exec(sql, opts, frags, meta) {
     const dialect = this;
-
-    expect(meta, 'meta').to.be.object();
-    expect(meta.name, 'meta.name').to.be.string();
-    expect(meta.name, 'meta.name').to.not.be.empty();
-    expect(meta.path, 'meta.path').to.be.string();
-    expect(meta.path, 'meta.path').to.not.be.empty();
-
-    if (UtilOpts.driverOpt('throwExecError', opts, dialect.connConf).value) {
-      const error = new Error(`Test error due to "opts.driverOptions.throwExecError" = ${
-        opts.driverOptions.throwExecError} and "this.connConf.driverOptions.throwExecError" = ${this.connConf.driverOptions.throwExecError}`);
-      const throwProps = UtilOpts.driverOpt('throwProperties', opts, dialect.connConf).value;
-      if (throwProps) {
-        error.sqler = {};
-        for (let prop in throwProps) {
-          error.sqler[prop] = throwProps[prop];
-        }
-      }
-      throw error;
-    }
-
-    const xopts = UtilOpts.createExecOpts();
-
-    const xoptsNoExpandedBinds = UtilOpts.createExecOpts(true);
-    expectOpts(dialect, opts, 'exec');
-    expect(opts.binds, 'opts.binds').to.be.object();
-    if (xoptsNoExpandedBinds.binds) {
-      expect(opts.binds, 'opts.binds').to.contain(xoptsNoExpandedBinds.binds);
-    }
-    if (dialect.connConf.binds) {
-      expect(opts.binds, 'opts.binds').to.contain(dialect.connConf.binds);
-    }
-    expectExpansionBinds(sql, opts, xopts);
-
-    if (dialect.connConf.substitutes) {
-      for (let sub in dialect.connConf.substitutes) {
-        if (!this.connConf.substitutes.hasOwnProperty(sub)) continue;
-        if (!sql.includes(sub) && !sql.includes(dialect.connConf.substitutes[sub])) continue; // SQL may not be using the substitute
-        expect(sql, `SQL raw substitute`).to.not.contain(sub);
-        expect(sql, `SQL raw substitute`).to.contain(dialect.connConf.substitutes[sub]);
-      }
-    }
-
-    const singleRecordKey = UtilOpts.driverOpt('singleRecordKey', opts, dialect.connConf), recordCount = UtilOpts.driverOpt('recordCount', opts, dialect.connConf);
-
-    if (frags) {
-      const fragLabel = `frags`;
-      expect(frags, fragLabel).to.be.array();
-
-      // frag names should have been removed
-      for (let frag of frags) {
-        expect(frag, `${fragLabel} (iteration)`).to.be.string();
-        expect(frag, `${fragLabel} (iteration) length`).to.not.be.empty();
-        expect(sql, `${fragLabel} (iteration) removed`).to.not.contain(frag);
-      }
-
-      // check to make sure the expected fragments are included in the SQL statement
-      const fragSqlSnip = UtilOpts.driverOpt('fragSqlSnippets', opts, dialect.connConf);
-      if (fragSqlSnip.source && fragSqlSnip.value) {
-        for (let fkey in fragSqlSnip.value) {
-          if (frags.includes(fkey)) {
-            expect(sql).to.contain(fragSqlSnip.value[fkey]);
-          }
-        }
-      }
-    }
-
-    expectSqlSubstitutes(sql, opts, dialect.connConf, frags);
-
     const rslt = { raw: {} };
 
-    let tx, ps;
+    try {
+      expect(meta, 'meta').to.be.object();
+      expect(meta.name, 'meta.name').to.be.string();
+      expect(meta.name, 'meta.name').to.not.be.empty();
+      expect(meta.path, 'meta.path').to.be.string();
+      expect(meta.path, 'meta.path').to.not.be.empty();
 
-    // transaction checks
-    if (!opts.hasOwnProperty('autoCommit') || !opts.autoCommit) {
-      expect(opts.transactionId, 'opts.transactionId').to.be.string();
-      expect(opts.transactionId, 'opts.transactionId').to.not.be.empty();
+      handleThrowError(dialect, opts);
 
-      const connLabel = `this.transactions.get('${opts.transactionId}') (beginTransaction called?)`;
-      tx = dialect.transactions.get(opts.transactionId);
-      expect(tx, connLabel).to.not.be.undefined();
-      expect(tx, connLabel).to.not.be.null();
+      if (!TestDialect.BYPASS_NEXT_EXEC_OPTS_CHECK) expectBinds(dialect, sql, opts);
+      expectRawSubstitutes(dialect, sql);
+      expectFrags(dialect, sql, opts, frags);
+      expectSqlSubstitutes(sql, opts, dialect.connConf, frags);
+      if (!TestDialect.BYPASS_NEXT_EXEC_OPTS_CHECK) expectTransactionPreparedStatement(dialect, opts, meta, rslt);
 
-      tx.pending++;
-      
-      rslt.commit = async () => {
-        if (ps) dialect.preparedStatements.delete(meta.name);
-        dialect.transactions.delete(opts.transactionId);
-      };
-      rslt.rollback = async () => {
-        if (ps) dialect.preparedStatements.delete(meta.name);
-        dialect.transactions.delete(opts.transactionId);
-      };
-    }
-
-    if (opts.prepareStatement) {
-      const connLabel = `this.preparedStatements.get('${meta.name}') (prepare called?)`;
-      ps = dialect.preparedStatements.get(meta.name);
-      expect(ps, connLabel).to.not.be.undefined();
-      expect(ps, connLabel).to.not.be.null();
-      
-      if (!tx) ps.pending++;
-
-      rslt.unprepare = async () => {
-        dialect.preparedStatements.delete(meta.name);
-      };
-    }
-
-    // set rows
-    let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
-    if (!cols) return rslt;
-    cols = cols[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
-    const rcrd = {};
-    let ci = 0;
-    for (let col of cols) {
-      rcrd[col.substr(col.lastIndexOf('.') + 1)] = ++ci;
-    }
-    // simple test output records (single record key overrides the record count)
-    if (singleRecordKey.source && sql.includes(singleRecordKey.value)) {
-      rslt.rows = [rcrd];
-      return rslt;
-    }
-    rslt.rows = [];
-    for (let i = 0; i < (recordCount.value || 2); ++i) {
-     rslt.rows.push(rcrd);
+      // set rows
+      const singleRecordKey = UtilOpts.driverOpt('singleRecordKey', opts, dialect.connConf), recordCount = UtilOpts.driverOpt('recordCount', opts, dialect.connConf);
+      let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
+      if (!cols) return rslt;
+      cols = cols[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
+      const rcrd = {};
+      let ci = 0;
+      for (let col of cols) {
+        rcrd[col.substr(col.lastIndexOf('.') + 1)] = ++ci;
+      }
+      // simple test output records (single record key overrides the record count)
+      if (singleRecordKey.source && sql.includes(singleRecordKey.value)) {
+        rslt.rows = [rcrd];
+        return rslt;
+      }
+      rslt.rows = [];
+      for (let i = 0; i < (recordCount.value || 2); ++i) {
+      rslt.rows.push(rcrd);
+      }
+    } finally {
+      TestDialect.BYPASS_NEXT_EXEC_OPTS_CHECK = false;
     }
     return rslt;
   }
@@ -332,6 +246,26 @@ function expectInterpolate(track) {
 }
 
 /**
+ * Throws any test errors that may be desired
+ * @param {TestDialect} dialect The dialect to use
+ * @param {Manager~ExecOpts} opts The {@link Manager~ExecOpts}
+ */
+function handleThrowError(dialect, opts) {
+  if (UtilOpts.driverOpt('throwExecError', opts, dialect.connConf).value) {
+    const error = new Error(`Test error due to "opts.driverOptions.throwExecError" = ${
+      opts.driverOptions.throwExecError} and "this.connConf.driverOptions.throwExecError" = ${dialect.connConf.driverOptions.throwExecError}`);
+    const throwProps = UtilOpts.driverOpt('throwProperties', opts, dialect.connConf).value;
+    if (throwProps) {
+      error.sqler = {};
+      for (let prop in throwProps) {
+        error.sqler[prop] = throwProps[prop];
+      }
+    }
+    throw error;
+  }
+}
+
+/**
  * Expects a track to contain the implmented `interpolate` field
  * @param {Manager~Track} track The track to expect
  */
@@ -381,6 +315,21 @@ function expectImmutable(name, obj, prop) {
   expect(error, `${name}.${prop} immutable (error)`).to.be.error();
 }
 
+function expectBinds(dialect, sql, opts) {
+  const xopts = UtilOpts.createExecOpts();
+
+  const xoptsNoExpandedBinds = UtilOpts.createExecOpts(true);
+  expectOpts(dialect, opts, 'exec');
+  expect(opts.binds, 'opts.binds').to.be.object();
+  if (xoptsNoExpandedBinds.binds) {
+    expect(opts.binds, 'opts.binds').to.contain(xoptsNoExpandedBinds.binds);
+  }
+  if (dialect.connConf.binds) {
+    expect(opts.binds, 'opts.binds').to.contain(dialect.connConf.binds);
+  }
+  expectExpansionBinds(sql, opts, xopts);
+}
+
 /**
  * Expects options
  * @param {TestDialect} dialect The dialect instance being tested
@@ -415,10 +364,26 @@ function expectExpansionBinds(sql, opts, xopts) {
 }
 
 /**
+ * Expect raw substitutions
+ * @param {TestDialect} dialect The dialect instance
+ * @param {Strin} sql The SQL being validated
+ */
+function expectRawSubstitutes(dialect, sql) {
+  if (dialect.connConf.substitutes) {
+    for (let sub in dialect.connConf.substitutes) {
+      if (!dialect.connConf.substitutes.hasOwnProperty(sub)) continue;
+      if (!sql.includes(sub) && !sql.includes(dialect.connConf.substitutes[sub])) continue; // SQL may not be using the substitute
+      expect(sql, `SQL raw substitute`).to.not.contain(sub);
+      expect(sql, `SQL raw substitute`).to.contain(dialect.connConf.substitutes[sub]);
+    }
+  }
+}
+
+/**
  * Expects the `opts.driverOptions.substitutes` to be substituted in the SQL statement
  * @param {String} sql The SQL being validated
  * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
- * @param {Manager~ExecOptions} xopts The {@link Manager~ExecOptions} that are being validated against
+ * @param {Manager~ConnectionOptions} xopts The {@link Manager~ExecOptions} that are being validated against
  */
 function expectSqlSubstitutes(sql, opts, connConf) {
   expect(sql).to.not.contain('[[!');
@@ -440,6 +405,83 @@ function expectSqlSubstitutes(sql, opts, connConf) {
     for (let absent of opts.driverOptions.substitutes.versions.absent) {
       expect(sql, connConf.version).to.not.contain(absent);
     }
+  }
+}
+
+/**
+ * Expects the fragments to be substituted in the SQL statement (if any)
+ * @param {String} sql The SQL being validated
+ * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
+ * @param {String[]} frags The fragments that are being validated
+ */
+function expectFrags(dialect, sql, opts, frags) {
+  if (frags) {
+    const fragLabel = `frags`;
+    expect(frags, fragLabel).to.be.array();
+
+    // frag names should have been removed
+    for (let frag of frags) {
+      expect(frag, `${fragLabel} (iteration)`).to.be.string();
+      expect(frag, `${fragLabel} (iteration) length`).to.not.be.empty();
+      expect(sql, `${fragLabel} (iteration) removed`).to.not.contain(frag);
+    }
+
+    // check to make sure the expected fragments are included in the SQL statement
+    const fragSqlSnip = UtilOpts.driverOpt('fragSqlSnippets', opts, dialect.connConf);
+    if (fragSqlSnip.source && fragSqlSnip.value) {
+      for (let fkey in fragSqlSnip.value) {
+        if (frags.includes(fkey)) {
+          expect(sql).to.contain(fragSqlSnip.value[fkey]);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Expects transaction and/or prepared statement options and sets the result functions that are
+ * expected in the execution results
+ * @param {TestDialect} dialect The dialect instance
+ * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
+ * @param {Manager~ExecMeta} meta The {@link Manager~ExecOptions}
+ * @param {Object} rslt The result where `commit`, `rollback` and/or `prepare` will be set
+ */
+function expectTransactionPreparedStatement(dialect, opts, meta, rslt) {
+  let tx, ps;
+
+  // transaction checks
+  if (!opts.hasOwnProperty('autoCommit') || !opts.autoCommit) {
+    expect(opts.transactionId, 'opts.transactionId').to.be.string();
+    expect(opts.transactionId, 'opts.transactionId').to.not.be.empty();
+
+    const connLabel = `this.transactions.get('${opts.transactionId}') (beginTransaction called?)`;
+    tx = dialect.transactions.get(opts.transactionId);
+    expect(tx, connLabel).to.not.be.undefined();
+    expect(tx, connLabel).to.not.be.null();
+
+    tx.pending++;
+    
+    rslt.commit = async () => {
+      if (ps) dialect.preparedStatements.delete(meta.name);
+      dialect.transactions.delete(opts.transactionId);
+    };
+    rslt.rollback = async () => {
+      if (ps) dialect.preparedStatements.delete(meta.name);
+      dialect.transactions.delete(opts.transactionId);
+    };
+  }
+
+  if (opts.prepareStatement) {
+    const connLabel = `this.preparedStatements.get('${meta.name}') (prepare called?)`;
+    ps = dialect.preparedStatements.get(meta.name);
+    expect(ps, connLabel).to.not.be.undefined();
+    expect(ps, connLabel).to.not.be.null();
+    
+    if (!tx) ps.pending++;
+
+    rslt.unprepare = async () => {
+      dialect.preparedStatements.delete(meta.name);
+    };
   }
 }
 

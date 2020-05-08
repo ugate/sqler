@@ -159,6 +159,14 @@ class Tester {
       throw err;
     }
   }
+
+  static async execOptsNone() {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
+    await UtilSql.initManager(priv, conf);
+
+    UtilOpts.TEST_DIALECT.BYPASS_NEXT_EXEC_OPTS_CHECK = true;
+    return priv.mgr.db[connName].read.no.binds();
+  }
 }
 
 // TODO : ESM comment the following line...

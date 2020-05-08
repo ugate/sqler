@@ -169,6 +169,7 @@ const MOD_KEY = 'sqler';
 /**
  * Options that are passed to generated {@link Manager~PreparedFunction}
  * @typedef {Object} Manager~ExecOptions
+ * @property {String} [name] A name to assign to the execution.
  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
  * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
  * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
@@ -645,6 +646,7 @@ class SQLS {
         }
       }
       const xopts = {
+        name: opts && opts.name,
         type,
         binds,
         autoCommit: opts && opts.hasOwnProperty('autoCommit') ? opts.autoCommit : true
@@ -775,7 +777,8 @@ class DBS {
         const eopts = JSON.parse(JSON.stringify(opts));
         eopts.binds = errorOpts && errorOpts.includeBindValues ? eopts.binds : Object.keys(opts.binds);
         if (dbs.at.errorLogging) {
-          dbs.at.errorLogging(`SQL ${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(eopts)}, state: ${dbs.at.dialect.state})`);
+          dbs.at.errorLogging(`SQL ${eopts.name ? `named "${eopts.name}" at ` : ''
+          }${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(eopts)}, state: ${dbs.at.dialect.state})`);
         }
         err[MOD_KEY] = err[MOD_KEY] || {};
         err[MOD_KEY].name = name;
