@@ -957,7 +957,7 @@ function interpolate(dest, source, interpolator, validator, onlyInterpolated, _v
  */
 function positionalBinds(sql, bindsObject, bindsArray, placeholder = '?') {
   const func = typeof placeholder === 'function' ? placeholder : null;
-  return sql.replace(/:(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g, (match, pname) => {
+  return sql.replace(/(?<!:):(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g, (match, pname) => {
     if (!bindsObject[pname]) throw new Error(`sqler: Unbound "${pname}" at position ${bindsArray.length}`);
     bindsArray.push(bindsObject[pname]);
     return func ? func(pname, bindsArray.length - 1) : placeholder;
