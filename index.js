@@ -654,9 +654,9 @@ class SQLS {
       if (opts && opts.driverOptions) xopts.driverOptions = opts.driverOptions;
       if (opts && opts.prepareStatement) xopts.prepareStatement = !!opts.prepareStatement;
       if (opts && opts.transactionId) xopts.transactionId = opts.transactionId;
-      if (!xopts.autoCommit && !xopts.transactionId) {
-        throw new Error(`SQL execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = ${
-          xopts.autoCommit}". Try setting "opts.transactionId = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
+      if (!xopts.autoCommit && !xopts.transactionId && !xopts.prepareStatement) {
+        throw new Error(`SQL execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = false" and` +
+        ` "opts.prepareStatement = false". Try setting "opts.transactionId = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
       }
       return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(name, fpth, xopts, frags, errorOpts));
     };
