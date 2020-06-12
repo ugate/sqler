@@ -36,7 +36,7 @@
     "@hapi/lab": "^22.0.4",
     "@ugate/labrat": "^2.1.0",
     "jsdoc": "^3.6.4",
-    "jsdocp": "^1.1.0",
+    "jsdocp": "^1.2.1",
     "minami": "^1.2.3"
   },
   "files": [
