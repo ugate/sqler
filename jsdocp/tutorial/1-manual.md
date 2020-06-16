@@ -153,6 +153,34 @@ FROM SOME_TABLE
 WHERE SOME_COL IN (:someParam, :someParam1, :someParam2)
 ```
 
+🆚 Expansions can also use conjunctive `AND` or `OR` instead of the previous _comma separated_ expansions.
+```json
+{
+  "someParam": ["one","two","three"]
+}
+```
+__read.some.query.sql__
+```sql
+SELECT SOME_COL
+FROM SOME_TABLE
+WHERE [[OR UPPER(SOME_COL) = UPPER(:someParam)]]
+```
+Would result in the following parameters and SQL execution
+<br/><br/>__[bind variables](Manager.html#~ExecOptions) passed into the driver used by the implementing [Dialect](Dialect.html):__
+```json
+{
+  "someParam": "one",
+  "someParam1": "two",
+  "someParam2": "three"
+}
+```
+__read.some.query.sql ---> read.some.query({ binds })__
+```sql
+SELECT SOME_COL
+FROM SOME_TABLE
+WHERE UPPER(SOME_COL) = UPPER(:someParam) OR UPPER(SOME_COL) = UPPER(:someParam1) OR UPPER(SOME_COL) = UPPER(:someParam2)
+```
+
 The normal driver driven variable substitutions would then be handled/applied external to `sqler`.
 
 #### 2️⃣ Fragment Substitutions <sub id="fs"></sub>:

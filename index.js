@@ -831,13 +831,13 @@ class DBS {
     const dbs = internal(this);
     // expansion substitutes
     if (binds) {
-      sql = sql.replace(/(:)([a-z]+[0-9]*?)/gi, function sqlArrayRpl(match, pkey, key) {
-        let newKeys = '';
-        for (let i = 0, vals = key && Array.isArray(binds[key]) && binds[key], l = vals && vals.length; i < l; ++i) {
-          newKeys += ((newKeys && ', ') || '') + pkey + key + (i || ''); // set SQL expanded binds
-          binds[key + (i || '')] = vals[i]; // set expanded binds
-        }
-        return newKeys || (pkey + key); // replace with new key(s) or leave as-is
+      // AND/OR conjunction expansions
+      sql = sql.replace(/\[\[(OR|AND)([\S\s]*?)(:)(\w+)([\S\s]*?)\s*\]\]/gi, function sqlExpandConjRpl(match, conjunction, prefix, bindKey, bindName, suffix) {
+        return DBS.segmentSubExpanded(binds, bindKey, bindName, ` ${conjunction}`, prefix, suffix);
+      });
+      // simple expansions using comma separations
+      sql = sql.replace(/(:)([a-z]+[0-9]*?)/gi, function sqlArrayRpl(match, bindKey, bindName) {
+        return DBS.segmentSubExpanded(binds, bindKey, bindName);
       });
     }
     // dialect substitutes
@@ -853,6 +853,30 @@ class DBS {
       return (key && frags && frags.indexOf(key) >= 0 && fsql && (lb1 + fsql)) || ((lb1 || lb2) && ' ') || '';
     });
     return sql;
+  }
+
+  /**
+   * Expenads a bind parameter using surrounding separators and expands the binds to reflect multiple values.
+   * @param {Object} binds The key/value bind parameters to use
+   * @param {String} bindKey The key that will be used when expanding the binding parameter names (e.g. `:`)
+   * @param {String} bindName The bound parameter that will be expanded
+   * @param {String} [conjunction=', '] The conjunction that will be used to separate the expanded binds
+   * (e.g. conjunction = ', '; bindKey = ':'; bindName = 'myBind'; binds = { myBind: [1,2] };` would result in
+   * `:myBind, :myBind1` with `binds = { myBind: 1, myBind1: 2 }`)
+   * @param {String} prefix The prefix that will be used before each expanded bind parameter
+   * (e.g. `prefix = 'UPPER('; suffix = ')'; conjunction = ' OR'; bindKey = ':'; bindName = 'myBind'; binds = { myBind: [1,2] };` would result in
+   * `UPPER(:myBind) OR UPPER(:myBind1)` with `binds = { myBind: 1, myBind1: 2 }`)
+   * @param {String} suffix The suffix that will be used after each expended bind parameter
+   * (e.g. `prefix = 'UPPER('; suffix = ')'; conjunction = ' OR'; bindKey = ':'; bindName = 'myBind'; binds = { myBind: [1,2] };` would result in
+   * `UPPER(:myBind) OR UPPER(:myBind1)` with `binds = { myBind: 1, myBind1: 2 }`)
+   */
+  static segmentSubExpanded(binds, bindKey, bindName, conjunction = ', ', prefix = '', suffix = '') {
+    let newKeys = '';
+    for (let i = 0, vals = bindName && Array.isArray(binds[bindName]) && binds[bindName], l = vals && vals.length; i < l; ++i) {
+      newKeys += `${(newKeys && conjunction) || ''}${prefix}${bindKey}${bindName}${i || ''}${suffix}`; // set SQL expanded binds
+      binds[bindName + (i || '')] = vals[i]; // set expanded binds
+    }
+    return newKeys || (bindKey + bindName); // replace with new key(s) or leave as-is
   }
 
   /**

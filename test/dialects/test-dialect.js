@@ -355,11 +355,14 @@ function expectExpansionBinds(sql, opts, xopts) {
   for (let xopt in xopts.binds) {
     if (!xopts.binds.hasOwnProperty(xopt)) continue;
     if (!Array.isArray(xopts.binds[xopt])) continue;
+    let xsql = '';
     for (let xi = 0, enm, xbinds = xopts.binds[xopt]; xi < xbinds.length; ++xi) {
       enm = `${xopt}${xi || ''}`;
       expect(opts.binds[enm], `opts.binds.${enm} (binds expansion) on SQL:\n${sql}\n`).to.equal(xbinds[xi]);
       expect(sql).to.contain(`:${enm}`);
+      xsql += `${xi === 0 ? '' : ' OR '}UPPER(SOME_EXP_COL) = UPPER(:${enm})`;
     }
+    expect(sql).to.contain(xsql);
   }
 }
 
