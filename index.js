@@ -414,11 +414,16 @@ class Manager {
    */
   async init(returnErrors) {
     const mgr = internal(this);
-    if (mgr.at.isInit) throw new Error(`${mgr.at.connNames.join()} database(s) are already initialized`);
+    if (mgr.at.isInit) throw new Error(`[${mgr.at.connNames.join()}] database(s) are already initialized`);
     const rslt = await operation(mgr, 'init', { returnErrors });
     mgr.at.isInit = true;
-    mgr.at.connNames = Object.getOwnPropertyNames(rslt);
-    if (mgr.at.log) mgr.at.log(`${mgr.at.connNames.join()} database(s) are ready for use`);
+    if (returnErrors && rslt.errors && rslt.errors.length) {
+      if (mgr.at.logError) {
+        mgr.at.logError(`Failed to initialize one or more [${mgr.at.connNames.join()}] database(s)`, ...errors);
+      }
+    } else if (mgr.at.log) {
+      mgr.at.log(`[${mgr.at.connNames.join()}] database(s) are ready for use`);
+    }
     return rslt;
   }
 
