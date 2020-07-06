@@ -367,7 +367,7 @@ class Manager {
     mgr.at.sqls = new Array(connCnt);
     mgr.at.logError = logging === true ? generateLogger(console.error, [MOD_KEY, 'db', 'error']) : logging && logging([MOD_KEY, 'db', 'error']);
     mgr.at.log = logging === true ? generateLogger(console.log, [MOD_KEY, 'db']) : logging && logging([MOD_KEY, 'db']);
-    mgr.at.dbCount = 0;
+    mgr.at.connNames = new Array(connCnt);
     //const reserved = Object.getOwnPropertyNames(Manager.prototype);
     for (let i = 0, conn, priv, dialect, dlct; i < connCnt; ++i) {
       conn = conf.db.connections[i];
@@ -403,7 +403,7 @@ class Manager {
       if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
       //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
       mgr.at.sqls[i] = new SQLS(ns, mainPath, cache, conn, (mgr.this[ns][conn.name] = {}), new DBS(dialect, conn));
-      mgr.at.dbCount++;
+      mgr.at.connNames[i] = conn.name;
     }
   }
 
@@ -414,11 +414,11 @@ class Manager {
    */
   async init(returnErrors) {
     const mgr = internal(this);
-    if (mgr.at.isInit) throw new Error(`${mgr.at.dbCount} database(s) are already initialized`);
+    if (mgr.at.isInit) throw new Error(`${mgr.at.connNames.join()} database(s) are already initialized`);
     const rslt = await operation(mgr, 'init', { returnErrors });
     mgr.at.isInit = true;
-    mgr.at.dbCount = Object.getOwnPropertyNames(rslt).length;
-    if (mgr.at.log) mgr.at.log(`${mgr.at.dbCount} database(s) are ready for use`);
+    mgr.at.connNames = Object.getOwnPropertyNames(rslt);
+    if (mgr.at.log) mgr.at.log(`${mgr.at.connNames.join()} database(s) are ready for use`);
     return rslt;
   }
 
