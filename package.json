@@ -32,7 +32,7 @@
     "asynchro": "^4.0.0"
   },
   "devDependencies": {
-    "@hapi/code": "^8.0.1",
+    "@hapi/code": "^8.0.2",
     "@hapi/lab": "^22.0.4",
     "@ugate/labrat": "^2.1.0",
     "jsdoc": "^3.6.4",
