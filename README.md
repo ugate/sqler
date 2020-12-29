@@ -32,7 +32,7 @@ In order to use `sqler` a simple implementation of [Dialect](https://ugate.githu
 
 - [SQL Server - `sqler-mssql`](https://ugate.github.io/sqler-mssql)
 - [Oracle - `sqler-oracle`](https://ugate.github.io/sqler-oracle)
-- [MriaDB and/or MySQL - `sqler-mdb`](https://ugate.github.io/sqler-mdb)
+- [MariaDB and/or MySQL - `sqler-mdb`](https://ugate.github.io/sqler-mdb)
 - [PostgreSQL - `sqler-postgres`](https://ugate.github.io/sqler-postgres)
 - [ODBC - `sqler-odbc`](https://ugate.github.io/sqler-odbc)
 
@@ -87,7 +87,7 @@ const rslts = await mgr.db.fin.read.ap.companies({ binds: { invoiceAudit: 'Y' } 
 
 // after we're done using the manager we should close it
 process.on('SIGINT', async function sigintDB() {
-  await mrg.close();
+  await mgr.close();
   console.log('Manager has been closed');
 });
 ```
