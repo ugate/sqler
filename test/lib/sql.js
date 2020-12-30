@@ -46,6 +46,27 @@ class Tester {
     return UtilSql.testRead(priv.mgr, connName);
   }
 
+  static async readWithAddConnection() {
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
+    conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
+    conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
+    const initOpts = {
+      logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
+    };
+    await UtilSql.initManager(priv, conf, initOpts);
+
+    await UtilSql.testRead(priv.mgr, connName);
+
+    // create another configuration 
+    const aconf = await UtilSql.initConf(), addConn = aconf.db.connections[0];
+    addConn.name = `${addConn.name}ADD`;
+    addConn.substitutes = UtilOpts.createSubstituteOpts();
+    addConn.binds = UtilOpts.createConnectionBinds();
+
+    await priv.mgr.addConnection(addConn, priv.cache, initOpts.logger);
+    return UtilSql.testRead(priv.mgr, addConn.name);
+  }
+
   static async readErrorReturn() {
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
     await UtilSql.initManager(priv, conf, {

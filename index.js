@@ -15,7 +15,8 @@ const COMPARE = Object.freeze({
   '>=': function gteq(x, y) { return x >= y; },
   '<>': function noteq(x, y) { return x !== y; }
 });
-const MOD_KEY = 'sqler';
+const MOD_KEY = 'sqler'; // module key used for the object namespace on errors and logging
+const NS = 'db'; // namespace on Manager where SQL functions will be added
 
 /**
  * The `cache` client responsible for regulating the frequency in which a SQL file is read by a {@link Manager}.
@@ -109,12 +110,13 @@ const MOD_KEY = 'sqler';
  * @typedef {Object} Manager~ConfigurationOptions
  * @property {String} [mainPath] Root directory starting point to look for SQL files (defaults to `require.main` path or `process.cwd()`)
  * @property {String} [privatePath] Current working directory where generated files will be located (if any, defaults to `process.cwd()`)
+ * @property {Boolean} [debug] Truthy to turn on debugging
+ * @property {Manager~UniversalOptions} univ The {@link Manager~UniversalOptions}
  * @property {Object} db The _public_ facing database configuration
  * @property {Object} db.dialects An object that contains {@link Dialect} implementation details where each property name matches a dialect name and the value contains either the module class or a string
  * that points to a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`). When using a directory path the dialect path will be prefixed with
  * `process.cwd()` before loading.
  * @property {Manager~ConnectionOptions[]} db.connections The connections options that will be used.
- * @property {Manager~UniversalOptions} univ The {@link Manager~UniversalOptions}
  */
 
 /**
@@ -148,6 +150,10 @@ const MOD_KEY = 'sqler';
  * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
  * perform `date.toISOString()`. __Gets overridden by the same option set on {@link Manager~ExecOptions}__.
  * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
+ * @property {(Boolean | String[])} [log] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the log output. Explicity set to `false` to disable
+ * connection _log_ level logging even if it is turned on via the {@link Manager}.
+ * @property {(Boolean | String[])} [logError] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the error log output. Explicity set to `false` to disable
+ * connection _error_ level logging even if it is turned on via the {@link Manager}.
  * @property {Object} [pool] The connection pool options (__overrides any `driverOptions` that may pertain the pool__)
  * @property {Integer} [pool.max] The maximum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
  * (__overrides any `driverOptions` that may pertain the pool max__)
@@ -160,10 +166,6 @@ const MOD_KEY = 'sqler';
  * @property {Integer} [pool.timeout] The number of milliseconds that a connection request should wait in the queue before the request is terminated
  * (__overrides any `driverOptions` that may pertain the pool timeout__)
  * @property {String} [pool.alias] __When supported__, the alias of this pool in the connection pool cache (__overrides any `driverOptions` that may pertain the pool alias__)
- * @property {(Boolean | String[])} [log] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the log output. Explicity set to `false` to disable
- * connection _log_ level logging even if it is turned on via the {@link Manager}.
- * @property {(Boolean | String[])} [logError] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the error log output. Explicity set to `false` to disable
- * connection _error_ level logging even if it is turned on via the {@link Manager}.
  */
 
 /**
@@ -351,64 +353,56 @@ class Manager {
     if (!Array.isArray(conf.db.connections) || !conf.db.connections.length) throw new Error('Database configuration.db.connections must contain at least one connection');
     const connCnt = conf.db.connections.length;
     const mgr = internal(this);
-    const mainPath = conf.mainPath || (require.main && require.main.filename.replace(/([^\\\/]*)$/, '')) || process.cwd();
-    const privatePath = conf.privatePath || process.cwd();
-    const ns = 'db';
-    const track = {};
-    Object.defineProperty(track, 'interpolate', {
+    mgr.at.track = {};
+    Object.defineProperty(mgr.at.track, 'interpolate', {
       value: interpolate,
       writable: false
     });
-    Object.defineProperty(track, 'positionalBinds', {
+    Object.defineProperty(mgr.at.track, 'positionalBinds', {
       value: positionalBinds,
       writable: false
     });
-    mgr.this[ns] = {};
+    mgr.this[NS] = {};
+    mgr.at.debug = conf.debug;
+    mgr.at.privDB = conf.univ.db;
+    mgr.at.dialects = conf.db.dialects;
+    mgr.at.mainPath = conf.mainPath || (require.main && require.main.filename.replace(/([^\\\/]*)$/, '')) || process.cwd();
+    mgr.at.privatePath = conf.privatePath || process.cwd();
     mgr.at.sqls = new Array(connCnt);
     mgr.at.logError = logging === true ? generateLogger(console.error, [MOD_KEY, 'db', 'error']) : logging && logging([MOD_KEY, 'db', 'error']);
     mgr.at.log = logging === true ? generateLogger(console.log, [MOD_KEY, 'db']) : logging && logging([MOD_KEY, 'db']);
     mgr.at.connNames = new Array(connCnt);
     //const reserved = Object.getOwnPropertyNames(Manager.prototype);
-    for (let i = 0, conn, priv, dialect, dlct; i < connCnt; ++i) {
-      conn = conf.db.connections[i];
-      if (!conn.id) throw new Error(`Connection at index ${i} must have an "id"`);
-      if (!conn.name) throw new Error(`Connection at index ${i}/ID ${conn.id} must have have a valid "name"`);
-      if (!conn.dialect || typeof conn.dialect !== 'string') throw new Error(`Connection at index ${i}/ID ${conn.id} must have have a valid "dialect" name`);
-      priv = conf.univ.db[conn.id]; // pull host/credentials from external conf resource
-      if (!priv) throw new Error(`Connection at index ${i}/ID ${conn.id} has an "id" that cannot be found within the provided "conf.univ.db"`);
-      priv = JSON.parse(JSON.stringify(priv));
-      priv.privatePath = privatePath;
-      conn.host = conn.host || priv.host;
-      dlct = conn.dialect.toLowerCase();
-      if (!conf.db.dialects.hasOwnProperty(dlct)) {
-        throw new Error(`Database configuration.db.dialects does not contain an implementation definition/module for ${dlct} at connection index ${i}/ID ${conn.id} for host ${conn.host}`);
-      }
-      if (typeof conf.db.dialects[dlct] === 'string') {
-        if (/^[a-z@]/i.test(conf.db.dialects[dlct])) conf.db.dialects[dlct] = require(conf.db.dialects[dlct]);
-        else conf.db.dialects[dlct] = require(Path.join(process.cwd(), conf.db.dialects[dlct]));
-      }
-      //if (!(conf.db.dialects[dlct] instanceof Dialect)) throw new Error(`Database dialect for ${dlct} is not an instance of a sqler "${Dialect.constructor.name}" at connection index ${i}/ID ${conn.id} for host ${conn.host}`);
-      if (conn.log !== false && !conn.log) conn.log = [];
-      if (conn.logError !== false && !conn.logError) conn.logError = [];
-      if (conn.log !== false) {
-        let ltags = [...conn.log, MOD_KEY, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
-        conn.logging = logging === true ? generateLogger(console.log, ltags) : logging && logging(ltags); // override dialect non-error logging
-      }
-      if (conn.logError !== false) {
-        let ltags = [...conn.logError, MOD_KEY, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
-        conn.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dialect error logging
-      }
-      dialect = new conf.db.dialects[dlct](priv, conn, track, conn.errorLogging || false, conn.logging || false, conf.debug || false);
-      // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
-      if (mgr.this[ns][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
-      //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
-      mgr.at.sqls[i] = new SQLS(ns, mainPath, cache, conn, (mgr.this[ns][conn.name] = {}), new DBS(dialect, conn));
-      mgr.at.connNames[i] = conn.name;
+    for (let i = 0; i < connCnt; ++i) {
+      addConnectionToManager(mgr, conf.db.connections[i], i, cache, logging);
     }
   }
 
   /**
-   * Initializes the defined database connections
+   * Adds a connection configuration to the manager and initializes the database connection
+   * @param {Manager~ConnectionOptions} conn The connection options that will be added to the manager
+   * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+   * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
+   * Pass `true` to use the console. Omit to disable logging altogether.
+   * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
+   * @returns {Manager~OperationResults} The results
+   */
+  async addConnection(conn, cache, logging, returnErrors) {
+    const mgr = internal(this);
+    addConnectionToManager(mgr, conn, null, cache, logging);
+    const rslt = await operation(mgr, 'init', { returnErrors });
+    if (returnErrors && rslt.errors && rslt.errors.length) {
+      if (mgr.at.logError) {
+        mgr.at.logError(`Failed to initialize connection ID ${conn.id} for ${conn.name} database`, ...errors);
+      }
+    } else if (mgr.at.log) {
+      mgr.at.log(`Connection ID ${conn.id} for ${conn.name} database is ready for use`);
+    }
+    return rslt;
+  }
+
+  /**
+   * Initializes the configured database connections
    * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
    * @returns {Manager~OperationResults} The results
    */
@@ -454,6 +448,58 @@ class Manager {
 }
 
 /**
+ * Adds a connection configuration to a manager
+ * @private
+ * @param {Manager} mgr The manager to add the connection to
+ * @param {Manager~ConnectionOptions} conn The connection options that will be added to the manager
+ * @param {Integer} [index] The index at which the connection options will be added to
+ * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+ * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
+ * Pass `true` to use the console. Omit to disable logging altogether.
+ */
+function addConnectionToManager(mgr, conn, index, cache, logging) {
+  const isExpand = !index && isNaN(index);
+  let idx = index, priv, dialect, dlct;
+  if (isExpand) { // expand connections
+    idx = mgr.at.sqls.length;
+    mgr.at.connNames.length = ++mgr.at.sqls.length;
+  }
+  if (!conn.id) throw new Error(`Connection must have an "id" at: ${JSON.stringify(conn)}`);
+  if (!conn.name) throw new Error(`Connection must have have a valid "name" at: ${JSON.stringify(conn)}`);
+  if (!conn.dialect || typeof conn.dialect !== 'string') throw new Error(`Connection ID ${conn.id} must have have a valid "dialect" name at: ${JSON.stringify(conn)}`);
+  priv = mgr.at.privDB[conn.id]; // pull host/credentials from external conf resource
+  if (!priv) throw new Error(`Connection ID ${conn.id} has an "id" that cannot be found within the provided "conf.univ.db" at: ${JSON.stringify(conn)}`);
+  priv = JSON.parse(JSON.stringify(priv));
+  priv.privatePath = mgr.at.privatePath;
+  conn.host = conn.host || priv.host;
+  dlct = conn.dialect.toLowerCase();
+  if (!mgr.at.dialects.hasOwnProperty(dlct)) {
+    throw new Error(`Database configuration.db.dialects does not contain an implementation definition/module for ${dlct} and connection ID ${conn.id} for host ${conn.host} at: ${JSON.stringify(conn)}`);
+  }
+  if (typeof mgr.at.dialects[dlct] === 'string') {
+    if (/^[a-z@]/i.test(mgr.at.dialects[dlct])) mgr.at.dialects[dlct] = require(mgr.at.dialects[dlct]);
+    else mgr.at.dialects[dlct] = require(Path.join(process.cwd(), mgr.at.dialects[dlct]));
+  }
+  //if (!(mgr.at.dialects[dlct] instanceof Dialect)) throw new Error(`Database dialect for ${dlct} is not an instance of a sqler "${Dialect.constructor.name}" at connection ID ${conn.id} for host ${conn.host}`);
+  if (conn.log !== false && !conn.log) conn.log = [];
+  if (conn.logError !== false && !conn.logError) conn.logError = [];
+  if (conn.log !== false) {
+    let ltags = [...conn.log, MOD_KEY, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
+    conn.logging = logging === true ? generateLogger(console.log, ltags) : logging && logging(ltags); // override dialect non-error logging
+  }
+  if (conn.logError !== false) {
+    let ltags = [...conn.logError, MOD_KEY, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
+    conn.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dialect error logging
+  }
+  dialect = new mgr.at.dialects[dlct](priv, conn, mgr.at.track, conn.errorLogging || false, conn.logging || false, mgr.at.debug || false);
+  // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
+  if (mgr.this[NS][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
+  //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
+  mgr.at.sqls[idx] = new SQLS(NS, mgr.at.mainPath, cache, conn, (mgr.this[NS][conn.name] = {}), new DBS(dialect, conn));
+  mgr.at.connNames[idx] = conn.name;
+}
+
+/**
  * Executes one or more {@link SQLS} functions
  * @private
  * @param {Manager} mgr The _internal_/private {@link Manager} store
@@ -485,10 +531,13 @@ async function operation(mgr, funcName, opts, connNames) {
     }
   };
   for (let i = 0, l = mgr.at.sqls.length; i < l; ++i) {
+    if (funcName === 'init' && mgr.at.sqls[i].isInitialized && mgr.at.sqls[i].isPrepared) continue;
     if (cnl) {
       if (!connNames.includes(mgr.at.sqls[i].connectionName)) continue;
       queue(mgr.at.sqls[i]);
-    } else queue(mgr.at.sqls[i]);
+    } else {
+      queue(mgr.at.sqls[i]);
+    }
   }
   const result = await ax.run();
   return { result, errors: ax.errors };
@@ -532,45 +581,53 @@ class SQLS {
    */
   async init() {
     const sqls = internal(this);
-    sqls.at.numOfPreparedFuncs = 0;
-    const prepare = async (cont, pnm, pdir) => {
-      let pth, proms = [];
-      try {
-        cont = cont || sqls.at.db;
-        pdir = pdir || sqls.at.basePath;
-        const files = await Fs.promises.readdir(pdir);
-        for (let fi = 0, stat, nm, ns, ext; fi < files.length; ++fi) {
-          pth = Path.resolve(pdir, files[fi]);
-          stat = await Fs.promises.stat(pth);
-          if (stat && stat.isDirectory()) {
-            nm = files[fi].replace(/[^0-9a-zA-Z]/g, '_');
-            proms.push(prepare(cont[nm] = {}, `${pnm ? `${pnm}_` : ''}${nm}`, pth));
-            continue;
+    const isPrepared = sqls.at.isPrepared;
+    if (!isPrepared) {
+      sqls.at.numOfPreparedFuncs = 0;
+      const prepare = async (cont, pnm, pdir) => {
+        let pth, proms = [];
+        try {
+          cont = cont || sqls.at.db;
+          pdir = pdir || sqls.at.basePath;
+          const files = await Fs.promises.readdir(pdir);
+          for (let fi = 0, stat, nm, ns, ext; fi < files.length; ++fi) {
+            pth = Path.resolve(pdir, files[fi]);
+            stat = await Fs.promises.stat(pth);
+            if (stat && stat.isDirectory()) {
+              nm = files[fi].replace(/[^0-9a-zA-Z]/g, '_');
+              proms.push(prepare(cont[nm] = {}, `${pnm ? `${pnm}_` : ''}${nm}`, pth));
+              continue;
+            }
+            if (!files[fi].endsWith('.sql')) continue;
+            nm = files[fi].replace(/[^0-9a-zA-Z\.]/g, '_');
+            ns = nm.split('.');
+            ext = ns.pop();
+            nm = `${sqls.at.conn.dialect}_${sqls.at.conn.name}_${pnm ? `${pnm}_` : ''}${ns.join('_')}`;
+            for (let ni = 0, nl = ns.length, so = cont; ni < nl; ++ni) {
+              if (ns[ni] === 'beginTransaction') throw new Error(`SQL "${fpth}" cannot contain reserved "beginTransaction"`);
+              so[ns[ni]] = so[ns[ni]] || (ni < nl - 1 ? {} : await sqls.this.prepared(nm, pth, ext));
+              so = so[ns[ni]];
+            }
           }
-          if (!files[fi].endsWith('.sql')) continue;
-          nm = files[fi].replace(/[^0-9a-zA-Z\.]/g, '_');
-          ns = nm.split('.');
-          ext = ns.pop();
-          nm = `${sqls.at.conn.dialect}_${sqls.at.conn.name}_${pnm ? `${pnm}_` : ''}${ns.join('_')}`;
-          for (let ni = 0, nl = ns.length, so = cont; ni < nl; ++ni) {
-            if (ns[ni] === 'beginTransaction') throw new Error(`SQL "${fpth}" cannot contain reserved "beginTransaction"`);
-            so[ns[ni]] = so[ns[ni]] || (ni < nl - 1 ? {} : await sqls.this.prepared(nm, pth, ext));
-            so = so[ns[ni]];
-          }
+          await Promise.all(proms);
+        } catch (err) {
+          if (sqls.at.conn.errorLogging) sqls.at.conn.errorLogging(`Failed to build SQL statements from files in directory ${pth || pdir}`, err);
+          throw err;
         }
-        await Promise.all(proms);
-      } catch (err) {
-        if (sqls.at.conn.errorLogging) sqls.at.conn.errorLogging(`Failed to build SQL statements from files in directory ${pth || pdir}`, err);
-        throw err;
-      }
-    };
-    await prepare();
-    sqls.at.db.beginTransaction = opts => sqls.at.dbs.beginTransaction(opts);
-    return sqls.at.dbs.init({ numOfPreparedFuncs: sqls.at.numOfPreparedFuncs });
+      };
+      await prepare();
+      sqls.at.db.beginTransaction = opts => sqls.at.dbs.beginTransaction(opts);
+      sqls.at.isPrepared = true;
+    }
+    if (!isPrepared || !sqls.at.initResult) {
+      sqls.at.initResult = await sqls.at.dbs.init({ numOfPreparedFuncs: sqls.at.numOfPreparedFuncs });
+    }
+    return sqls.at.initResult;
   }
 
   /**
    * Generates a function that will execute a pre-defined SQL statement contained within a SQL file (and handle caching of that file)
+   * @protected
    * @param {String} name the name of the SQL (excluding the extension)
    * @param {String} fpth the path to the SQL file to execute
    * @param {String} ext the file extension that will be used
@@ -709,6 +766,20 @@ class SQLS {
    */
   get connectionName() {
     return internal(this).at.conn.name;
+  }
+
+  /**
+   * @returns {Boolean} True when all of the SQL functions have been prepared
+   */
+  get isPrepared() {
+    return internal(this).at.isPrepared;
+  }
+
+  /**
+   * @returns {*} Any truthy value that indicates the initialization was successful (or an error when returning errors instead of throwing them)
+   */
+  get isInitialized() {
+    return internal(this).at.initResult;
   }
 }
 

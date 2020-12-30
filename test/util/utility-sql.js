@@ -69,46 +69,55 @@ class UtilSql {
         expect(iname, `manager.init() result.${iname} = conf.db.connections[].name`).to.equal(name);
       }
     }
+    UtilSql.expectManagerDB(priv.mgr, cname, skipPrepFuncs);
+  }
 
-    expect(priv.mgr.db, 'priv.mgr.db').to.be.object();
-    expect(priv.mgr.db[cname], `priv.mgr.db.${cname}`).to.be.object();
+  /**
+   * Validates `mgr.db[cname]`
+   * @param {Manager} mgr The manager
+   * @param {String} cname The connection name that will be validated
+   * @param {Boolean} [skipPrepFuncs] Truthy to skip validation of the prepared functions
+   */
+  static expectManagerDB(mgr, cname, skipPrepFuncs) {
+    expect(mgr.db, 'mgr.db').to.be.object();
+    expect(mgr.db[cname], `mgr.db.${cname}`).to.be.object();
 
     if (skipPrepFuncs) return;
 
-    expect(priv.mgr.db[cname].read, `priv.mgr.db.${cname}.read`).to.be.object();
-    expect(priv.mgr.db[cname].read.some, `priv.mgr.db.${cname}.read.some`).to.be.object();
-    expect(priv.mgr.db[cname].read.some.tables, `priv.mgr.db.${cname}.read.some.tables`).to.be.function();
+    expect(mgr.db[cname].read, `mgr.db.${cname}.read`).to.be.object();
+    expect(mgr.db[cname].read.some, `mgr.db.${cname}.read.some`).to.be.object();
+    expect(mgr.db[cname].read.some.tables, `mgr.db.${cname}.read.some.tables`).to.be.function();
 
-    expect(priv.mgr.db[cname].finance, `priv.mgr.db.${cname}.finance`).to.be.object();
+    expect(mgr.db[cname].finance, `mgr.db.${cname}.finance`).to.be.object();
 
-    expect(priv.mgr.db[cname].finance.read, `priv.mgr.db.${cname}.finance.read`).to.be.object();
-    expect(priv.mgr.db[cname].finance.read.annual, `priv.mgr.db.${cname}.finance.read.annual`).to.be.object();
-    expect(priv.mgr.db[cname].finance.read.annual.report, `priv.mgr.db.${cname}.finance.read.annual.report`).to.be.function();
+    expect(mgr.db[cname].finance.read, `mgr.db.${cname}.finance.read`).to.be.object();
+    expect(mgr.db[cname].finance.read.annual, `mgr.db.${cname}.finance.read.annual`).to.be.object();
+    expect(mgr.db[cname].finance.read.annual.report, `mgr.db.${cname}.finance.read.annual.report`).to.be.function();
 
-    expect(priv.mgr.db[cname].finance.create, `priv.mgr.db.${cname}.finance.create`).to.be.object();
-    expect(priv.mgr.db[cname].finance.create.annual, `priv.mgr.db.${cname}.finance.create.annual`).to.be.object();
-    expect(priv.mgr.db[cname].finance.create.annual.report, `priv.mgr.db.${cname}.finance.create.annual.report`).to.be.function();
+    expect(mgr.db[cname].finance.create, `mgr.db.${cname}.finance.create`).to.be.object();
+    expect(mgr.db[cname].finance.create.annual, `mgr.db.${cname}.finance.create.annual`).to.be.object();
+    expect(mgr.db[cname].finance.create.annual.report, `mgr.db.${cname}.finance.create.annual.report`).to.be.function();
 
-    expect(priv.mgr.db[cname].finance.ap, `priv.mgr.db.${cname}.finance.ap`).to.be.object();
+    expect(mgr.db[cname].finance.ap, `mgr.db.${cname}.finance.ap`).to.be.object();
 
-    expect(priv.mgr.db[cname].finance.ap.delete, `priv.mgr.db.${cname}.finance.ap.delete`).to.be.object();
-    expect(priv.mgr.db[cname].finance.ap.delete.audits, `priv.mgr.db.${cname}.finance.ap.delete.audits`).to.be.function();
+    expect(mgr.db[cname].finance.ap.delete, `mgr.db.${cname}.finance.ap.delete`).to.be.object();
+    expect(mgr.db[cname].finance.ap.delete.audits, `mgr.db.${cname}.finance.ap.delete.audits`).to.be.function();
 
-    expect(priv.mgr.db[cname].finance.ap.update, `priv.mgr.db.${cname}.finance.ap.update`).to.be.object();
-    expect(priv.mgr.db[cname].finance.ap.update.audits, `priv.mgr.db.${cname}.finance.ap.update.audits`).to.be.function();
+    expect(mgr.db[cname].finance.ap.update, `mgr.db.${cname}.finance.ap.update`).to.be.object();
+    expect(mgr.db[cname].finance.ap.update.audits, `mgr.db.${cname}.finance.ap.update.audits`).to.be.function();
 
-    expect(priv.mgr.db[cname].finance.ar, `priv.mgr.db.${cname}.finance.ar`).to.be.object();
+    expect(mgr.db[cname].finance.ar, `mgr.db.${cname}.finance.ar`).to.be.object();
 
-    expect(priv.mgr.db[cname].finance.ar.delete, `priv.mgr.db.${cname}.finance.ar.delete`).to.be.object();
-    expect(priv.mgr.db[cname].finance.ar.delete.audits, `priv.mgr.db.${cname}.finance.ar.delete.audits`).to.be.function();
+    expect(mgr.db[cname].finance.ar.delete, `mgr.db.${cname}.finance.ar.delete`).to.be.object();
+    expect(mgr.db[cname].finance.ar.delete.audits, `mgr.db.${cname}.finance.ar.delete.audits`).to.be.function();
 
-    expect(priv.mgr.db[cname].finance.ar.update, `priv.mgr.db.${cname}.finance.ar.update`).to.be.object();
-    expect(priv.mgr.db[cname].finance.ar.update.audits, `priv.mgr.db.${cname}.finance.ar.update.audits`).to.be.function();
+    expect(mgr.db[cname].finance.ar.update, `mgr.db.${cname}.finance.ar.update`).to.be.object();
+    expect(mgr.db[cname].finance.ar.update.audits, `mgr.db.${cname}.finance.ar.update.audits`).to.be.function();
 
-    expect(priv.mgr.db[cname].no, `priv.mgr.db.${cname}.no`).to.be.object();
-    expect(priv.mgr.db[cname].no.prefix, `priv.mgr.db.${cname}.no.prefix`).to.be.object();
-    expect(priv.mgr.db[cname].no.prefix.some, `priv.mgr.db.${cname}.no.prefix.some`).to.be.object();
-    expect(priv.mgr.db[cname].no.prefix.some.tables, `priv.mgr.db.${cname}.no.prefix.some.tables`).to.be.function();
+    expect(mgr.db[cname].no, `mgr.db.${cname}.no`).to.be.object();
+    expect(mgr.db[cname].no.prefix, `mgr.db.${cname}.no.prefix`).to.be.object();
+    expect(mgr.db[cname].no.prefix.some, `mgr.db.${cname}.no.prefix.some`).to.be.object();
+    expect(mgr.db[cname].no.prefix.some.tables, `mgr.db.${cname}.no.prefix.some.tables`).to.be.function();
   }
 
   /**

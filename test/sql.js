@@ -29,6 +29,7 @@ lab.experiment(plan, () => {
   if (Tester.afterEach) lab.afterEach(Tester.afterEach);
 
   lab.test(`${plan}: Read`, { timeout: TEST_TKO }, Tester.read);
+  lab.test(`${plan}: Read With Add Connection`, { timeout: TEST_TKO }, Tester.readWithAddConnection);
   lab.test(`${plan}: Read Return Error`, { timeout: TEST_TKO }, Tester.readErrorReturn);
   lab.test(`${plan}: Read Throw Error`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'read throw' }, Tester.readErrorThrow));
   lab.test(`${plan}: Read With SQL Dialect Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsDialects);
