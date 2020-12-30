@@ -381,15 +381,17 @@ class Manager {
   /**
    * Adds a connection configuration to the manager and initializes the database connection
    * @param {Manager~ConnectionOptions} conn The connection options that will be added to the manager
+   * @param {Manager~PrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
+   * into the constructor to make a `privPassedIntoConstructor[conn.id]` match.
    * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
    * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
    * Pass `true` to use the console. Omit to disable logging altogether.
    * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
    * @returns {Manager~OperationResults} The results
    */
-  async addConnection(conn, cache, logging, returnErrors) {
+  async addConnection(conn, priv, cache, logging, returnErrors) {
     const mgr = internal(this);
-    addConnectionToManager(mgr, conn, null, cache, logging);
+    addConnectionToManager(mgr, conn, null, cache, logging, priv);
     const rslt = await operation(mgr, 'init', { returnErrors });
     if (returnErrors && rslt.errors && rslt.errors.length) {
       if (mgr.at.logError) {
@@ -456,10 +458,12 @@ class Manager {
  * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
  * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
  * Pass `true` to use the console. Omit to disable logging altogether.
+ * @param {Manager~PrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
+ * into the constructor to make a `privPassedIntoConstructor[conn.id]` match.
  */
-function addConnectionToManager(mgr, conn, index, cache, logging) {
-  const isExpand = !index && isNaN(index);
-  let idx = index, priv, dialect, dlct;
+function addConnectionToManager(mgr, conn, index, cache, logging, priv) {
+  const isExpand = !index && !Number.isInteger(index);
+  let idx = index, dialect, dlct, privy;
   if (isExpand) { // expand connections
     idx = mgr.at.sqls.length;
     mgr.at.connNames.length = ++mgr.at.sqls.length;
@@ -467,11 +471,11 @@ function addConnectionToManager(mgr, conn, index, cache, logging) {
   if (!conn.id) throw new Error(`Connection must have an "id" at: ${JSON.stringify(conn)}`);
   if (!conn.name) throw new Error(`Connection must have have a valid "name" at: ${JSON.stringify(conn)}`);
   if (!conn.dialect || typeof conn.dialect !== 'string') throw new Error(`Connection ID ${conn.id} must have have a valid "dialect" name at: ${JSON.stringify(conn)}`);
-  priv = mgr.at.privDB[conn.id]; // pull host/credentials from external conf resource
-  if (!priv) throw new Error(`Connection ID ${conn.id} has an "id" that cannot be found within the provided "conf.univ.db" at: ${JSON.stringify(conn)}`);
-  priv = JSON.parse(JSON.stringify(priv));
-  priv.privatePath = mgr.at.privatePath;
-  conn.host = conn.host || priv.host;
+  privy = priv || mgr.at.privDB[conn.id]; // pull host/credentials from external conf resource
+  if (!privy) throw new Error(`Connection ID ${conn.id} has an "id" that cannot be found within the Manager constructor provided "conf.univ.db" at: ${JSON.stringify(conn)}`);
+  privy = JSON.parse(JSON.stringify(privy)); // need to make a clone since additional properties will be added
+  privy.privatePath = mgr.at.privatePath;
+  conn.host = conn.host || privy.host;
   dlct = conn.dialect.toLowerCase();
   if (!mgr.at.dialects.hasOwnProperty(dlct)) {
     throw new Error(`Database configuration.db.dialects does not contain an implementation definition/module for ${dlct} and connection ID ${conn.id} for host ${conn.host} at: ${JSON.stringify(conn)}`);
@@ -491,7 +495,7 @@ function addConnectionToManager(mgr, conn, index, cache, logging) {
     let ltags = [...conn.logError, MOD_KEY, 'db', conn.name, dlct, conn.service, conn.id, `v${conn.version || 0}`];
     conn.errorLogging = logging === true ? generateLogger(console.error, ltags) : logging && logging(ltags); // override dialect error logging
   }
-  dialect = new mgr.at.dialects[dlct](priv, conn, mgr.at.track, conn.errorLogging || false, conn.logging || false, mgr.at.debug || false);
+  dialect = new mgr.at.dialects[dlct](privy, conn, mgr.at.track, conn.errorLogging || false, conn.logging || false, mgr.at.debug || false);
   // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
   if (mgr.this[NS][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
   //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);

@@ -10,24 +10,24 @@ const UtilSql = require('../util/utility-sql');
 // TODO : import * as UtilOpts from '../util/utility-options.mjs';
 // TODO : import * as UtilSql from '../util/utility-sql.mjs';
 
-const priv = { mgr: null, cache: null, mgrLogit: !!LOGGER.info };
+const test = { mgr: null, cache: null, mgrLogit: !!LOGGER.info };
 
 // TODO : ESM uncomment the following line...
 // export
 class Tester {
 
   static async beforeEach() {
-    const cch = priv.cache;
-    priv.mgr = priv.cache = null;
+    const cch = test.cache;
+    test.mgr = test.cache = null;
     if (cch && cch.start) await cch.start();
   }
 
   static async afterEach() {
-    const mgr = priv.mgr, cch = priv.cache, error = priv.error;
-    priv.mgr = priv.cache = priv.error = null;
+    const mgr = test.mgr, cch = test.cache, error = test.error;
+    test.mgr = test.cache = test.error = null;
     const proms = [];
-    if (mgr && !error && priv.closeConnNames) {
-      for (let cname of priv.closeConnNames) {
+    if (mgr && !error && test.closeConnNames) {
+      for (let cname of test.closeConnNames) {
         proms.push(UtilSql.testOperation('close', mgr, cname, 1, `afterEach() connection "${cname}"`));
       }
     }
@@ -39,11 +39,11 @@ class Tester {
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
     conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
     conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
-    await UtilSql.initManager(priv, conf, {
-      logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
+    await UtilSql.initManager(test, conf, {
+      logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
     });
 
-    return UtilSql.testRead(priv.mgr, connName);
+    return UtilSql.testRead(test.mgr, connName);
   }
 
   static async readWithAddConnection() {
@@ -51,26 +51,32 @@ class Tester {
     conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
     conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
     const initOpts = {
-      logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
+      logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
     };
-    await UtilSql.initManager(priv, conf, initOpts);
+    await UtilSql.initManager(test, conf, initOpts);
 
-    await UtilSql.testRead(priv.mgr, connName);
+    await UtilSql.testRead(test.mgr, connName);
 
     // create another configuration 
-    const aconf = await UtilSql.initConf(), addConn = aconf.db.connections[0];
+    const aconf = await UtilSql.initConf(), addConn = aconf.db.connections[0], oldAddConnId = addConn.id;
     addConn.name = `${addConn.name}ADD`;
     addConn.substitutes = UtilOpts.createSubstituteOpts();
     addConn.binds = UtilOpts.createConnectionBinds();
 
-    await priv.mgr.addConnection(addConn, priv.cache, initOpts.logger);
-    return UtilSql.testRead(priv.mgr, addConn.name);
+    // test using conf.univ.db[conn.id] private options
+    await test.mgr.addConnection(addConn, null, test.cache, initOpts.logger);
+    await UtilSql.testRead(test.mgr, addConn.name);
+
+    // test using passed private options
+    addConn.name = `${addConn.name}2`;
+    await test.mgr.addConnection(addConn, aconf.univ.db[oldAddConnId], test.cache, initOpts.logger);
+    return UtilSql.testRead(test.mgr, addConn.name);
   }
 
   static async readErrorReturn() {
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(priv, conf, {
-      logger: priv.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
+    await UtilSql.initManager(test, conf, {
+      logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
     });
 
     const execOpts = UtilOpts.createExecOpts();
@@ -80,32 +86,32 @@ class Tester {
       testErrorProp: 123
     };
     let errorOpts = true;
-    await UtilSql.testRead(priv.mgr, connName, { execOpts, errorOpts });
+    await UtilSql.testRead(test.mgr, connName, { execOpts, errorOpts });
     errorOpts = {
       returnErrors: true,
       includeBindValues: true
     };
-    return UtilSql.testRead(priv.mgr, connName, { execOpts, errorOpts });
+    return UtilSql.testRead(test.mgr, connName, { execOpts, errorOpts });
   }
 
   static async readErrorThrow() {
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(priv, conf);
+    await UtilSql.initManager(test, conf);
 
     const execOpts = UtilOpts.createExecOpts();
     execOpts.driverOptions = execOpts.driverOptions || {};
     execOpts.driverOptions.throwExecError = true;
-    return UtilSql.testRead(priv.mgr, connName, { execOpts });
+    return UtilSql.testRead(test.mgr, connName, { execOpts });
   }
 
   static async readWithSubstitutionsDialects() {
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(priv, conf);
+    await UtilSql.initManager(test, conf);
 
     const execOpts = UtilOpts.createExecOpts();
     execOpts.driverOptions = execOpts.driverOptions || {};
     execOpts.driverOptions.substitutes = { dialects: UtilOpts.createSubstituteDriverOptsDialects() };
-    return UtilSql.testRead(priv.mgr, connName, {
+    return UtilSql.testRead(test.mgr, connName, {
       execOpts,
       prepFuncPaths: { read: 'finance.read.annual.report' }
     });
@@ -113,7 +119,7 @@ class Tester {
 
   static async readWithSubstitutionsFrags() {
     const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(priv, conf);
+    await UtilSql.initManager(test, conf);
 
     conn.driverOptions = conn.driverOptions || {};
     conn.driverOptions.fragSqlSnippets = UtilOpts.createSubstituteDriverOptsFrags();
@@ -122,71 +128,71 @@ class Tester {
       frags.push(frag);
     }
 
-    return UtilSql.testRead(priv.mgr, connName, {
+    return UtilSql.testRead(test.mgr, connName, {
       frags,
       prepFuncPaths: { read: 'finance.read.annual.report' }
     });
   }
 
   static async readWithSubstitutionsVersionNegative1() {
-    return UtilSql.testVersions(priv, -1, [-1, 0, 3], 1, 2, 4);
+    return UtilSql.testVersions(test, -1, [-1, 0, 3], 1, 2, 4);
   }
 
   static async readWithSubstitutionsVersion1() {
-    return UtilSql.testVersions(priv, 1, [0, 1, 4], -1, 2, 3);
+    return UtilSql.testVersions(test, 1, [0, 1, 4], -1, 2, 3);
   }
 
   static async readWithSubstitutionsVersion2() {
-    return UtilSql.testVersions(priv, 2, [2, 3, 4], -1, 0, 1);
+    return UtilSql.testVersions(test, 2, [2, 3, 4], -1, 0, 1);
   }
 
   static async execOptsAutoCommitFalseTransactionIdMissing() {
     const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(priv, conf);
+    await UtilSql.initManager(test, conf);
 
     const xopts = UtilOpts.createExecOpts();
     xopts.autoCommit = false;
     // no transaction started should throw error
-    await UtilSql.testCUD(priv.mgr, connName, conf, xopts, { noTransaction: true });
+    await UtilSql.testCUD(test.mgr, connName, conf, xopts, { noTransaction: true });
   }
 
   static async execOptsPreparedStatements() {
     const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(priv, conf);
+    await UtilSql.initManager(test, conf);
 
     const xopts = UtilOpts.createExecOpts();
-    await UtilSql.testCUD(priv.mgr, connName, conf, xopts, { prepare: true });
+    await UtilSql.testCUD(test.mgr, connName, conf, xopts, { prepare: true });
   }
 
   static async intervalCache() {
     const cacheOpts = { expiresIn: 100 };
     const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(priv, conf, { cache: new IntervalCache(cacheOpts), logger: priv.mgrLogit });
+    await UtilSql.initManager(test, conf, { cache: new IntervalCache(cacheOpts), logger: test.mgrLogit });
 
     try {
-      await UtilSql.testRead(priv.mgr, connName, { cache: priv.cache, cacheOpts });
+      await UtilSql.testRead(test.mgr, connName, { cache: test.cache, cacheOpts });
 
       const xopts = UtilOpts.createExecOpts();
 
       if (LOGGER.info) LOGGER.info('>> CUD tests using autoCommit = true (default)');
       xopts.autoCommit = true;
-      await UtilSql.testCUD(priv.mgr, connName, conf, xopts);
+      await UtilSql.testCUD(test.mgr, connName, conf, xopts);
 
       if (LOGGER.info) LOGGER.info('>> CUD tests using autoCommit = false');
       xopts.autoCommit = false;
-      await UtilSql.testCUD(priv.mgr, connName, conf, xopts);
+      await UtilSql.testCUD(test.mgr, connName, conf, xopts);
     } catch (err) {
-      priv.error = err;
+      test.error = err;
       throw err;
     }
   }
 
   static async execOptsNone() {
     const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(priv, conf);
+    await UtilSql.initManager(test, conf);
 
     UtilOpts.TEST_DIALECT.BYPASS_NEXT_EXEC_OPTS_CHECK = true;
-    return priv.mgr.db[connName].read.no.binds();
+    return test.mgr.db[connName].read.no.binds();
   }
 }
 
