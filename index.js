@@ -133,7 +133,7 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
  * @property {String} id Identifies the connection within a {@link Manager~PrivateOptions}
  * @property {String} dialect The database dialect (e.g. mysql, mssql, oracle, etc.)
  * @property {String} name The name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
- * connection container `manager.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
+ * connection container `manager.db.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
  * @property {String} [dir=name] The alternative dir where `*.sql` files will be found relative to `mainPath` passed into a {@link Manager} constructor. The directory path will be used as the basis
  * for generating SQL statements from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
  * within the file name with the last entry as the executable {@link Manager~PreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
