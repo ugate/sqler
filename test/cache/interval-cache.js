@@ -43,9 +43,9 @@ class IntervalCache {
   }
 
   /**
-   * @see Cache
+   * @see SQLERCache
    * @param {String} key The SQL statement key
-   * @returns {Object} The return object described in {@link Cache}
+   * @returns {Object} The return object described in {@link SQLERCache}
    */
   async get(key) {
     const cch = internal(this), store = cch.at.store;
@@ -55,7 +55,7 @@ class IntervalCache {
   }
 
   /**
-   * @see Cache
+   * @see SQLERCache
    * @param {String} key The SQL statement key
    * @param {*} val The value to cache
    * @param {Integer} [ttl] The time-to-live overrride for the option value set on {@link IntervalCache}
@@ -69,7 +69,7 @@ class IntervalCache {
   }
 
   /**
-   * @see Cache
+   * @see SQLERCache
    * @param {String} key The SQL statement key
    */
   async drop(key) {

@@ -20,7 +20,7 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
 
 /**
  * The `cache` client responsible for regulating the frequency in which a SQL file is read by a {@link Manager}.
- * @typedef {Object} Cache
+ * @typedef {Object} SQLERCache
  * @property {Function} start An `async function()` that starts caching. This could be a `noop` or could start any background processing and/or capture of cached keys (depending on the type of
  * implementation).
  * @property {Function} stop An `async function()` that stops caching. This could be a `noop` or could stop any background processing and/or capture of cached keys (depending on the type of
@@ -95,7 +95,7 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
 
 /**
  * Private options for global {@link Manager} use
- * @typedef {Object} Manager~PrivateOptions
+ * @typedef {Object} SQLERPrivateOptions
  * @property {String} [username] The username to connect to the database
  * @property {String} [password] The password to connect to the database
  * @property {String} [host] The host to connect to for the database
@@ -107,48 +107,48 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
 
 /**
  * Configuration options for {@link Manager} use
- * @typedef {Object} Manager~ConfigurationOptions
+ * @typedef {Object} SQLERConfigurationOptions
  * @property {String} [mainPath] Root directory starting point to look for SQL files (defaults to `require.main` path or `process.cwd()`)
  * @property {String} [privatePath] Current working directory where generated files will be located (if any, defaults to `process.cwd()`)
  * @property {Boolean} [debug] Truthy to turn on debugging
- * @property {Manager~UniversalOptions} univ The {@link Manager~UniversalOptions}
+ * @property {SQLERUniversalOptions} univ The {@link SQLERUniversalOptions}
  * @property {Object} db The _public_ facing database configuration
  * @property {Object} db.dialects An object that contains {@link Dialect} implementation details where each property name matches a dialect name and the value contains either the module class or a string
  * that points to a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`). When using a directory path the dialect path will be prefixed with
  * `process.cwd()` before loading.
- * @property {Manager~ConnectionOptions[]} db.connections The connections options that will be used.
+ * @property {SQLERConnectionOptions[]} db.connections The connections options that will be used.
  */
 
 /**
  * The universal configuration that, for security and sharing purposes, remains external to an application
- * @typedef {Object} Manager~UniversalOptions
- * @property {Object} db The database options that contain _private_ sensitive configuration. Each property should correspond to a {@link Manager~PrivateOptions} instance and the property name should
- * be linked to a {@link Manager~ConnectionOptions} `id` within `conf.db.connections`. Each {@link Manager~PrivateOptions} instance will be used to connect to the underlying database
+ * @typedef {Object} SQLERUniversalOptions
+ * @property {Object} db The database options that contain _private_ sensitive configuration. Each property should correspond to a {@link SQLERPrivateOptions} instance and the property name should
+ * be linked to a {@link SQLERConnectionOptions} `id` within `conf.db.connections`. Each {@link SQLERPrivateOptions} instance will be used to connect to the underlying database
  * (e.g. `{ db: myConnId: { host: "someDbhost.example.com", username: "someUser", password: "somePass" } }`)
  */
 
 /**
 * Options for connections used by {@link Manager}
- * @typedef {Object} Manager~ConnectionOptions
- * @property {String} id Identifies the connection within a {@link Manager~PrivateOptions}
+ * @typedef {Object} SQLERConnectionOptions
+ * @property {String} id Identifies the connection within a {@link SQLERPrivateOptions}
  * @property {String} dialect The database dialect (e.g. mysql, mssql, oracle, etc.)
  * @property {String} name The name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
  * connection container `manager.db.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
  * @property {String} [dir=name] The alternative dir where `*.sql` files will be found relative to `mainPath` passed into a {@link Manager} constructor. The directory path will be used as the basis
  * for generating SQL statements from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
- * within the file name with the last entry as the executable {@link Manager~PreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
+ * within the file name with the last entry as the executable {@link SQLERPreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
  * as "mgr.db.conn1.user.team.details()". But when `dir` is set to "myDir" the SQL files will be loaded from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection
  * name "conn1".
  * @property {Float} [version] A version that can be used for version substitutions within an SQL statement
  * @property {String} [service] The service name defined by the underlying database (may be required depending on the implementing {@link Dialect}
  * @property {Object} [binds] The global object that contains bind variable values that will be included in all SQL calls made under the connection for parameter `binds` if not overridden
- * by individual "binds" passed into the {@link Manager~PreparedFunction}
+ * by individual "binds" passed into the {@link SQLERPreparedFunction}
  * @property {Object} [substitutes] Key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
- * @property {String} [host] The database host override for a value specified in {@link Manager~PrivateOptions}
- * @property {String} [port] The database port override for a value specified in {@link Manager~PrivateOptions}
- * @property {String} [protocol] The database protocol override for a value specified in {@link Manager~PrivateOptions}
- * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
- * perform `date.toISOString()`. __Gets overridden by the same option set on {@link Manager~ExecOptions}__.
+ * @property {String} [host] The database host override for a value specified in {@link SQLERPrivateOptions}
+ * @property {String} [port] The database port override for a value specified in {@link SQLERPrivateOptions}
+ * @property {String} [protocol] The database protocol override for a value specified in {@link SQLERPrivateOptions}
+ * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link SQLERPreparedFunction} calls. Set to a truthy value to
+ * perform `date.toISOString()`. __Gets overridden by the same option set on {@link SQLERExecOptions}__.
  * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
  * @property {(Boolean | String[])} [log] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the log output. Explicity set to `false` to disable
  * connection _log_ level logging even if it is turned on via the {@link Manager}.
@@ -169,37 +169,37 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
  */
 
 /**
- * Options that are passed to generated {@link Manager~PreparedFunction}
- * @typedef {Object} Manager~ExecOptions
+ * Options that are passed to generated {@link SQLERPreparedFunction}
+ * @typedef {Object} SQLERExecOptions
  * @property {String} [name] A name to assign to the execution.
  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
  * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
  * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
  * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
- * until the returned {@link Manager~ExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
+ * until the returned {@link SQLERExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
  * @property {String} [transactionId] A transaction identifier returned from a prior call to `manager.db.myConnectionName.beginTransaction()` that will be used when executing
- * the {@link Manager~PreparedFunction}. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections
+ * the {@link SQLERPreparedFunction}. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections
  * used by other transactions that may also be in progress. The ID is ignored when there is no transaction in progress with the specified ID.
- * @property {Boolean} [prepareStatement] Truthy to generate or use an existing prepared statement for the SQL being executed via the {@link Manager~PreparedFunction}.
+ * @property {Boolean} [prepareStatement] Truthy to generate or use an existing prepared statement for the SQL being executed via the {@link SQLERPreparedFunction}.
  * Prepared statements _may_ help optimize SQL that is executed many times across the same connection with similar or different bind values.
- * __Care must be taken not to drain the connection pool since the connection remains open until the SQL executions have completed and `unprepare` has been called on the {@link Manager~ExecResults}.__
- * returned from the {@link Manager~PreparedFunction} call.
- * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link Manager~PreparedFunction} calls. Set to a truthy value to
- * perform `date.toISOString()`. __Overrides the same option set on {@link Manager~ConnectionOptions}__.
- * @property {Object} [driverOptions] Options that may override the {@link Manager~ConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
+ * __Care must be taken not to drain the connection pool since the connection remains open until the SQL executions have completed and `unprepare` has been called on the {@link SQLERExecResults}.__
+ * returned from the {@link SQLERPreparedFunction} call.
+ * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link SQLERPreparedFunction} calls. Set to a truthy value to
+ * perform `date.toISOString()`. __Overrides the same option set on {@link SQLERConnectionOptions}__.
+ * @property {Object} [driverOptions] Options that may override the {@link SQLERConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
  */
  // TODO : @property {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
 
 /**
  * Internally generated metadata that is passed into {@link Dialect.exec} by a {@link Manager} for determining SQL sources.
- * @typedef {Object} Manager~ExecMeta
+ * @typedef {Object} SQLERExecMeta
  * @property {String} name The composed name given to a given SQL file
  * @property {String} path The path to the SQL file
  */
 
 /**
  * Options for handling any errors that occur during execution.
- * @typedef {Object} Manager~ExecErrorOptions
+ * @typedef {Object} SQLERExecErrorOptions
  * @property {Function} [handler] A `function(error)` that will handle any errors thrown. The errors should contain a `sqler` property containing
  * @property {Boolean} [includeBindValues] Truthy to include the bind parameter values `error.sqler`.
  * @property {Boolean} [returnErrors] Truthy to return any errors that may occur. Otherwise, throw any errors that may occur.
@@ -208,64 +208,64 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
 /**
  * Prepared functions are auto-generated `async` functions that execute an SQL statement from an SQL file source.
  * @async
- * @callback {Function} Manager~PreparedFunction
- * @param {Manager~ExecOptions} [opts] The SQL execution options
+ * @callback {Function} SQLERPreparedFunction
+ * @param {SQLERExecOptions} [opts] The SQL execution options
  * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
  * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
- * @param {(Manager~ExecErrorOptions | Boolean)} [errorOpts] Either the error handling options or a boolean flag indicating that any errors that occur during execution should be returned in
- * the {@link Manager~ExecResults} rather then being thrown.
- * @returns {Manager~ExecResults} The execution results
+ * @param {(SQLERExecErrorOptions | Boolean)} [errorOpts] Either the error handling options or a boolean flag indicating that any errors that occur during execution should be returned in
+ * the {@link SQLERExecResults} rather then being thrown.
+ * @returns {SQLERExecResults} The execution results
  */
 
 /**
- * Results returned from invoking a {@link Manager~PreparedFunction}
- * @typedef {Object} Manager~ExecResults
+ * Results returned from invoking a {@link SQLERPreparedFunction}
+ * @typedef {Object} SQLERExecResults
  * @property {Object[]} [rows] The execution array of model objects representing each row or `undefined` when executing a non-read SQL statement.
- * @property {Function} [commit] A no-argument _async_ function that commits any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_
- * or when the {@link Manager~PreparedFunction} is called without a valid `transactionId`.
+ * @property {Function} [commit] A no-argument _async_ function that commits any outstanding transactions. Will not be available when the {@link SQLERExecOptions} `autoCommit` is _truthy_
+ * or when the {@link SQLERPreparedFunction} is called without a valid `transactionId`.
  * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transactionId` is supplied to ensue underlying connections are completed and closed.__
- * @property {Function} [rollback] A no-argument _async_ function that rollbacks any outstanding transactions. Will not be available when the {@link Manager~ExecOptions} `autoCommit` is _truthy_
- * or when the {@link Manager~PreparedFunction} is called without a valid `transactionId`.
+ * @property {Function} [rollback] A no-argument _async_ function that rollbacks any outstanding transactions. Will not be available when the {@link SQLERExecOptions} `autoCommit` is _truthy_
+ * or when the {@link SQLERPreparedFunction} is called without a valid `transactionId`.
  * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transactionId` is supplied to ensue underlying connections are completed and closed.__
- * @property {Function} [unprepare] A no-argument _async_ function that unprepares an outstanding prepared statement. Will not be available when the {@link Manager~PreparedFunction} is called
- * when the specified `prepareStatement` is _falsy_ on the {@link Manager~ExecOptions} passed into the {@link Manager~PreparedFunction}.
+ * @property {Function} [unprepare] A no-argument _async_ function that unprepares an outstanding prepared statement. Will not be available when the {@link SQLERPreparedFunction} is called
+ * when the specified `prepareStatement` is _falsy_ on the {@link SQLERExecOptions} passed into the {@link SQLERPreparedFunction}.
  * __NOTE: A call to `unprepare` must be invoked when a `prepareStatement` is _truthy_ to ensue underlying statements and/or connections are completed and closed.__
- * @property {Error} [error] Any caught error that occurred when a {@link Manager~PreparedFunction} was invoked with the `errorOpts` flag set to a _truthy_ value.
+ * @property {Error} [error] Any caught error that occurred when a {@link SQLERPreparedFunction} was invoked with the `errorOpts` flag set to a _truthy_ value.
  * @property {Object} raw The raw results from the execution (driver-specific execution results).
  */
 
 /**
  * Transaction options that can be passed into a `manager.connectionName.beginTransaction(transactionDriverOptions)` function.
- * @typedef {Object} Manager~TransactionOptions
+ * @typedef {Object} SQLERTransactionOptions
  */
 
 /**
  * Options for operational methods on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.state}, {@link Manager.close}, etc.).
- * @typedef {Object} Manager~OperationOptions
+ * @typedef {Object} SQLEROperationOptions
  * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `errorOpts` and/or `executeInSeries`
- * that will override any global options set directly on the {@link Manager~OperationOptions}. For example, `opts.connections.myConnection.executeInseries` would override
+ * that will override any global options set directly on the {@link SQLEROperationOptions}. For example, `opts.connections.myConnection.executeInseries` would override
  * `opts.executeInSeries` for the connection named `myConnection`, but would use `opts.executeInSeries` for any other connections that ae not overridden.
  * @property {Boolean} [executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel.
- * @property {(Manager~ExecErrorOptions | Boolean)} [errorOpts] Set to truthy to return any errors. Otherise throw any errors as they are encountered. options can also be set instead.
+ * @property {(SQLERExecErrorOptions | Boolean)} [errorOpts] Set to truthy to return any errors. Otherise throw any errors as they are encountered. options can also be set instead.
  */
 
 /**
  * Results returned from invoking an operational method on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.state}, {@link Manager.close}, etc.).
- * @typedef {Object} Manager~OperationResults
+ * @typedef {Object} SQLEROperationResults
  * @property {Object} result An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection).
- * @property {Error[]} errors Any errors that may have occurred on the operational methods. Should only be populated when {@link Manager~OperationOptions} are used with a truthy value set on
+ * @property {Error[]} errors Any errors that may have occurred on the operational methods. Should only be populated when {@link SQLEROperationOptions} are used with a truthy value set on
  * `errorOpts`. Each will contain meta properties set by [Asynchro](https://ugate.github.io/asynchro).
  */
 
 /**
  * Options that are used during initialization
- * @typedef {Object} Manager~InitOptions
- * @property {Integer} numOfPreparedFuncs The total number of {@link Manager~PreparedFunction}(s) registered on the {@link Dialect}
+ * @typedef {Object} SQLERInitOptions
+ * @property {Integer} numOfPreparedFuncs The total number of {@link SQLERPreparedFunction}(s) registered on the {@link Dialect}
  */
 
 /**
  * The current state of the managed {@link Dialect}
- * @typedef {Object} Manager~State
+ * @typedef {Object} SQLERState
  * @property {Integer} pending The number of transactions that are pending `commit` or `roolback` plus any prepared statements that are pending
  * `unprepare`.
  * @property {Object} [connections] The connection state
@@ -274,8 +274,8 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
  */
 
 /**
- * A validation for validating interpolation used by a {@link Manager~InterpolateFunction}
- * @callback {Function} Manager~InterpolateValidationFunction
+ * A validation for validating interpolation used by a {@link SQLERInterpolateFunction}
+ * @callback {Function} SQLERInterpolateValidationFunction
  * @param {String[]} srcPropNames Property path(s) to the value being validated (e.g. `source.my.path = 123` would equate to 
  * a invocation to `validator(['my','path'], 123)`).
  * @param {*} srcPropValue The value being validated for interpolation
@@ -288,12 +288,12 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
  * or an interpolated property on the `interpolator`.
  * For example `source.someProp = '${SOME_VALUE}'` will be interpreted as `dest.someProp = dest.SOME_VALUE` when the `interpolator` is omitted and
  * `dest.someProp = interpolator.SOME_VALUE` when an `interpolator` is specified.
- * __Typically only used by implementing {@link Dialect} constructors within a {@link Manager~Track}.__
- * @callback {Function} Manager~InterpolateFunction
+ * __Typically only used by implementing {@link Dialect} constructors within a {@link SQLERTrack}.__
+ * @callback {Function} SQLERInterpolateFunction
  * @param {Object} dest The destination where the sources will be set (also the interpolated source when `interpolator` is omitted).
- * @param {Object} source The source of the values to interpolate (e.g. {@link Manager~ConnectionOptions}, {@link Manager~ExecOptions}, etc.).
+ * @param {Object} source The source of the values to interpolate (e.g. {@link SQLERConnectionOptions}, {@link SQLERExecOptions}, etc.).
  * @param {Object} [interpolator=dest] An alternative source to use for extracting interpolated values from.
- * @param {Manager~InterpolateValidationFunction} [validator] A validation function for each property/value being interpolated to determine
+ * @param {SQLERInterpolateValidationFunction} [validator] A validation function for each property/value being interpolated to determine
  * if it will be interolated.
  * @param {Boolean} [onlyInterpolated] Truthy to indicate that the only values that will be set from the `source`/`interpolator` will be values that
  * have been interpolated. __NOTE: Truthy values will not prevent `source`/`interpolator` objects from getting set on `dest`, just non-interpoalted
@@ -304,7 +304,7 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
 /**
  * Converts a SQL statement that contains named bind parameters into a SQL statement that contains unnamed/positional bind parameters (using `?`).
  * Each bound parameter is pushed to the array in the position that corresponds to the position within the SQL statement.
- * @callback {Function} Manager~PositionalBindsFunction
+ * @callback {Function} SQLERPositionalBindsFunction
  * @param {String} sql The SQL statement that contains the bind parameters
  * @param {Object} bindsObject An object that contains the bind parameters as property names/values
  * @param {Array} bindsArray The array that will be populated with the bind parameters
@@ -318,11 +318,11 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
  * A tracking mechanism that is shared between all {@link Dialect} implementations for a given {@link Manager}. A track provides a means to share
  * data, etc. from one {@link Dialect} to another. Properties can also be _added_ by a {@link Dialect} for use in other {@link Dialect}s.
  * __Typically only used by implementing {@link Dialect} constructors.__
- * @typedef {Object} Manager~Track
- * @property {Manager~InterpolateFunction} interpolate An interpolation function that can be used by {@link Dialect} implementations to interpolate
+ * @typedef {Object} SQLERTrack
+ * @property {SQLERInterpolateFunction} interpolate An interpolation function that can be used by {@link Dialect} implementations to interpolate
  * configuration option values from underlying drivers within a {@link Dialect} (immutable). The convenience of doing so negates the need for an
  * application that uses a {@link Manager} to import/require a database driver just to access driver constants, etc.
- * @property {Manager~PositionalBindsFunction} positionalBinds A function that will convert an SQL statement with named binds into positional binds
+ * @property {SQLERPositionalBindsFunction} positionalBinds A function that will convert an SQL statement with named binds into positional binds
  */
 
 /**
@@ -333,16 +333,16 @@ const NS = 'db'; // namespace on Manager where SQL functions will be added
  * - `db` - The database accessible object where all of the constructed connections reside. For example
  * - `db.<CONN_NAME>` - There will be a property assigned for each database connection configured during construction. For example, when _<CONN_NAME>_ is _myConn_, the
  * manager instance will be accessible via _manager.db.myConn_.
- * - `db.<CONN_NAME>.<PREPARED_FUNC_PATHS>` The generated SQL executable {@link Manager~PreparedFunction}(s). Assuming a _<CONN_NAME>_ of _myConn_ and a path of
- * _/db/myConn/read.my.table.sql_, the accessible {@link Manager~PreparedFunction} may be accessible via _db.myConn.read.my.table()_.
- * - `db.<CONN_NAME>.beginTransaction` - A function that accepts a single {@link Manager~TransactionOptions} that begins a transaction for a given database connection pool.
+ * - `db.<CONN_NAME>.<PREPARED_FUNC_PATHS>` The generated SQL executable {@link SQLERPreparedFunction}(s). Assuming a _<CONN_NAME>_ of _myConn_ and a path of
+ * _/db/myConn/read.my.table.sql_, the accessible {@link SQLERPreparedFunction} may be accessible via _db.myConn.read.my.table()_.
+ * - `db.<CONN_NAME>.beginTransaction` - A function that accepts a single {@link SQLERTransactionOptions} that begins a transaction for a given database connection pool.
  */
 class Manager {
 
   /**
   * Creates a new database manager. Vendor-specific implementations should have constructors that accept properties defined by {@link Dialect}.
-  * @param {Manager~ConfigurationOptions} conf The configuration options
-  * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+  * @param {SQLERConfigurationOptions} conf The configuration options
+  * @param {SQLERCache} [cache] the {@link SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
   * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
   * Pass `true` to use the console. Omit to disable logging altogether.
   */
@@ -380,14 +380,14 @@ class Manager {
 
   /**
    * Adds a connection configuration to the manager and initializes the database connection
-   * @param {Manager~ConnectionOptions} conn The connection options that will be added to the manager
-   * @param {Manager~PrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
+   * @param {SQLERConnectionOptions} conn The connection options that will be added to the manager
+   * @param {SQLERPrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
    * into the constructor to make a `privPassedIntoConstructor[conn.id]` match.
-   * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+   * @param {SQLERCache} [cache] the {@link SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
    * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
    * Pass `true` to use the console. Omit to disable logging altogether.
    * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
-   * @returns {Manager~OperationResults} The results
+   * @returns {SQLEROperationResults} The results
    */
   async addConnection(conn, priv, cache, logging, returnErrors) {
     const mgr = internal(this);
@@ -406,7 +406,7 @@ class Manager {
   /**
    * Initializes the configured database connections
    * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
-   * @returns {Manager~OperationResults} The results
+   * @returns {SQLEROperationResults} The results
    */
   async init(returnErrors) {
     const mgr = internal(this);
@@ -424,10 +424,10 @@ class Manager {
   }
 
    /**
-   * Composes the {@link Manager~State} on either all the connections used by the manager or on the specified connection names.
-   * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
+   * Composes the {@link SQLERState} on either all the connections used by the manager or on the specified connection names.
+   * @param {SQLEROperationOptions} [opts] The {@link SQLEROperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the check on (defaults to all connections)  
-   * @returns {Manager~OperationResults} The results
+   * @returns {SQLEROperationResults} The results
    */
   async state(opts, ...connNames) {
     return operation(internal(this), 'state', opts, connNames);
@@ -435,7 +435,7 @@ class Manager {
  
   /**
    * Closes all database pools/connections/etc.
-   * @returns {Manager~OperationResults} The results
+   * @returns {SQLEROperationResults} The results
    */
   async close() {
     return operation(internal(this), 'close');
@@ -453,12 +453,12 @@ class Manager {
  * Adds a connection configuration to a manager
  * @private
  * @param {Manager} mgr The manager to add the connection to
- * @param {Manager~ConnectionOptions} conn The connection options that will be added to the manager
+ * @param {SQLERConnectionOptions} conn The connection options that will be added to the manager
  * @param {Integer} [index] The index at which the connection options will be added to
- * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+ * @param {SQLERCache} [cache] the {@link SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
  * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
  * Pass `true` to use the console. Omit to disable logging altogether.
- * @param {Manager~PrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
+ * @param {SQLERPrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
  * into the constructor to make a `privPassedIntoConstructor[conn.id]` match.
  */
 function addConnectionToManager(mgr, conn, index, cache, logging, priv) {
@@ -508,9 +508,9 @@ function addConnectionToManager(mgr, conn, index, cache, logging, priv) {
  * @private
  * @param {Manager} mgr The _internal_/private {@link Manager} store
  * @param {String} funcName The async function name to call on each {@link SQLS} instance
- * @param {Manager~OperationOptions} [opts] The {@link Manager~OperationOptions} to use
+ * @param {SQLEROperationOptions} [opts] The {@link SQLEROperationOptions} to use
  * @param {String[]} [connNames] The connection names to perform the opearion on (defaults to all connections)
- * @returns {Manager~OperationResults} The results
+ * @returns {SQLEROperationResults} The results
  */
 async function operation(mgr, funcName, opts, connNames) {
   opts = opts || {};
@@ -556,10 +556,10 @@ class SQLS {
   /**
    * Reads all the prepared SQL definition files for a specified name directory and adds a function to execute the SQL file contents
    * @constructs SQLS
-   * @param {String} ns The namespace on the {@link Manager} where all {@link Manager~PreparedFunction} will be added
+   * @param {String} ns The namespace on the {@link Manager} where all {@link SQLERPreparedFunction} will be added
    * @param {String} sqlBasePth the absolute path that SQL files will be included
-   * @param {Cache} [cache] the {@link Cache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
-   * @param {Manager~ConnectionOptions} conn options for the prepared statements
+   * @param {SQLERCache} [cache] the {@link SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+   * @param {SQLERConnectionOptions} conn options for the prepared statements
    * @param {Object} db the object where SQL retrieval methods will be stored (by file name parts separated by a period- except the file extension)
    * @param {DBS} dbs the database service to use
    */
@@ -635,7 +635,7 @@ class SQLS {
    * @param {String} name the name of the SQL (excluding the extension)
    * @param {String} fpth the path to the SQL file to execute
    * @param {String} ext the file extension that will be used
-   * @returns {Manager~PreparedFunction} an `async function` that executes SQL statement(s)
+   * @returns {SQLERPreparedFunction} an `async function` that executes SQL statement(s)
    */
   async prepared(name, fpth, ext) {
     const sqls = internal(this);
@@ -684,7 +684,7 @@ class SQLS {
 
     /**
     * Sets/formats SQL parameters and executes an SQL statement
-    * @see Manager~PreparedFunction
+    * @see SQLERPreparedFunction
     */
     return async function execSqlPublic(opts, frags, errorOpts) {
       const binds = {}, mopt = { binds, opts: frags }, type = (opts && opts.type && opts.type.toUpperCase()) || crud;
@@ -752,7 +752,7 @@ class SQLS {
   }
 
   /**
-   * @returns {Manager~State} The current managed state of the {@link DBS}
+   * @returns {SQLERState} The current managed state of the {@link DBS}
    */
   get state() {
     return internal(this).at.dbs.state;
@@ -797,7 +797,7 @@ class DBS {
    * Database service constructor
    * @constructs DBS
    * @param {Dialect} dialect the database dialect implementation/executor to use
-   * @param {Manager~ConnectionOptions} conn the connection options
+   * @param {SQLERConnectionOptions} conn the connection options
    */
   constructor(dialect, conn) {
     const dbs = internal(this);
@@ -820,7 +820,7 @@ class DBS {
 
   /**
    * Begins a transaction
-   * @param {Manager~TransactionOptions} [opts={}] The passed transaction options
+   * @param {SQLERTransactionOptions} [opts={}] The passed transaction options
    * @returns {String} The transaction identifier
    */
   async beginTransaction(opts) {
@@ -835,10 +835,10 @@ class DBS {
   * @param {String} name The name given to the SQL file
   * @param {String} fpth The originating file path where the SQL resides
   * @param {String} sql The SQL to execute with optional substitutions {@link DBS#frag}
-  * @param {Manager~ExecOptions} opts The eectution options
+  * @param {SQLERExecOptions} opts The eectution options
   * @param {String[]} frags The frament keys within the SQL that will be retained
-  * @param {(Manager~ExecErrorOptions | Boolean)} [errorOpts] Truthy to return any errors thrown during execution rather than throwing them.
-  * Can also pass {@link Manager~ExecErrorOptions} for more control over execution errors.
+  * @param {(SQLERExecErrorOptions | Boolean)} [errorOpts] Truthy to return any errors thrown during execution rather than throwing them.
+  * Can also pass {@link SQLERExecErrorOptions} for more control over execution errors.
   * @returns {Dialect~ExecResults} The execution results
   */
   async exec(name, fpth, sql, opts, frags, errorOpts) {
@@ -891,13 +891,13 @@ class DBS {
   * - __Expansions__ - Expands _bind_ variables that contain an array of values when they appear in the SQL statement. For example, an SQL statement with a section that contains
   * `IN (:someParam)` and _binds_ of `{ someParam: [1,2,3] }` would become `IN (:someParam, :someParam1, :someParam2)` with _binds_ of `{ someParam: 1, someParam1: 2, SomeParam2: 3 }`
   * - __Dialects__ - Replaces SQL segments that contain an open `[[! myDialectName]]` and closing `[[!]]` with the SQL content that is between the opening and closing _dialect_ tags
-  * when the {@link Manager~ConnectionOptions} contains the designated _dialect_ name (`myDialectName` in this case). For example, 
+  * when the {@link SQLERConnectionOptions} contains the designated _dialect_ name (`myDialectName` in this case). For example, 
   * `[[! oracle]] SOME_COL = SUBSTR(SOME_COL, 1, 1) [[!]] [[! mssql]] SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1) [[!]]`
   * would become `SOME_COL = SUBSTR(SOME_COL, 1, 1)` when using an `oracle` dialect, `SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1)` when using an `mssql` dialect and omitted using any
   * other dialect.
   * - __Versions__ - Replaces SQL segments that contain an open `[[version = 1]]` and closing `[[version]]` with the SQL content that is between the opening and closing _version_ tags
-  * when the {@link Manager~ConnectionOptions} contains a _version_ that satisfys the comparative operator for the version within the tag designator. For example,
-  * `[[version <= 1]] SOME_OLD_COL [[version]] [[version > 1]] SOME_NEW_COL [[version]]` would become `SOME_OLD_COL` using a {@link Manager~ConnectionOptions} _version_ that is less than
+  * when the {@link SQLERConnectionOptions} contains a _version_ that satisfys the comparative operator for the version within the tag designator. For example,
+  * `[[version <= 1]] SOME_OLD_COL [[version]] [[version > 1]] SOME_NEW_COL [[version]]` would become `SOME_OLD_COL` using a {@link SQLERConnectionOptions} _version_ that is less than
   * or equal to `1`, but woud become `SOME_NEW_COL` when the _version_ is greater than `1`.
   * - __Fragments__ - Replaces SQL segments that contain an open `[[? someKey]]` and closing `[[?]]` with the SQL content that is between the opening and closing _fragment_ tags when
   * the `keys` contain the designated fragment identifier. For example, `WHERE SOME_COL1 = 1 [[? someKey]] AND SOME_COL2 = 2 [[?]]` would become `WHERE SOME_COL1 = 1 AND SOME_COL2 = 2`
@@ -968,7 +968,7 @@ class DBS {
   }
 
   /**
-   * @returns {Manager~State} The managed state of the {@link Dialect}
+   * @returns {SQLERState} The managed state of the {@link Dialect}
    */
   get state() {
     const dbs = internal(this);
@@ -1008,7 +1008,7 @@ function generateGUID(value, hyphenate = true) {
 }
 
 /**
- * @see Manager~InterpolateFunction
+ * @see SQLERInterpolateFunction
  * @private
  */
 function interpolate(dest, source, interpolator, validator, onlyInterpolated, _vpths) {
@@ -1056,7 +1056,7 @@ function interpolate(dest, source, interpolator, validator, onlyInterpolated, _v
 }
 
 /**
- * @see Manager~PositionalBindsFunction
+ * @see SQLERPositionalBindsFunction
  * @private
  */
 function positionalBinds(sql, bindsObject, bindsArray, placeholder = '?') {

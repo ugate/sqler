@@ -574,4 +574,4 @@ try {
 > __It's imperative that `unprepare` (or `commit`/`rollback` when using a [transaction](#tx)) is called when using [`prepareStatement = true` is set](Manager.html#~ExecOptions) since the underlying connection is typically left open until the `unprepare` function is invoked. Not doing so could quickly starve available connections! It's also equally important not to have more __active__ prepared statements in progress than what is available in the connection pool that is being used by the underlying dialect.__
 
 #### 🗄️ Caching SQL <sub id="cache"></sub>:
-By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#Cache) container into the [Manager constructor](Manager.html#Manager).
+By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#SQLERCache) container into the [Manager constructor](Manager.html#Manager).

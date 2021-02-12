@@ -153,7 +153,7 @@ class TestDialect extends Dialect {
 
 /**
  * Expects a track to contain the implmented fields
- * @param {Manager~Track} track The track to expect
+ * @param {SQLERTrack} track The track to expect
  */
 function expectTrack(track) {
   expect(track, 'track').to.be.object();
@@ -163,7 +163,7 @@ function expectTrack(track) {
 
 /**
  * Expects a track to contain the implmented `interpolate` field
- * @param {Manager~Track} track The track to expect
+ * @param {SQLERTrack} track The track to expect
  */
 function expectInterpolate(track) {
   expect(track.interpolate, 'track.interpolate').to.be.function();
@@ -248,7 +248,7 @@ function expectInterpolate(track) {
 /**
  * Throws any test errors that may be desired
  * @param {TestDialect} dialect The dialect to use
- * @param {Manager~ExecOpts} opts The {@link Manager~ExecOpts}
+ * @param {SQLERExecOpts} opts The {@link SQLERExecOpts}
  */
 function handleThrowError(dialect, opts) {
   if (UtilOpts.driverOpt('throwExecError', opts, dialect.connConf).value) {
@@ -267,7 +267,7 @@ function handleThrowError(dialect, opts) {
 
 /**
  * Expects a track to contain the implmented `interpolate` field
- * @param {Manager~Track} track The track to expect
+ * @param {SQLERTrack} track The track to expect
  */
 function expectPositionalBinds(track) {
   expect(track.positionalBinds, 'track.positionalBinds').to.be.function();
@@ -333,7 +333,7 @@ function expectBinds(dialect, sql, opts) {
 /**
  * Expects options
  * @param {TestDialect} dialect The dialect instance being tested
- * @param {Manager~ExecOptions} opts The expected options
+ * @param {SQLERExecOptions} opts The expected options
  * @param {String} operation The operation origin
  */
 function expectOpts(dialect, opts, operation) {
@@ -347,8 +347,8 @@ function expectOpts(dialect, opts, operation) {
 /**
  * Expects binds that should have been expanded into multiple binds are persent
  * @param {String} sql The SQL being validated
- * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
- * @param {Manager~ExecOptions} xopts The {@link Manager~ExecOptions} that are being validated against
+ * @param {SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
+ * @param {SQLERExecOptions} xopts The {@link SQLERExecOptions} that are being validated against
  */
 function expectExpansionBinds(sql, opts, xopts) {
   if (!xopts.binds || !/IN[\s\n\r]*\(/.test(sql)) return;
@@ -385,8 +385,8 @@ function expectRawSubstitutes(dialect, sql) {
 /**
  * Expects the `opts.driverOptions.substitutes` to be substituted in the SQL statement
  * @param {String} sql The SQL being validated
- * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
- * @param {Manager~ConnectionOptions} xopts The {@link Manager~ExecOptions} that are being validated against
+ * @param {SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
+ * @param {SQLERConnectionOptions} xopts The {@link SQLERExecOptions} that are being validated against
  */
 function expectSqlSubstitutes(sql, opts, connConf) {
   expect(sql).to.not.contain('[[!');
@@ -414,7 +414,7 @@ function expectSqlSubstitutes(sql, opts, connConf) {
 /**
  * Expects the fragments to be substituted in the SQL statement (if any)
  * @param {String} sql The SQL being validated
- * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
+ * @param {SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
  * @param {String[]} frags The fragments that are being validated
  */
 function expectFrags(dialect, sql, opts, frags) {
@@ -445,8 +445,8 @@ function expectFrags(dialect, sql, opts, frags) {
  * Expects transaction and/or prepared statement options and sets the result functions that are
  * expected in the execution results
  * @param {TestDialect} dialect The dialect instance
- * @param {Manager~ExecOptions} opts The {@link Manager~ExecOptions} that are being validated
- * @param {Manager~ExecMeta} meta The {@link Manager~ExecOptions}
+ * @param {SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
+ * @param {SQLERExecMeta} meta The {@link SQLERExecOptions}
  * @param {Object} rslt The result where `commit`, `rollback` and/or `prepare` will be set
  */
 function expectTransactionPreparedStatement(dialect, opts, meta, rslt) {

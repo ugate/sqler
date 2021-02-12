@@ -25,10 +25,10 @@ class UtilSql {
    * @param {Object} priv The private storage
    * @param {Object} conf The manager configuration
    * @param {Object} [initOpts] The initialization options
-   * @param {Cache} [initOpts.cache] The cache to use for the manager
+   * @param {SQLERCache} [initOpts.cache] The cache to use for the manager
    * @param {Function} [initOpts.logger] A custom logger to use for the manager
    * @param {Manager} [initOpts.mgr] The manager to initialize
-   * @param {Boolean} [initOpts.skipPrepFuncs] Truthy to skip {@link Manager~PreparedFunction} validation
+   * @param {Boolean} [initOpts.skipPrepFuncs] Truthy to skip {@link SQLERPreparedFunction} validation
    * @param {Boolean} [initOpts.returnErrors] Override value passed into {@link Manager.init}
    */
   static async initManager(priv, conf, initOpts = {}) {
@@ -121,15 +121,15 @@ class UtilSql {
   }
 
   /**
-   * Tests that `read` SQL statements work with and w/o {@link Cache} by re-writting the SQL file to see if the cahce picks it up
+   * Tests that `read` SQL statements work with and w/o {@link SQLERCache} by re-writting the SQL file to see if the cahce picks it up
    * @param {Manager} mgr The {@link Manager} that will be used
    * @param {String} connName The connection name to use
    * @param {Object} [testReadOpts] Options specific to the test read
-   * @param {Cache} [testReadOpts.cache] the {@link Cache} that will be used for SQL statements
-   * @param {Object} [testReadOpts.cacheOpts] the options that were used on the specified {@link Cache}
-   * @param {Manager~ConnectionOptions} [testReadOpts.connOpts] The {@link Manager~ConnectionOptions} that was used
-   * @param {Manager~ExecOptions} [testReadOpts.execOpts] The {@link Manager~ExecOptions} to use (leave `undefined` to create)
-   * @param {(Manager~ExecErrorOptions | Boolean)} [testReadOpts.errorOpts] Value passed into the {@link Manager~PreparedFunction}
+   * @param {SQLERCache} [testReadOpts.cache] the {@link SQLERCache} that will be used for SQL statements
+   * @param {Object} [testReadOpts.cacheOpts] the options that were used on the specified {@link SQLERCache}
+   * @param {SQLERConnectionOptions} [testReadOpts.connOpts] The {@link SQLERConnectionOptions} that was used
+   * @param {SQLERExecOptions} [testReadOpts.execOpts] The {@link SQLERExecOptions} to use (leave `undefined` to create)
+   * @param {(SQLERExecErrorOptions | Boolean)} [testReadOpts.errorOpts] Value passed into the {@link SQLERPreparedFunction}
    * @param {Object} [testReadOpts.prepFuncPaths] Override the path(s) to the prepared function that resides on the {@link Manager}
    * @param {String} [testReadOpts.prepFuncPaths.read='read.some.tables'] Override path from the `mgr.db[connName]` to the prepared function that will be executed for a file
    * that is prefixed with `read`
@@ -233,7 +233,7 @@ class UtilSql {
   }
 
   /**
-   * Tests for version substitutions using the `version` defined in the {@link Manager~ConnectionOptions}.
+   * Tests for version substitutions using the `version` defined in the {@link SQLERConnectionOptions}.
    * @param {Object} priv The private dataspace
    * @param {Manager} priv.mgr The {@link Manager} to use
    * @param {Number} version The version that will be set on the connection options
@@ -263,7 +263,7 @@ class UtilSql {
    * @param {Manager} mgr The manager
    * @param {String} connName The connection name to use
    * @param {Object} conf The {@link UtilOpts.getConf} object
-   * @param {Manager~ExecOptions} [xopts] The execution options
+   * @param {SQLERExecOptions} [xopts] The execution options
    * @param {Object} [testOpts={}] The test options
    * @param {Boolean} [testOpts.noTransaction] Truthy to skip `beginTransaction` (should throw an error)
    */
@@ -364,7 +364,7 @@ class UtilSql {
 
   /**
    * Expects a transaction (or `undefined` when not a transaction)
-   * @param {Manager~ExecResults} rslt The results from a {@link Manager~PreparedFunction} for a CUD invocation
+   * @param {SQLERExecResults} rslt The results from a {@link SQLERPreparedFunction} for a CUD invocation
    * @param {Boolean} [notExpected] Flag indicating the transaction should __NOT__ be expected
    * @param {String} [label] The label to use for the expect
    */
@@ -380,7 +380,7 @@ class UtilSql {
 
   /**
    * Expects a prepared statement (or `undefined` when not a prepared statement)
-   * @param {Manager~ExecResults} rslt The results from a {@link Manager~PreparedFunction} for a CUD invocation
+   * @param {SQLERExecResults} rslt The results from a {@link SQLERPreparedFunction} for a CUD invocation
    * @param {Boolean} [notExpected] Flag indicating the transaction should __NOT__ be expected
    * @param {String} [label] The label to use for the expect
    */
@@ -395,11 +395,11 @@ class UtilSql {
   /**
    * Tests if the specified operation and operation result
    * @param {String} type The type of manager operation to test (e.g. `close`, etc.)
-   * @param {(Manager | Object)} opd Either the {@link Manager} or a {@link Manager~ExecResults}
+   * @param {(Manager | Object)} opd Either the {@link Manager} or a {@link SQLERExecResults}
    * @param {String} connName The connection name to use
    * @param {*} expected The expected result
    * @param {String} [label] A label to use for the operation
-   * @param {Manager~OperationOptions} [opts] The opearion options
+   * @param {SQLEROperationOptions} [opts] The opearion options
    * @param {Boolean} [allConnections] Truthy to perform on all connections rather than just the passed connection
    * @returns {Object} The operation result
    */
