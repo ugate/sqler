@@ -146,7 +146,7 @@ class Tester {
     return UtilSql.testVersions(test, 2, [2, 3, 4], -1, 0, 1);
   }
 
-  static async execOptsAutoCommitFalseTransactionIdMissing() {
+  static async execOptsAutoCommitFalseTransactionMissing() {
     const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
     await UtilSql.initManager(test, conf);
 
@@ -154,6 +154,16 @@ class Tester {
     xopts.autoCommit = false;
     // no transaction started should throw error
     await UtilSql.testCUD(test.mgr, connName, conf, xopts, { noTransaction: true });
+  }
+
+  static async execOptsAutoCommitFalseTransactionIdMissing() {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
+    await UtilSql.initManager(test, conf);
+
+    const xopts = UtilOpts.createExecOpts();
+    xopts.autoCommit = false;
+    // no transaction started should throw error
+    await UtilSql.testCUD(test.mgr, connName, conf, xopts, { noTransactionId: true });
   }
 
   static async execOptsPreparedStatements() {

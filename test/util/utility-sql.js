@@ -266,6 +266,7 @@ class UtilSql {
    * @param {SQLERExecOptions} [xopts] The execution options
    * @param {Object} [testOpts={}] The test options
    * @param {Boolean} [testOpts.noTransaction] Truthy to skip `beginTransaction` (should throw an error)
+   * @param {Boolean} [testOpts.noTransactionId] Truthy to set the `transaction.id` to null (should throw an error)
    */
   static async testCUD(mgr, connName, conf, xopts, testOpts = {}) {
     const testState = { pending: 0 };
@@ -290,91 +291,98 @@ class UtilSql {
 
     let rslt, label;
 
+    let tx, txLabel = `execOptions.autoCommit=${autoCommit}`;
     if (!autoCommit) {
       xopts = xopts || {};
-      if (!testOpts.noTransaction) {
-        xopts.transactionId = await mgr.db[connName].beginTransaction(testOpts.transactionOptions);
-        expect(xopts.transactionId, 'xopts.transactionId').to.be.string();
-        expect(xopts.transactionId, 'xopts.transactionId').to.not.be.empty();
+      if (!testOpts.noTransaction || testOpts.noTransactionId) {
+        txLabel = testOpts.noTransactionId ? `${txLabel}, transaction.id=null` : txLabel;
+        txLabel = `Transaction object from await mgr.db.${connName}.beginTransaction() (${txLabel})`;
+        xopts.transaction = tx = await mgr.db[connName].beginTransaction(testOpts.transactionOptions);
+        tx.id = testOpts.noTransactionId ? null : tx.id;
+      } else {
+        txLabel = `No transaction (testOpts.noTransaction=${testOpts.noTransaction}, ${txLabel})`;
       }
+    } else {
+      txLabel = `No transaction (${txLabel})`;
     }
+    if (!testOpts.noTransactionId) { // bypass transaction check when testing null tranasaction IDs (should throw in that case)
+      UtilSql.expectTransaction(tx, autoCommit, txLabel);
+    }
+  
     const orignalName = xopts && xopts.name;
 
-    label = `CREATE mgr.db.${connName}.finance.create.annual.report()`;
+    label = `CREATE mgr.db.${connName}.finance.create.annual.report() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.create.annual.report(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
-    UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
-    label = `READ mgr.db.${connName}.finance.read.annual.report()`;
+    label = `READ mgr.db.${connName}.finance.read.annual.report() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.read.annual.report(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.array();
     expect(rslt.rows, `${label} result rows.length`).to.be.length(2); // two records should be returned w/o order by
-    UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
     
     if (xopts.prepareStatement) await rslt.unprepare();
 
-    label = `UPDATE mgr.db.${connName}.finance.ap.update.audits()`;
+    label = `UPDATE mgr.db.${connName}.finance.ap.update.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ap.update.audits(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
-    UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
-    label = `DELETE mgr.db.${connName}.finance.ap.delete.audits()`;
+    label = `DELETE mgr.db.${connName}.finance.ap.delete.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
-    UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
-    label = `UPDATE mgr.db.${connName}.finance.ar.update.audits()`;
+    label = `UPDATE mgr.db.${connName}.finance.ar.update.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ar.update.audits(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
-    UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
-    label = `DELETE mgr.db.${connName}.finance.ar.delete.audits()`;
+    label = `DELETE mgr.db.${connName}.finance.ar.delete.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
     expect(rslt, `${label} result`).to.be.object();
     expect(rslt.rows, `${label} result rows`).to.be.undefined();
-    UtilSql.expectTransaction(rslt, autoCommit, label);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     if (!xopts) xopts.name = orignalName;
 
-    if (!autoCommit) await rslt.commit();
+    if (!autoCommit) await tx.commit();
   }
 
   /**
    * Expects a transaction (or `undefined` when not a transaction)
-   * @param {SQLERExecResults} rslt The results from a {@link SQLERPreparedFunction} for a CUD invocation
+   * @param {SQLERTransaction} tx The results from a {@link SQLERPreparedFunction} for a CUD invocation
    * @param {Boolean} [notExpected] Flag indicating the transaction should __NOT__ be expected
    * @param {String} [label] The label to use for the expect
    */
-  static expectTransaction(rslt, notExpected, label = '') {
+  static expectTransaction(tx, notExpected, label = '') {
     if (notExpected) {
-      expect(rslt.commit,`${label} result commit`).to.be.undefined();
-      expect(rslt.rollback,`${label} result rollback`).to.be.undefined();
+      expect(tx, `${label} transaction`).to.be.undefined();
     } else {
-      expect(rslt.commit,`${label} result commit`).to.be.function();
-      expect(rslt.rollback,`${label} result rollback`).to.be.function();
+      expect(tx, `${label} transaction`).to.not.be.undefined();
+      expect(tx, `${label} transaction`).to.be.object();
+      expect(tx.id, `${label} transaction.id`).to.be.string();
+      expect(tx.id, `${label} transaction.id`).to.not.be.empty();
+      expect(tx.commit,`${label} transaction.commit`).to.be.function();
+      expect(tx.rollback,`${label} transaction.rollback`).to.be.function();
     }
   }
 

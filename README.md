@@ -103,7 +103,7 @@ VALUES (:company, :name, :payGroup, :taxAccount, :taxAcctUnit);
 // using the same setup as the read example...
 
 // execute within the an implicit transaction scope
-// (i.e. autoCommit === true w/o transactionId)
+// (i.e. autoCommit === true w/o transaction)
 const rslts = await mgr.db.fin.create.ap.company({
   autoCommit: true, // <--- could omit since true is default
   binds: {
@@ -149,31 +149,31 @@ const acctOpts = {
   }
 };
 
-let exc1, exc2;
+let tx;
 try {
   // start a transaction
-  const txId = await mgr.db.fin.beginTransaction();
+  tx = await mgr.db.fin.beginTransaction();
 
-  // set the transaction ID on the execution options
+  // set the transaction on the execution options
   // so the company/account SQL execution is invoked
   // within the same transaction scope
-  coOpts.transactionId = txId;
-  acctOpts.transactionId = txId;
+  coOpts.transaction = tx;
+  acctOpts.transaction = tx;
 
   // execute within the a transaction scope
-  // (i.e. autoCommit === false and transactionId = txId)
-  exc1 = await mgr.db.fin.create.ap.company(coOpts);
+  // (i.e. autoCommit === false and transaction = tx)
+  const exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
   // execute within the same transaction scope
-  // (i.e. autoCommit === false and transactionId = txId)
-  exc2 = await mgr.db.fin.create.ap.account(acctOpts);
+  // (i.e. autoCommit === false and transaction = tx)
+  const exc2 = await mgr.db.fin.create.ap.account(acctOpts);
 
-  // can commit using either exc1.commit() or exc2.commit()
-  await exc1.commit();
+  // use the transaction to commit the changes
+  await tx.commit();
 } catch (err) {
-  if (exc1) {
-    // can rollback using either exc1.rollback() or exc2.rollback()
-    await exc1.rollback();
+  if (tx) {
+    // use the transaction to rollback the changes
+    await tx.rollback();
   }
   throw err;
 }

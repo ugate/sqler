@@ -332,11 +332,11 @@ class SQLS {
    */
   async prepared(name, fpth, ext) {
     const sqls = internal(this);
-    if (sqls.at.conn.logging) sqls.at.conn.logging(`Generating prepared statement for ${fpth} at name ${name}`);
+    if (sqls.at.conn.logging) sqls.at.conn.logging(`Generating prepared function for ${fpth} at name ${name}`);
     let crud = Path.parse(fpth).name.match(/[^\.]*/)[0].toUpperCase();
     if (!CRUD_TYPES.includes(crud)) crud = null;
     if (sqls.at.conn.logging) {
-      sqls.at.conn.logging(`Generating prepared statement for ${fpth} at name ${name}${
+      sqls.at.conn.logging(`Generating prepared function for ${fpth} at name ${name}${
         crud ? '' : ` (statement execution must include "opts.type" set to one of ${CRUD_TYPES.join(',')} since the SQL file path is not prefixed with the type)`}`);
     }
     // cache the SQL statement capture in order to accommodate dynamic file updates on expiration
@@ -412,10 +412,10 @@ class SQLS {
       };
       if (opts && opts.driverOptions) xopts.driverOptions = opts.driverOptions;
       if (opts && opts.prepareStatement) xopts.prepareStatement = !!opts.prepareStatement;
-      if (opts && opts.transactionId) xopts.transactionId = opts.transactionId;
-      if (!xopts.autoCommit && !xopts.transactionId && !xopts.prepareStatement) {
-        throw new Error(`SQL execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = false" and` +
-        ` "opts.prepareStatement = false". Try setting "opts.transactionId = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
+      if (opts && opts.transaction) xopts.transaction = opts.transaction;
+      if (!xopts.autoCommit && (!xopts.transaction || !xopts.transaction.id) && !xopts.prepareStatement) {
+        throw new Error(`SQL execution at "${fpth}" must include "opts.transaction" when "opts.autoCommit = false" and` +
+        ` "opts.prepareStatement = false". Try setting "opts.transaction = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
       }
       return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(name, fpth, xopts, frags, errorOpts));
     };
@@ -514,13 +514,11 @@ class DBS {
   /**
    * Begins a transaction
    * @param {SQLERTransactionOptions} [opts={}] The passed transaction options
-   * @returns {String} The transaction identifier
+   * @returns {SQLERTransaction} The transaction that has been started
    */
   async beginTransaction(opts) {
     const dbs = internal(this);
-    const txId = generateGUID();
-    await dbs.at.dialect.beginTransaction(txId, opts || {});
-    return txId;
+    return dbs.at.dialect.beginTransaction(generateGUID(), opts || {});
   }
 
   /**
@@ -936,9 +934,9 @@ let internal = function (object) {
  * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
  * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
  * until the returned {@link SQLERExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
- * @property {String} [transactionId] A transaction identifier returned from a prior call to `manager.db.myConnectionName.beginTransaction()` that will be used when executing
- * the {@link SQLERPreparedFunction}. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections
- * used by other transactions that may also be in progress. The ID is ignored when there is no transaction in progress with the specified ID.
+ * @property {SQLERTransaction} [transaction] A transaction returned from a prior call to `manager.db.myConnectionName.beginTransaction()` that will be used when executing the {@link SQLERPreparedFunction}.
+ * The generated `transaction.id` helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also
+ * be in progress. The transaction is ignored when there is no transaction in progress with the specified `transaction.id`.
  * @property {Boolean} [prepareStatement] Truthy to generate or use an existing prepared statement for the SQL being executed via the {@link SQLERPreparedFunction}.
  * Prepared statements _may_ help optimize SQL that is executed many times across the same connection with similar or different bind values.
  * __Care must be taken not to drain the connection pool since the connection remains open until the SQL executions have completed and `unprepare` has been called on the {@link SQLERExecResults}.__
@@ -977,24 +975,34 @@ let internal = function (object) {
  */
 
 /**
- * Results returned from invoking a {@link SQLERPreparedFunction}
+ * Results returned from invoking a {@link SQLERPreparedFunction}.
+ * __NOTE: Either `transaction.commit` or `trnasaction.rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transaction` is supplied to ensue underlying connections are
+ * completed and closed.__
  * @typedef {Object} SQLERExecResults
  * @property {Object[]} [rows] The execution array of model objects representing each row or `undefined` when executing a non-read SQL statement.
- * @property {Function} [commit] A no-argument _async_ function that commits any outstanding transactions. Will not be available when the {@link SQLERExecOptions} `autoCommit` is _truthy_
- * or when the {@link SQLERPreparedFunction} is called without a valid `transactionId`.
- * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transactionId` is supplied to ensue underlying connections are completed and closed.__
- * @property {Function} [rollback] A no-argument _async_ function that rollbacks any outstanding transactions. Will not be available when the {@link SQLERExecOptions} `autoCommit` is _truthy_
- * or when the {@link SQLERPreparedFunction} is called without a valid `transactionId`.
- * __NOTE: Either `commit` or `rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transactionId` is supplied to ensue underlying connections are completed and closed.__
  * @property {Function} [unprepare] A no-argument _async_ function that unprepares an outstanding prepared statement. Will not be available when the {@link SQLERPreparedFunction} is called
- * when the specified `prepareStatement` is _falsy_ on the {@link SQLERExecOptions} passed into the {@link SQLERPreparedFunction}.
+ * when the specified `prepareStatement` is _falsy_ on the {@link SQLERExecOptions} passed into the {@link SQLERPreparedFunction}. When a prepared statement is used in conjunction with a
+ * {@link SQLERTransaction} `transaction` on the {@link SQLERExecOptions}, `unprepare` will be implicitly called when `transaction.commit` or `transaction.rollback` are called (of course,
+ * `unprepare` can still be explicitly called as well).
  * __NOTE: A call to `unprepare` must be invoked when a `prepareStatement` is _truthy_ to ensue underlying statements and/or connections are completed and closed.__
  * @property {Error} [error] Any caught error that occurred when a {@link SQLERPreparedFunction} was invoked with the `errorOpts` flag set to a _truthy_ value.
  * @property {Object} raw The raw results from the execution (driver-specific execution results).
  */
 
 /**
- * Transaction options that can be passed into a `manager.connectionName.beginTransaction(transactionDriverOptions)` function.
+ * Transaction that symbolizes a unit of work performed within a {@link Manager} connection.
+ * @typedef {Object} SQLERTransaction
+ * @property {String} id The unique identifier for the transaction.
+ * @property {Function} commit A no-argument _async_ function that commits the outstanding transaction.
+ * @property {Function} rollback A no-argument _async_ function that rollbacks the outstanding transaction.
+ * @property {Object} state The state of the transaction
+ * @property {Boolean} state.isCommitted True when the transaction has been committed.
+ * @property {Boolean} state.isRolledback True when the transaction has been rolledback.
+ * @property {Integer} state.pending The number of pending SQL statements executed within the scope of the given transaction.
+ */
+
+/**
+ * Options for a {@link SQLERTransaction} that can be passed into a `manager.connectionName.beginTransaction(transactionDriverOptions)` function.
  * @typedef {Object} SQLERTransactionOptions
  */
 

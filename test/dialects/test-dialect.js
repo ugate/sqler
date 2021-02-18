@@ -16,6 +16,7 @@ class TestDialect extends Dialect {
     super(priv, connConf, track, errorLogger, logger, debug);
     this.transactions = new Map();
     this.preparedStatements = new Map();
+    this.preparedStatementsInTransactions = new Map();
 
     expect(priv, 'priv').to.be.object();
     expect(priv.host, 'priv.host').to.be.string();
@@ -68,16 +69,62 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async beginTransaction(txId, opts) {
-    if (!this.transactions.has(txId)) this.transactions.set(txId, { pending: 0 });
+    let tx;
+    if (!this.transactions.has(txId)) {
+      const dialect = this;
+      tx = {
+        id: txId,
+        commit: async () => {
+          const pss = dialect.preparedStatementsInTransactions.get(this.id);
+          if (pss) {
+            for (let ps of pss) {
+              dialect.preparedStatements.delete(ps.id);
+            }
+          }
+          dialect.transactions.delete(this.id);
+        },
+        rollback: async () => {
+          const pss = dialect.preparedStatementsInTransactions.get(this.id);
+          if (pss) {
+            for (let ps of pss) {
+              dialect.preparedStatements.delete(ps.id);
+            }
+          }
+          dialect.transactions.delete(this.id);
+        },
+        state: {
+          pending: 0
+        }
+      };
+      this.transactions.set(tx.id, tx);
+    } else {
+      tx = this.transactions.get(txId);
+    }
     expect(opts, 'transaction options').to.be.object();
+    return tx;
   }
 
   /**
-   * @inheritdoc
+   * Test preapre 
    */
   async prepare(psId, opts) {
-    if (!this.preparedStatements.has(psId)) this.preparedStatements.set(psId, { pending: 0 });
+    try {
+      throw new Error(`psId=${psId}, opts=${JSON.stringify(opts)}`);
+    } catch (err) {
+      console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', err);
+    }
     expect(opts, 'prepared statement options').to.be.object();
+    let ps = this.preparedStatements.has(psId) ? this.preparedStatements.get(psId) : null;
+    if (!ps) {
+      this.preparedStatements.set(psId, ps = { id: psId, pending: 0 });
+    }
+    if (opts.transaction) {
+      if (this.preparedStatementsInTransactions.has(opts.transaction.id)) {
+        this.preparedStatementsInTransactions.get(opts.transaction.id).push(ps);
+      } else {
+        this.preparedStatementsInTransactions.set(opts.transaction.id, [ ps ]);
+      }
+    }
   }
 
   /**
@@ -131,8 +178,9 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async close() {
-    this.transactions = new Map();
-    this.preparedStatements = new Map();
+    this.transactions.clear();
+    this.preparedStatements.clear();
+    this.preparedStatementsInTransactions.clear();
     return 1;
   }
 
@@ -142,7 +190,7 @@ class TestDialect extends Dialect {
   get state() {
     const rtn = { pending: 0 };
     for (let [id, tx] of this.transactions) {
-      rtn.pending += tx.pending;
+      rtn.pending += tx.state.pending;
     }
     for (let [id, ps] of this.preparedStatements) {
       rtn.pending += ps.pending;
@@ -454,24 +502,16 @@ function expectTransactionPreparedStatement(dialect, opts, meta, rslt) {
 
   // transaction checks
   if (!opts.hasOwnProperty('autoCommit') || !opts.autoCommit) {
-    expect(opts.transactionId, 'opts.transactionId').to.be.string();
-    expect(opts.transactionId, 'opts.transactionId').to.not.be.empty();
+    expect(opts.transaction, 'opts.transaction').to.be.object();
+    expect(opts.transaction.id, 'opts.transaction.id').to.be.string();
+    expect(opts.transaction.id, 'opts.transaction.id').to.not.be.empty();
 
-    const connLabel = `this.transactions.get('${opts.transactionId}') (beginTransaction called?)`;
-    tx = dialect.transactions.get(opts.transactionId);
+    const connLabel = `this.transactions.get('${opts.transaction.id}') (beginTransaction called?)`;
+    tx = dialect.transactions.get(opts.transaction.id);
     expect(tx, connLabel).to.not.be.undefined();
     expect(tx, connLabel).to.not.be.null();
 
-    tx.pending++;
-    
-    rslt.commit = async () => {
-      if (ps) dialect.preparedStatements.delete(meta.name);
-      dialect.transactions.delete(opts.transactionId);
-    };
-    rslt.rollback = async () => {
-      if (ps) dialect.preparedStatements.delete(meta.name);
-      dialect.transactions.delete(opts.transactionId);
-    };
+    tx.state.pending++;
   }
 
   if (opts.prepareStatement) {
@@ -480,7 +520,14 @@ function expectTransactionPreparedStatement(dialect, opts, meta, rslt) {
     expect(ps, connLabel).to.not.be.undefined();
     expect(ps, connLabel).to.not.be.null();
     
-    if (!tx) ps.pending++;
+    if (!tx) {
+      ps.pending++;
+    } else {
+      const pstxLabel = `this.preparedStatementsInTransactions.get('${tx.id}') (prepare called?)`;
+      const pstx = dialect.preparedStatementsInTransactions.get(tx.id);
+      expect(pstx, pstxLabel).to.not.be.undefined();
+      expect(pstx, pstxLabel).to.not.be.null();
+    }
 
     rslt.unprepare = async () => {
       dialect.preparedStatements.delete(meta.name);
