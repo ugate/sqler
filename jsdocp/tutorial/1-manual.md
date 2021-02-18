@@ -296,7 +296,7 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
 #### 🎬 Transactions <sub id="tx"></sub>:
-[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](global.html#SQLERTransactionOptions) argument and returns a unique [Transaction](global.html#SQLERTransaction) with an ID that can be passed as the `transaction` option in subsequent [Prepared Function](global.html#SQLERPreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Each generated [Prepared Function](global.html#SQLERPreparedFunction) that is invoked will return a [result](global.html#SQLERExecResults) that contains two functions used to finalize a transaction:
+[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](global.html#SQLERTransactionOptions) argument and returns a unique [Transaction](global.html#SQLERTransaction) with an ID that can be passed as the `transaction` option in subsequent [Prepared Function](global.html#SQLERPreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Amoung other properties, each [Transaction](global.html#SQLERTransaction) contains the following functions used to finalize a transaction:
 
 - `commit` - Commits any pending changes from one or more previously invoked SQL script
 - `rollback` - Rolls back any pending changes from one or more previously invoked SQL script
@@ -317,7 +317,7 @@ const coOpts = {
 const exec1 = await mgr.db.fin.create.ap.company(coOpts);
  ```
 
- Lets say there are multiple SQL scripts that need to be included in a single transaction. To do so, the `autoCommit` flag can be set to _true_ on the last transaction being executed. Also, to ensure every SQL script that is executed be performed within the same transaction scope, a `transaction` should be set to the same value for every SQL execution that needs to be included within the same transaction. Calling `manager.db.myConnectionName.beginTransaction()` will generate/return a unique tranaction identifier that can be passed into each [prepared function](global.html#SQLERPreparedFunction) [options](global.html#SQLERExecOptions).
+ Lets say there are multiple SQL scripts that need to be included in a single transaction. To do so, the `autoCommit` flag can be set to _true_ on the last transaction being executed. Also, to ensure every SQL script that is executed be performed within the same transaction scope, a `transaction` should be set to the same value for every SQL execution that needs to be included within the same transaction. Calling `manager.db.myConnectionName.beginTransaction()` will generate/return a unique [transaction](global.html#SQLERTransaction) that can be passed into each [prepared function](global.html#SQLERPreparedFunction) [options](global.html#SQLERExecOptions).
 
 ```js
 // autCommit = false requires a transaction to be set
@@ -416,7 +416,7 @@ try {
 }
 ```
 
-The previous transaction examples execute the SQL script in _series_, but they can also be executed in _parallel_. However, doing so requires that all the SQL executions use the same `transaction` and that `autoCommit` is set to _false_ since executing in _parallel_ does not guarantee the order in which the SQL scripts are executed.
+The previous transaction examples execute the SQL script in _series_, but they can also be executed in _parallel_. However, doing so requires that all the SQL executions use the same `transaction` and that `autoCommit` is set to _false_ since __executing in _parallel_ does not guarantee the order in which the SQL scripts are executed__.
 
 ```js
 // autCommit = false will cause a transaction to be started
@@ -514,7 +514,7 @@ try {
 }
 ```
 
-Prepared statements can also be contained within a [transaction](#tx). When doing so, calls to `commit` or `rollback` will _implicitly_ call `unprepare` from the [execution result](global.html#SQLERExecResults).
+Prepared statements can also be contained within a [transaction](#tx). When doing so, calls to `commit` or `rollback` on the [transaction](global.html#SQLERTransaction) will _implicitly_ call `unprepare` for each [execution result](global.html#SQLERExecResults) that used the same [transaction](global.html#SQLERTransaction) on the [execution options](global.html#SQLERExecOptions) that is passed into the [prepared function](global.html#SQLERPreparedFunction).
 
 ```js
 // autCommit = false will cause a transaction to be started
@@ -543,7 +543,7 @@ try {
   // start a transaction
   tx = await mgr.db.fin.beginTransaction();
 
-  // set the transaction ID on the execution options
+  // set the transaction on the execution options
   // so the company/account SQL execution is invoked
   // within the same transaction scope
   coOpts1.transaction = tx;
