@@ -296,7 +296,7 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
 #### 🎬 Transactions <sub id="tx"></sub>:
-[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](global.html#SQLERTransactionOptions) argument and returns a unique [Transaction](global.html#SQLERTransaction) with an ID that can be passed as the `transaction` option in subsequent [Prepared Function](global.html#SQLERPreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Amoung other properties, each [Transaction](global.html#SQLERTransaction) contains the following functions used to finalize a transaction:
+[Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `await manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](global.html#SQLERTransactionOptions) argument and returns a unique [Transaction](global.html#SQLERTransaction) with an ID that can be passed as the `transactionId` option in subsequent [Prepared Function](global.html#SQLERPreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Amoung other properties, each [Transaction](global.html#SQLERTransaction) contains the following functions used to finalize a transaction:
 
 - `commit` - Commits any pending changes from one or more previously invoked SQL script
 - `rollback` - Rolls back any pending changes from one or more previously invoked SQL script
@@ -317,7 +317,7 @@ const coOpts = {
 const exec1 = await mgr.db.fin.create.ap.company(coOpts);
  ```
 
- Lets say there are multiple SQL scripts that need to be included in a single transaction. To do so, the `autoCommit` flag can be set to _true_ on the last transaction being executed. Also, to ensure every SQL script that is executed be performed within the same transaction scope, a `transaction` should be set to the same value for every SQL execution that needs to be included within the same transaction. Calling `manager.db.myConnectionName.beginTransaction()` will generate/return a unique [transaction](global.html#SQLERTransaction) that can be passed into each [prepared function](global.html#SQLERPreparedFunction) [options](global.html#SQLERExecOptions).
+ Lets say there are multiple SQL scripts that need to be included in a single transaction. To do so, the `autoCommit` flag can be set to _true_ on the last transaction being executed. Also, to ensure every SQL script that is executed be performed within the same transaction scope, a `transactionId` should be set to the same value for every SQL execution that needs to be included within the same transaction. Calling `const tx = await manager.db.myConnectionName.beginTransaction()` will generate/return a [transaction](global.html#SQLERTransaction) that contains a unique `id` that can be passed into each [prepared function](global.html#SQLERPreparedFunction) [options](global.html#SQLERExecOptions).
 
 ```js
 // autCommit = false requires a transaction to be set
@@ -343,19 +343,19 @@ try {
   // start a transaction
   tx = await mgr.db.fin.beginTransaction();
 
-  // set the transaction on the execution options
+  // set the transaction ID on the execution options
   // so the company/account SQL execution is invoked
   // within the same transaction scope
-  coOpts.transaction = tx;
-  acctOpts.transaction = tx;
+  coOpts.transactionId = tx.id;
+  acctOpts.transactionId = tx.id;
 
   // execute within a transaction scope
-  // (i.e. autoCommit = false and transaction = tx)
+  // (i.e. autoCommit = false and transactionId = tx.id)
   const exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
   // execute within the same transaction scope
   // and commit after the satement has executed
-  // (i.e. autoCommit = true and transaction = tx)
+  // (i.e. autoCommit = true and transactionId = tx.id)
   const exc2 = await mgr.db.fin.create.ap.account(acctOpts);
 } catch (err) {
   if (tx) {
@@ -391,18 +391,18 @@ try {
   // start a transaction
   tx = await mgr.db.fin.beginTransaction();
 
-  // set the transaction on the execution options
+  // set the transaction ID on the execution options
   // so the company/account SQL execution is invoked
   // within the same transaction scope
-  coOpts.transaction = tx;
-  acctOpts.transaction = tx;
+  coOpts.transactionId = tx.id;
+  acctOpts.transactionId = tx.id;
 
   // execute within the a transaction scope
-  // (i.e. autoCommit = false and transaction = tx)
+  // (i.e. autoCommit = false and transactionId = tx.id)
   const exc1 = await mgr.db.fin.create.ap.company(coOpts);
 
   // execute within the same transaction scope
-  // (i.e. autoCommit = false and transaction = tx)
+  // (i.e. autoCommit = false and transactionId = tx.id)
   const exc2 = await mgr.db.fin.create.ap.account(acctOpts);
 
   // use the transaction to commit the changes
@@ -441,18 +441,18 @@ try {
   // start a transaction
   tx = await mgr.db.fin.beginTransaction();
 
-  // set the transaction on the execution options
+  // set the transaction ID on the execution options
   // so the company/account SQL execution is invoked
   // within the same transaction scope
-  coOpts.transaction = tx;
-  acctOpts.transaction = tx;
+  coOpts.transactionId = tx.id;
+  acctOpts.transactionId = tx.id;
 
   // execute within the same transaction scope
-  // (i.e. autoCommit = false and transaction = tx)
+  // (i.e. autoCommit = false and transactionId = tx.id)
   const coProm = mgr.db.fin.create.ap.company(coOpts);
 
   // execute within the same transaction scope
-  // (i.e. autoCommit = false and transaction = tx)
+  // (i.e. autoCommit = false and transactionId = tx.id)
   const acctProm = mgr.db.fin.create.ap.account(acctOpts);
 
   // wait for the parallel executions to complete
@@ -543,14 +543,14 @@ try {
   // start a transaction
   tx = await mgr.db.fin.beginTransaction();
 
-  // set the transaction on the execution options
+  // set the transaction ID on the execution options
   // so the company/account SQL execution is invoked
   // within the same transaction scope
-  coOpts1.transaction = tx;
-  coOpts2.transaction = tx;
+  coOpts1.transactionId = tx.id;
+  coOpts2.transactionId = tx.id;
 
   // execute within the same transaction scope
-  // (i.e. autoCommit === false, transaction = tx, prepareStatement = true)
+  // (i.e. autoCommit === false, transactionId = tx.id, prepareStatement = true)
   const coProm1 = mgr.db.fin.create.ap.company(coOpts1);
   const coProm2 = mgr.db.fin.create.ap.account(coOpts2);
 

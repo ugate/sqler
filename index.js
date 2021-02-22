@@ -412,10 +412,10 @@ class SQLS {
       };
       if (opts && opts.driverOptions) xopts.driverOptions = opts.driverOptions;
       if (opts && opts.prepareStatement) xopts.prepareStatement = !!opts.prepareStatement;
-      if (opts && opts.transaction) xopts.transaction = opts.transaction;
-      if (!xopts.autoCommit && (!xopts.transaction || !xopts.transaction.id) && !xopts.prepareStatement) {
-        throw new Error(`SQL execution at "${fpth}" must include "opts.transaction" when "opts.autoCommit = false" and` +
-        ` "opts.prepareStatement = false". Try setting "opts.transaction = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction()"`);
+      if (opts && opts.transactionId) xopts.transactionId = opts.transactionId;
+      if (!xopts.autoCommit && !xopts.transactionId && !xopts.prepareStatement) {
+        throw new Error(`SQL execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = false" and` +
+        ` "opts.prepareStatement = false". Try setting "const tx = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction(); opts.transactionId = tx.id"`);
       }
       return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(name, fpth, xopts, frags, errorOpts));
     };
@@ -761,6 +761,7 @@ function positionalBinds(sql, bindsObject, bindsArray, placeholder = '?') {
   });
 }
 
+/** @type {SQLERExports} */
 module.exports = Object.freeze({ Manager, Dialect });
 
 // private mapping
@@ -774,6 +775,13 @@ let internal = function (object) {
     this: object
   };
 };
+
+/**
+ * `sqler` exports
+ * @typedef {Object} SQLERExports
+ * @property {Manager} Manager The {@link Manager} class
+ * @property {Dialect} Dialect The {@link Dialect} class
+ */
 
 /**
  * The `cache` client responsible for regulating the frequency in which a SQL file is read by a {@link Manager}.
@@ -926,7 +934,9 @@ let internal = function (object) {
  */
 
 /**
- * Options that are passed to generated {@link SQLERPreparedFunction}
+ * Options that are passed to generated {@link SQLERPreparedFunction}.
+ * __NOTE: Either `transaction.commit` or `trnasaction.rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transactionId` is supplied to ensue underlying connections are
+ * completed and closed.__
  * @typedef {Object} SQLERExecOptions
  * @property {String} [name] A name to assign to the execution.
  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
@@ -934,9 +944,9 @@ let internal = function (object) {
  * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
  * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
  * until the returned {@link SQLERExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
- * @property {SQLERTransaction} [transaction] A transaction returned from a prior call to `manager.db.myConnectionName.beginTransaction()` that will be used when executing the {@link SQLERPreparedFunction}.
- * The generated `transaction.id` helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also
- * be in progress. The transaction is ignored when there is no transaction in progress with the specified `transaction.id`.
+ * @property {String} [transactionId] A transaction ID returned from a prior call to `const tx = await manager.db.myConnectionName.beginTransaction(); options.transactionId = tx.id` that will be used when
+ * executing the {@link SQLERPreparedFunction}. The generated `transactionId` helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database
+ * connections used by other transactions that may also be in progress. The `transactionId` is ignored when there is no transaction in progress with the specified `transactionId`.
  * @property {Boolean} [prepareStatement] Truthy to generate or use an existing prepared statement for the SQL being executed via the {@link SQLERPreparedFunction}.
  * Prepared statements _may_ help optimize SQL that is executed many times across the same connection with similar or different bind values.
  * __Care must be taken not to drain the connection pool since the connection remains open until the SQL executions have completed and `unprepare` has been called on the {@link SQLERExecResults}.__
@@ -976,13 +986,11 @@ let internal = function (object) {
 
 /**
  * Results returned from invoking a {@link SQLERPreparedFunction}.
- * __NOTE: Either `transaction.commit` or `trnasaction.rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transaction` is supplied to ensue underlying connections are
- * completed and closed.__
  * @typedef {Object} SQLERExecResults
  * @property {Object[]} [rows] The execution array of model objects representing each row or `undefined` when executing a non-read SQL statement.
  * @property {Function} [unprepare] A no-argument _async_ function that unprepares an outstanding prepared statement. Will not be available when the {@link SQLERPreparedFunction} is called
  * when the specified `prepareStatement` is _falsy_ on the {@link SQLERExecOptions} passed into the {@link SQLERPreparedFunction}. When a prepared statement is used in conjunction with a
- * {@link SQLERTransaction} `transaction` on the {@link SQLERExecOptions}, `unprepare` will be implicitly called when `transaction.commit` or `transaction.rollback` are called (of course,
+ * {@link SQLERTransaction} `transactionId` on the {@link SQLERExecOptions}, `unprepare` will be implicitly called when `transaction.commit` or `transaction.rollback` are called (of course,
  * `unprepare` can still be explicitly called as well).
  * __NOTE: A call to `unprepare` must be invoked when a `prepareStatement` is _truthy_ to ensue underlying statements and/or connections are completed and closed.__
  * @property {Error} [error] Any caught error that occurred when a {@link SQLERPreparedFunction} was invoked with the `errorOpts` flag set to a _truthy_ value.

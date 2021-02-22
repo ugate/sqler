@@ -1,5 +1,6 @@
 'use strict';
 
+/** @type {import('../..').SQLERExports} */
 const { Manager, Dialect } = require('../../index');
 const UtilOpts = require('../util/utility-options');
 const { expect } = require('@hapi/code');
@@ -74,7 +75,7 @@ class TestDialect extends Dialect {
       const dialect = this;
       tx = {
         id: txId,
-        commit: async () => {
+        commit: async function() {
           const pss = dialect.preparedStatementsInTransactions.get(this.id);
           if (pss) {
             for (let ps of pss) {
@@ -83,7 +84,7 @@ class TestDialect extends Dialect {
           }
           dialect.transactions.delete(this.id);
         },
-        rollback: async () => {
+        rollback: async function() {
           const pss = dialect.preparedStatementsInTransactions.get(this.id);
           if (pss) {
             for (let ps of pss) {
@@ -102,29 +103,6 @@ class TestDialect extends Dialect {
     }
     expect(opts, 'transaction options').to.be.object();
     return tx;
-  }
-
-  /**
-   * Test preapre 
-   */
-  async prepare(psId, opts) {
-    try {
-      throw new Error(`psId=${psId}, opts=${JSON.stringify(opts)}`);
-    } catch (err) {
-      console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!', err);
-    }
-    expect(opts, 'prepared statement options').to.be.object();
-    let ps = this.preparedStatements.has(psId) ? this.preparedStatements.get(psId) : null;
-    if (!ps) {
-      this.preparedStatements.set(psId, ps = { id: psId, pending: 0 });
-    }
-    if (opts.transaction) {
-      if (this.preparedStatementsInTransactions.has(opts.transaction.id)) {
-        this.preparedStatementsInTransactions.get(opts.transaction.id).push(ps);
-      } else {
-        this.preparedStatementsInTransactions.set(opts.transaction.id, [ ps ]);
-      }
-    }
   }
 
   /**
@@ -147,6 +125,8 @@ class TestDialect extends Dialect {
       expectRawSubstitutes(dialect, sql);
       expectFrags(dialect, sql, opts, frags);
       expectSqlSubstitutes(sql, opts, dialect.connConf, frags);
+
+      if (opts && opts.prepareStatement) prepare(dialect, meta.name, opts);
       if (!TestDialect.BYPASS_NEXT_EXEC_OPTS_CHECK) expectTransactionPreparedStatement(dialect, opts, meta, rslt);
 
       // set rows
@@ -200,8 +180,29 @@ class TestDialect extends Dialect {
 }
 
 /**
+ * Test preapred statement
+ * @param {TestDialect} dialect The test dialect
+ * @param {String} psId The unique prepared statement ID
+ * @param {import('../..').SQLERExecOptions} opts The execution options
+ */
+async function prepare(dialect, psId, opts) {
+  expect(opts, 'prepared statement options').to.be.object();
+  let ps = dialect.preparedStatements.has(psId) ? dialect.preparedStatements.get(psId) : null;
+  if (!ps) {
+    dialect.preparedStatements.set(psId, ps = { id: psId, pending: 0 });
+  }
+  if (opts.transactionId) {
+    if (dialect.preparedStatementsInTransactions.has(opts.transactionId)) {
+      dialect.preparedStatementsInTransactions.get(opts.transactionId).push(ps);
+    } else {
+      dialect.preparedStatementsInTransactions.set(opts.transactionId, [ ps ]);
+    }
+  }
+}
+
+/**
  * Expects a track to contain the implmented fields
- * @param {SQLERTrack} track The track to expect
+ * @param {import('../..').SQLERTrack} track The track to expect
  */
 function expectTrack(track) {
   expect(track, 'track').to.be.object();
@@ -211,7 +212,7 @@ function expectTrack(track) {
 
 /**
  * Expects a track to contain the implmented `interpolate` field
- * @param {SQLERTrack} track The track to expect
+ * @param {import('../..').SQLERTrack} track The track to expect
  */
 function expectInterpolate(track) {
   expect(track.interpolate, 'track.interpolate').to.be.function();
@@ -296,7 +297,7 @@ function expectInterpolate(track) {
 /**
  * Throws any test errors that may be desired
  * @param {TestDialect} dialect The dialect to use
- * @param {SQLERExecOpts} opts The {@link SQLERExecOpts}
+ * @param {import('../..').SQLERExecOptions} opts The {@link SQLERExecOptions}
  */
 function handleThrowError(dialect, opts) {
   if (UtilOpts.driverOpt('throwExecError', opts, dialect.connConf).value) {
@@ -315,7 +316,7 @@ function handleThrowError(dialect, opts) {
 
 /**
  * Expects a track to contain the implmented `interpolate` field
- * @param {SQLERTrack} track The track to expect
+ * @param {import('../..').SQLERTrack} track The track to expect
  */
 function expectPositionalBinds(track) {
   expect(track.positionalBinds, 'track.positionalBinds').to.be.function();
@@ -363,6 +364,12 @@ function expectImmutable(name, obj, prop) {
   expect(error, `${name}.${prop} immutable (error)`).to.be.error();
 }
 
+/**
+ * Expects binds
+ * @param {TestDialect} dialect The dialect instance being tested
+ * @param {String} sql The SQL statement
+ * @param {import('../..').SQLERExecOptions} opts The execution options
+ */
 function expectBinds(dialect, sql, opts) {
   const xopts = UtilOpts.createExecOpts();
 
@@ -381,7 +388,7 @@ function expectBinds(dialect, sql, opts) {
 /**
  * Expects options
  * @param {TestDialect} dialect The dialect instance being tested
- * @param {SQLERExecOptions} opts The expected options
+ * @param {import('../..').SQLERExecOptions} opts The expected options
  * @param {String} operation The operation origin
  */
 function expectOpts(dialect, opts, operation) {
@@ -395,8 +402,8 @@ function expectOpts(dialect, opts, operation) {
 /**
  * Expects binds that should have been expanded into multiple binds are persent
  * @param {String} sql The SQL being validated
- * @param {SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
- * @param {SQLERExecOptions} xopts The {@link SQLERExecOptions} that are being validated against
+ * @param {import('../..').SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
+ * @param {import('../..').SQLERExecOptions} xopts The {@link SQLERExecOptions} that are being validated against
  */
 function expectExpansionBinds(sql, opts, xopts) {
   if (!xopts.binds || !/IN[\s\n\r]*\(/.test(sql)) return;
@@ -417,7 +424,7 @@ function expectExpansionBinds(sql, opts, xopts) {
 /**
  * Expect raw substitutions
  * @param {TestDialect} dialect The dialect instance
- * @param {Strin} sql The SQL being validated
+ * @param {String} sql The SQL being validated
  */
 function expectRawSubstitutes(dialect, sql) {
   if (dialect.connConf.substitutes) {
@@ -433,8 +440,8 @@ function expectRawSubstitutes(dialect, sql) {
 /**
  * Expects the `opts.driverOptions.substitutes` to be substituted in the SQL statement
  * @param {String} sql The SQL being validated
- * @param {SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
- * @param {SQLERConnectionOptions} xopts The {@link SQLERExecOptions} that are being validated against
+ * @param {import('../..').SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
+ * @param {import('../..').SQLERConnectionOptions} xopts The {@link SQLERExecOptions} that are being validated against
  */
 function expectSqlSubstitutes(sql, opts, connConf) {
   expect(sql).to.not.contain('[[!');
@@ -462,7 +469,7 @@ function expectSqlSubstitutes(sql, opts, connConf) {
 /**
  * Expects the fragments to be substituted in the SQL statement (if any)
  * @param {String} sql The SQL being validated
- * @param {SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
+ * @param {import('../..').SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
  * @param {String[]} frags The fragments that are being validated
  */
 function expectFrags(dialect, sql, opts, frags) {
@@ -493,8 +500,8 @@ function expectFrags(dialect, sql, opts, frags) {
  * Expects transaction and/or prepared statement options and sets the result functions that are
  * expected in the execution results
  * @param {TestDialect} dialect The dialect instance
- * @param {SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
- * @param {SQLERExecMeta} meta The {@link SQLERExecOptions}
+ * @param {import('../..').SQLERExecOptions} opts The {@link SQLERExecOptions} that are being validated
+ * @param {import('../..').SQLERExecMeta} meta The {@link SQLERExecOptions}
  * @param {Object} rslt The result where `commit`, `rollback` and/or `prepare` will be set
  */
 function expectTransactionPreparedStatement(dialect, opts, meta, rslt) {
@@ -502,12 +509,11 @@ function expectTransactionPreparedStatement(dialect, opts, meta, rslt) {
 
   // transaction checks
   if (!opts.hasOwnProperty('autoCommit') || !opts.autoCommit) {
-    expect(opts.transaction, 'opts.transaction').to.be.object();
-    expect(opts.transaction.id, 'opts.transaction.id').to.be.string();
-    expect(opts.transaction.id, 'opts.transaction.id').to.not.be.empty();
+    expect(opts.transactionId, 'opts.transactionId').to.be.string();
+    expect(opts.transactionId, 'opts.transactionId').to.not.be.empty();
 
-    const connLabel = `this.transactions.get('${opts.transaction.id}') (beginTransaction called?)`;
-    tx = dialect.transactions.get(opts.transaction.id);
+    const connLabel = `this.transactions.get('${opts.transactionId}') (beginTransaction called?)`;
+    tx = dialect.transactions.get(opts.transactionId);
     expect(tx, connLabel).to.not.be.undefined();
     expect(tx, connLabel).to.not.be.null();
 
@@ -535,4 +541,5 @@ function expectTransactionPreparedStatement(dialect, opts, meta, rslt) {
   }
 }
 
+/** @type {TestDialect} */
 module.exports = TestDialect;

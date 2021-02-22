@@ -297,8 +297,8 @@ class UtilSql {
       if (!testOpts.noTransaction || testOpts.noTransactionId) {
         txLabel = testOpts.noTransactionId ? `${txLabel}, transaction.id=null` : txLabel;
         txLabel = `Transaction object from await mgr.db.${connName}.beginTransaction() (${txLabel})`;
-        xopts.transaction = tx = await mgr.db[connName].beginTransaction(testOpts.transactionOptions);
-        tx.id = testOpts.noTransactionId ? null : tx.id;
+        tx = await mgr.db[connName].beginTransaction(testOpts.transactionOptions);
+        xopts.transactionId = testOpts.noTransactionId ? null : tx.id;
       } else {
         txLabel = `No transaction (testOpts.noTransaction=${testOpts.noTransaction}, ${txLabel})`;
       }

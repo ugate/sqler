@@ -154,11 +154,11 @@ try {
   // start a transaction
   tx = await mgr.db.fin.beginTransaction();
 
-  // set the transaction on the execution options
+  // set the transaction ID on the execution options
   // so the company/account SQL execution is invoked
   // within the same transaction scope
-  coOpts.transaction = tx;
-  acctOpts.transaction = tx;
+  coOpts.transactionId = tx.id;
+  acctOpts.transactionId = tx.id;
 
   // execute within the a transaction scope
   // (i.e. autoCommit === false and transaction = tx)
