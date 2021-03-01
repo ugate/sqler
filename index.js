@@ -530,7 +530,7 @@ class DBS {
   * @param {String[]} frags The frament keys within the SQL that will be retained
   * @param {(SQLERExecErrorOptions | Boolean)} [errorOpts] Truthy to return any errors thrown during execution rather than throwing them.
   * Can also pass {@link SQLERExecErrorOptions} for more control over execution errors.
-  * @returns {Dialect~ExecResults} The execution results
+  * @returns {SQLERExecResults} The execution results
   */
   async exec(name, fpth, sql, opts, frags, errorOpts) {
     const dbs = internal(this);
