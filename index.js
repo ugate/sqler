@@ -549,7 +549,9 @@ class DBS {
         eopts.binds = errorOpts && errorOpts.includeBindValues ? eopts.binds : Object.keys(opts.binds);
         if (dbs.at.errorLogging) {
           dbs.at.errorLogging(`SQL ${eopts.name ? `named "${eopts.name}" at ` : ''
-          }${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(eopts)}, state: ${dbs.at.dialect.state})`);
+          }${fpth} failed ${err.message || JSON.stringify(err)} (options: ${JSON.stringify(eopts)}, state: ${
+            JSON.stringify(dbs.at.dialect.state)
+          })`);
         }
         err[MOD_KEY] = err[MOD_KEY] || {};
         err[MOD_KEY].name = name;
@@ -572,7 +574,9 @@ class DBS {
       throw err;
     }
     if (dbs.at.logging) {
-      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.rows && rslt.rows.length) || 0} records (options: ${JSON.stringify(opts)}, state: ${dbs.at.dialect.state})`);
+      dbs.at.logging(`SQL ${fpth} returned with ${(rslt && rslt.rows && rslt.rows.length) || 0} records (options: ${JSON.stringify(opts)}, state: ${
+        JSON.stringify(dbs.at.dialect.state)
+      })`);
     }
     return rslt;
   }
