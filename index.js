@@ -15,6 +15,7 @@ const COMPARE = Object.freeze({
   '>=': function gteq(x, y) { return x >= y; },
   '<>': function noteq(x, y) { return x !== y; }
 });
+const POS_BINDS_REGEXP = /(?<!:):(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g;
 const MOD_KEY = 'sqler'; // module key used for the object namespace on errors and logging
 const NS = 'db'; // namespace on Manager where SQL functions will be added
 
@@ -139,6 +140,14 @@ class Manager {
    */
   static get OPERATION_TYPES() {
     return CRUD_TYPES;
+  }
+
+  /**
+   * @returns {RegExp} A regular expression that globally matches each _named bind parameters_ in a SQL statement. A single capture group is defined for each parameter name (match on entire bind name
+   * syntax)
+   */
+  static get POSITIONAL_BINDS_REGEXP() {
+    return POS_BINDS_REGEXP;
   }
 }
 
@@ -756,7 +765,7 @@ function interpolate(dest, source, interpolator, validator, onlyInterpolated, _v
  */
 function positionalBinds(sql, bindsObject, bindsArray, placeholder = '?') {
   const func = typeof placeholder === 'function' ? placeholder : null;
-  return sql.replace(/(?<!:):(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g, (match, pname) => {
+  return sql.replace(POS_BINDS_REGEXP, (match, pname) => {
     if (!bindsObject.hasOwnProperty(pname)) throw new Error(`sqler: Unbound "${pname}" at position ${
       bindsArray.length
     } found during positional bind formatting`);
