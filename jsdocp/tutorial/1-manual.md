@@ -581,16 +581,23 @@ Since `sqler` expects SQL files to be defined prior to [initialization](Manager.
  1. Add/generate SQL files before [Manager.init](Manager.html#init)
  1. Add/generate SQL files, then add the connection for them later using [Manager.addConnection](Manager.html#addConnection)
 
-If using any of the forementioned strategies isn't enough:
+If using any of the forementioned strategies isn't enough, SQL files can be changed and either the SQL key can be dropped from the cache or the entire cache can be removed (and alternately set back):
 ```js
 // see SQLERCache for setting up a cache
 const mgr = new Manager(conf, cache);
 await mgr.init();
-// ... make some changes to the SQL files
+// ... make some changes to the SQL files here
 
-// drop the key from the cache
+// ===== Option 1 =====
+// drop the key from the cache for the SQL file
+// being changed
+const key = await mgr.getCacheKey('/absolute/path/to/sql/file.sql', 'myConnName');
 cache.drop(key);
-// alt, clear the entire cache so that the SQL
+
+// ===== Option 2 =====
+// clear the entire cache so that all SQL
 // files will be read on the next execution
-await mgr.setCache(null);
+await mgr.setCache(null, 'myConnName');
+// set the cache back?
+await mgr.setCache(cache, 'myConnName');
 ```

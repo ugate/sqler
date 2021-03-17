@@ -6,6 +6,8 @@ const IntervalCache = require('../cache/interval-cache');
 const UtilOpts = require('../util/utility-options');
 const UtilSql = require('../util/utility-sql');
 const Fs = require('fs');
+const Path = require('path');
+const { expect } = require('@hapi/code');
 const CACHE_READ_SQL_NAME = 'read.some.tables';
 const CACHE_READ_SQL_PATH = './test/db/read.some.tables.sql';
 // TODO : import { Labrat, LOGGER } from '@ugate/labrat';
@@ -122,6 +124,13 @@ class Tester {
     await test.mgr.setCache(cache, true);
     // also test setting the cache to itself - should be a noop
     await test.mgr.setCache(cache, true);
+
+    let cacheKey = await test.mgr.getCacheKey(CACHE_READ_SQL_PATH, connName);
+    expect(cacheKey, `getCacheKey for ${CACHE_READ_SQL_PATH}`).to.be.undefined();
+    const absPath = Path.resolve(CACHE_READ_SQL_PATH);
+    cacheKey = await test.mgr.getCacheKey(absPath, connName);
+    expect(cacheKey, `getCacheKey for ${absPath}`).to.be.string();
+    expect(cacheKey, `getCacheKey for ${absPath}`).to.not.be.empty();
 
     const orig = await Fs.promises.readFile(CACHE_READ_SQL_PATH, 'utf-8');
     try {

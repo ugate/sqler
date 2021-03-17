@@ -1,6 +1,15 @@
 'use strict';
 
-module.exports = {};
+const exported = Object.freeze({
+  MOD_KEY: 'sqler', // module key used for the object namespace on errors and logging
+  NS: 'db', // namespace on Manager where SQL functions will be added
+  CRUD_TYPES: Object.freeze(['CREATE', 'READ', 'UPDATE', 'DELETE']),
+  POS_BINDS_REGEXP: /(?<!:):(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g, // regexp for capturing named bind parameter names within SQL
+  FUNC_NAME_DIR_REGEXP: /[^0-9a-zA-Z]/g, // regexp for removing invalid chars from prepared function directory names
+  FUNC_NAME_FILE_REGEXP: /[^0-9a-zA-Z\.]/g, // regexp for removing invalid chars from prepared function file names
+  FUNC_NAME_SEPARATOR: '_' // separator for prepared function names (also used as the dir/filename replacement)
+});
+module.exports = exported;
 
 /**
  * @namespace typedefs
