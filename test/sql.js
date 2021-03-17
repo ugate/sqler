@@ -17,6 +17,7 @@ const TEST_TKO = 10000;
 const plan = `DB Manager`;
 
 // node test/lib/sql.js -NODE_ENV=test
+// node test/lib/sql.js someTestFunction -NODE_ENV=test
 
 // "node_modules/.bin/lab" test/sql.js -v
 // "node_modules/.bin/lab" test/sql.js -vi 1
@@ -30,6 +31,8 @@ lab.experiment(plan, () => {
 
   lab.test(`${plan}: Read`, { timeout: TEST_TKO }, Tester.read);
   lab.test(`${plan}: Read With Add Connection`, { timeout: TEST_TKO }, Tester.readWithAddConnection);
+  lab.test(`${plan}: Read With Set Cache Throw Error`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'setCache read throw' }, Tester.readWithSetCacheThrow));
+  lab.test(`${plan}: Read With Set Cache`, { timeout: TEST_TKO }, Tester.readWithSetCache);
   lab.test(`${plan}: Read Return Error`, { timeout: TEST_TKO }, Tester.readErrorReturn);
   lab.test(`${plan}: Read Throw Error`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'read throw' }, Tester.readErrorThrow));
   lab.test(`${plan}: Read With SQL Dialect Substitutions`, { timeout: TEST_TKO }, Tester.readWithSubstitutionsDialects);

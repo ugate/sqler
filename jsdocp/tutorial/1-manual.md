@@ -2,6 +2,7 @@
 The [Manager](Manager.html) is the entry point for one or more databases/connections. The manager basically consolidates each database connection(s) into a single API. One of the major advantages to this simplistic approach is that service calls from javascript to SQL and back can have no vendor-specific references. That translates into a clean seperation of concerns between the two, allowing SQL changes (or even database swapping) to be made without changing any javascript. In contrast to typical ORM solutions, optimations can be applied directly to the SQL scripts, eliminates javascript edits as SQL scripts evolve, removes the need to generate entity definitions and reduces the complexity of the supporting API (thus making it easier to implement and support additional database vendors/drivers).
 
 > TOC
+- [👀 Globals](global.html)
 - [⚙️ Setup &amp; Configuration](#conf)
 - [🗃️ SQL Files](#sqlf)
   - [1️⃣ Expanded SQL Substitutions](#es)
@@ -574,4 +575,22 @@ try {
 > __It's imperative that `unprepare` (or `commit`/`rollback` when using a [transaction](#tx)) is called when using [`prepareStatement = true` is set](global.html#SQLERExecOptions) since the underlying connection is typically left open until the `unprepare` function is invoked. Not doing so could quickly starve available connections! It's also equally important not to have more __active__ prepared statements in progress than what is available in the connection pool that is being used by the underlying dialect.__
 
 #### 🗄️ Caching SQL <sub id="cache"></sub>:
-By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache (see example)](global.html#SQLERCache) container into the [Manager constructor](Manager.html#Manager).
+By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache container (see example)](global.html#SQLERCache) into the [Manager constructor](Manager.html#Manager) or by calling [Manager.setCache](Manager.html#setCache).
+
+Since `sqler` expects SQL files to be defined prior to [initialization](Manager.html#init), there are several techniques that can be used to produce and maintain evolving SQL statements:
+ 1. Add/generate SQL files before [Manager.init](Manager.html#init)
+ 1. Add/generate SQL files, then add the connection for them later using [Manager.addConnection](Manager.html#addConnection)
+
+If using any of the forementioned strategies isn't enough:
+```js
+// see SQLERCache for setting up a cache
+const mgr = new Manager(conf, cache);
+await mgr.init();
+// ... make some changes to the SQL files
+
+// drop the key from the cache
+cache.drop(key);
+// alt, clear the entire cache so that the SQL
+// files will be read on the next execution
+await mgr.setCache(null);
+```

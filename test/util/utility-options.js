@@ -66,7 +66,7 @@ class UtilOpts {
   }
 
   /**
-   * @returns {Object} The test `substitutions` for {@link SQLERConnectionOptions}
+   * @returns {Object} The test `substitutions` for {@link typedefs.SQLERConnectionOptions}
    */
   static createSubstituteOpts() {
     // for testing purposes, the key should not be contained in the value (e.g. { SOME_OTHER_DB: 'SOME_OTHER_DB_TEST' })
@@ -152,10 +152,10 @@ class UtilOpts {
   /**
    * Checks if a specified driver option is present and returns the value when present
    * @param {String} opt The option to check for
-   * @param {SQLERExecOptions} execOpts The execution options being passed
-   * @param {SQLERConnectionOptions} connConf The connection configuration being used
+   * @param {typedefs.SQLERExecOptions} execOpts The execution options being passed
+   * @param {typedefs.SQLERConnectionOptions} connConf The connection configuration being used
    * @returns {Object} The driver option details that contain the following properties:
-   * - `source` - _execution_ when the option came from the {@link SQLERExecOptions}, _connection_ when coming from the {@link SQLERConnectionOptions}
+   * - `source` - _execution_ when the option came from the {@link typedefs.SQLERExecOptions}, _connection_ when coming from the {@link typedefs.SQLERConnectionOptions}
    * or _undefined_ when the option is not found.
    * - `value` - The option value
    */

@@ -41,6 +41,7 @@
   },
   "files": [
     "/index.js",
-    "/lib/**/*"
+    "/lib/**/*",
+    "/typedefs.js"
   ]
 }

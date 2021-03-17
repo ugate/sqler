@@ -1,6 +1,7 @@
 'use strict';
 
 const Dialect = require('./lib/dialect');
+const typedefs = require('./typedefs');
 
 const Asynchro = require('asynchro');
 const Fs = require('fs');
@@ -16,27 +17,30 @@ const COMPARE = Object.freeze({
   '<>': function noteq(x, y) { return x !== y; }
 });
 const POS_BINDS_REGEXP = /(?<!:):(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g;
+const FUNC_NAME_DIR_REGEXP = /[^0-9a-zA-Z]/g;
+const FUNC_NAME_FILE_REGEXP = /[^0-9a-zA-Z\.]/g;
+const FUNC_NAME_SEPARATOR = '_';
 const MOD_KEY = 'sqler'; // module key used for the object namespace on errors and logging
 const NS = 'db'; // namespace on Manager where SQL functions will be added
 
 /**
  * The database(s) manager entry point that autogenerates/manages SQL execution functions from underlying SQL statement files.
- * Vendor-specific implementations should implement {@link Dialect} and pass the class or module path into the constructor as `conf.db.dialects.myDialectClassOrModulePath`.
+ * Vendor-specific implementations should implement {@link typedefs.Dialect} and pass the class or module path into the constructor as `conf.db.dialects.myDialectClassOrModulePath`.
  * See [README.md](index.html) for more details about SQL related features.
  * A manager will contain the following properties:
  * - `db` - The database accessible object where all of the constructed connections reside. For example
  * - `db.<CONN_NAME>` - There will be a property assigned for each database connection configured during construction. For example, when _<CONN_NAME>_ is _myConn_, the
  * manager instance will be accessible via _manager.db.myConn_.
- * - `db.<CONN_NAME>.<PREPARED_FUNC_PATHS>` The generated SQL executable {@link SQLERPreparedFunction}(s). Assuming a _<CONN_NAME>_ of _myConn_ and a path of
- * _/db/myConn/read.my.table.sql_, the accessible {@link SQLERPreparedFunction} may be accessible via _db.myConn.read.my.table()_.
- * - `db.<CONN_NAME>.beginTransaction` - A function that accepts a single {@link SQLERTransactionOptions} that begins a transaction for a given database connection pool.
+ * - `db.<CONN_NAME>.<PREPARED_FUNC_PATHS>` The generated SQL executable {@link typedefs.SQLERPreparedFunction}(s). Assuming a _<CONN_NAME>_ of _myConn_ and a path of
+ * _/db/myConn/read.my.table.sql_, the accessible {@link typedefs.SQLERPreparedFunction} may be accessible via _db.myConn.read.my.table()_.
+ * - `db.<CONN_NAME>.beginTransaction` - A function that accepts a single {@link typedefs.SQLERTransactionOptions} that begins a transaction for a given database connection pool.
  */
 class Manager {
 
   /**
-  * Creates a new database manager. Vendor-specific implementations should have constructors that accept properties defined by {@link Dialect}.
-  * @param {SQLERConfigurationOptions} conf The configuration options
-  * @param {SQLERCache} [cache] the {@link SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+  * Creates a new database manager. Vendor-specific implementations should have constructors that accept properties defined by {@link typedefs.Dialect}.
+  * @param {typedefs.SQLERConfigurationOptions} conf The configuration options
+  * @param {typedefs.SQLERCache} [cache] the {@link typedefs.SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
   * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
   * Pass `true` to use the console. Omit to disable logging altogether.
   */
@@ -74,18 +78,19 @@ class Manager {
 
   /**
    * Adds a connection configuration to the manager and initializes the database connection
-   * @param {SQLERConnectionOptions} conn The connection options that will be added to the manager
-   * @param {SQLERPrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
+   * @param {typedefs.SQLERConnectionOptions} conn The connection options that will be added to the manager
+   * @param {typedefs.SQLERPrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
    * into the constructor to make a `privPassedIntoConstructor[conn.id]` match.
-   * @param {SQLERCache} [cache] the {@link SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+   * @param {typedefs.SQLERCache} [cache] the {@link typedefs.SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
    * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
    * Pass `true` to use the console. Omit to disable logging altogether.
    * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
-   * @returns {SQLEROperationResults} The results
+   * @returns {typedefs.SQLEROperationResults} The results
    */
   async addConnection(conn, priv, cache, logging, returnErrors) {
     const mgr = internal(this);
     addConnectionToManager(mgr, conn, null, cache, logging, priv);
+    /** @type {typedefs.SQLEROperationResults} */
     const rslt = await operation(mgr, 'init', { returnErrors });
     if (returnErrors && rslt.errors && rslt.errors.length) {
       if (mgr.at.logError) {
@@ -100,11 +105,12 @@ class Manager {
   /**
    * Initializes the configured database connections
    * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
-   * @returns {SQLEROperationResults} The results
+   * @returns {typedefs.SQLEROperationResults} The results
    */
   async init(returnErrors) {
     const mgr = internal(this);
     if (mgr.at.isInit) throw new Error(`[${mgr.at.connNames.join()}] database(s) are already initialized`);
+    /** @type {typedefs.SQLEROperationResults} */
     const rslt = await operation(mgr, 'init', { returnErrors });
     mgr.at.isInit = true;
     if (returnErrors && rslt.errors && rslt.errors.length) {
@@ -118,10 +124,10 @@ class Manager {
   }
 
    /**
-   * Composes the {@link SQLERState} on either all the connections used by the manager or on the specified connection names.
-   * @param {SQLEROperationOptions} [opts] The {@link SQLEROperationOptions} to use
+   * Composes the {@link typedefs.SQLERState} on either all the connections used by the manager or on the specified connection names.
+   * @param {typedefs.SQLEROperationOptions} [opts] The {@link typedefs.SQLEROperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the check on (defaults to all connections)  
-   * @returns {SQLEROperationResults} The results
+   * @returns {typedefs.SQLEROperationResults} The results
    */
   async state(opts, ...connNames) {
     return operation(internal(this), 'state', opts, connNames);
@@ -129,10 +135,54 @@ class Manager {
  
   /**
    * Closes all database pools/connections/etc.
-   * @returns {SQLEROperationResults} The results
+   * @returns {typedefs.SQLEROperationResults} The results
    */
   async close() {
     return operation(internal(this), 'close');
+  }
+
+  /**
+   * Sets the caching mechanism that will be used that will determine the frequency of reading SQL source files
+   * @param {typedefs.SQLERCache} [cache] the {@link typedefs.SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+   * @param {Boolean} [isTransfer] Truthy when the passed `cache` is present and any existing SQL (either cached or non-cached) should be transferred to it (if any)
+   * @param {...String} connNames The connection names to set the cache for
+   * @returns {typedefs.SQLEROperationResults} The results, each `result[connectionName]` containing the number of cached keys transferred
+   */
+  async setCache(cache, isTransfer, ...connNames) {
+    return operation(internal(this), 'setCache', null, connNames, cache, isTransfer);
+  }
+
+  /**
+   * Generates a key used for caching SQL methods
+   * @param {String} dialect The database dialect
+   * @param {String} connName The connection name
+   * @param {String} methodName The SQL method name
+   * @param {String} ext The SQL file extension
+   * @returns {String} The key used for caching
+   */
+  generateCacheKey(dialect, connName, methodName, ext) {
+    return `${MOD_KEY}:${dialect}:${connName}:db:${methodName}:${ext}`;
+  }
+
+  /**
+   * Duplicates a SQL statement by sequentially incrementing _named bind parameters_ by appending an increacing numeric count to each bind parameter
+   * @example
+   * Manager.namedBindSequence('SELECT * FROM EXAMPLE X WHERE X.A = :a AND X.B = :b AND X.C = :c', 2);
+   * // produces:
+   * [
+   *   'SELECT * FROM EXAMPLE X WHERE X.A = :a1 AND X.B = :b1 AND X.C = :c1',
+   *   'SELECT * FROM EXAMPLE X WHERE X.A = :a2 AND X.B = :b2 AND X.C = :c2'
+   * ]
+   * @param {String} sql The SQL statement that contains the bind names that will be sequenced
+   * @param {Integer} count The total number of duplicates to make
+   * @returns {String[]} The SQL statements that have been duplicated with sequentially numeric suffixes
+   */
+  static namedBindSequence(sql, count) {
+    const rtn = new Array(count);
+    for (let i = 1; i <= count; i++) {
+      rtn[i] = sql.replace(POS_BINDS_REGEXP, match => `${match}${i}`);
+    }
+    return rtn;
   }
 
   /**
@@ -155,17 +205,21 @@ class Manager {
  * Adds a connection configuration to a manager
  * @private
  * @param {Manager} mgr The manager to add the connection to
- * @param {SQLERConnectionOptions} conn The connection options that will be added to the manager
+ * @param {typedefs.SQLERConnectionOptions} conn The connection options that will be added to the manager
  * @param {Integer} [index] The index at which the connection options will be added to
- * @param {SQLERCache} [cache] the {@link SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+ * @param {typedefs.SQLERCache} [cache] the {@link typedefs.SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
  * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
  * Pass `true` to use the console. Omit to disable logging altogether.
- * @param {SQLERPrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
+ * @param {typedefs.SQLERPrivateOptions} [priv] The private options that contain the connection credentials that should match `priv[conn.id]`. When omitted, an attempt to use the private options passed
  * into the constructor to make a `privPassedIntoConstructor[conn.id]` match.
  */
 function addConnectionToManager(mgr, conn, index, cache, logging, priv) {
   const isExpand = !index && !Number.isInteger(index);
-  let idx = index, dialect, dlct, privy;
+  let idx = index, dlct;
+  /** @type {typedefs.Dialect} */
+  let dialect;
+  /** @type {typedefs.SQLERPrivateOptions} */
+  let privy;
   if (isExpand) { // expand connections
     idx = mgr.at.sqls.length;
     mgr.at.connNames.length = ++mgr.at.sqls.length;
@@ -201,7 +255,7 @@ function addConnectionToManager(mgr, conn, index, cache, logging, priv) {
   // prepared SQL functions from file(s) that reside under the defined name and dialect (or "default" when dialect is flagged accordingly)
   if (mgr.this[NS][conn.name]) throw new Error(`Database connection ID ${conn.id} cannot have a duplicate name for ${conn.name}`);
   //if (reserved.includes(conn.name)) throw new Error(`Database connection name ${conn.name} for ID ${conn.id} cannot be one of the following reserved names: ${reserved}`);
-  mgr.at.sqls[idx] = new SQLS(NS, mgr.at.mainPath, cache, conn, (mgr.this[NS][conn.name] = {}), new DBS(dialect, conn));
+  mgr.at.sqls[idx] = new SQLS(NS, mgr.at.mainPath, cache, conn, (mgr.this[NS][conn.name] = {}), new DBS(dialect, conn), mgr.this.generateCacheKey.bind(mgr.this));
   mgr.at.connNames[idx] = conn.name;
 }
 
@@ -210,18 +264,19 @@ function addConnectionToManager(mgr, conn, index, cache, logging, priv) {
  * @private
  * @param {Manager} mgr The _internal_/private {@link Manager} store
  * @param {String} funcName The async function name to call on each {@link SQLS} instance
- * @param {SQLEROperationOptions} [opts] The {@link SQLEROperationOptions} to use
+ * @param {typedefs.SQLEROperationOptions} [opts] The {@link typedefs.SQLEROperationOptions} to use
  * @param {String[]} [connNames] The connection names to perform the opearion on (defaults to all connections)
- * @returns {SQLEROperationResults} The results
+ * @param {...any} [args] The arguments to pass into the function being called on the {@link SQLS} instance
+ * @returns {typedefs.SQLEROperationResults} The results
  */
-async function operation(mgr, funcName, opts, connNames) {
+async function operation(mgr, funcName, opts, connNames, ...args) {
   opts = opts || {};
   const cnl = (connNames && connNames.length) || 0;
   const ax = new Asynchro({}, opts.returnErrors ? false : true);
   const queue = sqli => {
-    const func = () => {
-      if (typeof sqli[funcName] === 'function') return sqli[funcName]();
-      return Promise.resolve(sqli[funcName]);
+    const func = (...args) => {
+      const rtn = typeof sqli[funcName] === 'function' ? sqli[funcName](...args) : sqli[funcName];
+      return rtn instanceof Promise ? rtn : Promise.resolve(rtn);
     };
     const name = sqli.connectionName;
     const hasConnOpts = opts.connections && opts.connections[name] && typeof opts.connections[name] === 'object';
@@ -229,11 +284,11 @@ async function operation(mgr, funcName, opts, connNames) {
     const hasErrorOverride = hasConnOpts && opts.connections[name].hasOwnProperty('returnErrors');
     const throws = hasErrorOverride && opts.connections[name].returnErrors ? false : true;
     if (hasSeriesOverride ? opts.connections[name].executeInSeries : opts.executeInSeries) {
-      if (hasErrorOverride) ax.seriesThrowOverride(name, throws, func);
-      else ax.series(name, func);
+      if (hasErrorOverride) ax.seriesThrowOverride(name, throws, func, ...args);
+      else ax.series(name, func, ...args);
     } else {
-      if (hasErrorOverride) ax.parallelThrowOverride(name, throws, func);
-      else ax.parallel(name, func);
+      if (hasErrorOverride) ax.parallelThrowOverride(name, throws, func, ...args);
+      else ax.parallel(name, func, ...args);
     }
   };
   for (let i = 0, l = mgr.at.sqls.length; i < l; ++i) {
@@ -246,7 +301,9 @@ async function operation(mgr, funcName, opts, connNames) {
     }
   }
   const result = await ax.run();
-  return { result, errors: ax.errors };
+  /** @type {typedefs.SQLEROperationResults} */
+  const rtn = { result, errors: ax.errors };
+  return rtn;
 }
 
 /**
@@ -258,14 +315,15 @@ class SQLS {
   /**
    * Reads all the prepared SQL definition files for a specified name directory and adds a function to execute the SQL file contents
    * @constructs SQLS
-   * @param {String} ns The namespace on the {@link Manager} where all {@link SQLERPreparedFunction} will be added
+   * @param {String} ns The namespace on the {@link Manager} where all {@link typedefs.SQLERPreparedFunction} will be added
    * @param {String} sqlBasePth the absolute path that SQL files will be included
-   * @param {SQLERCache} [cache] the {@link SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
-   * @param {SQLERConnectionOptions} conn options for the prepared statements
+   * @param {typedefs.SQLERCache} [cache] the {@link typedefs.SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+   * @param {typedefs.SQLERConnectionOptions} conn options for the prepared statements
    * @param {Object} db the object where SQL retrieval methods will be stored (by file name parts separated by a period- except the file extension)
    * @param {DBS} dbs the database service to use
+   * @param {Function} [generateCacheKey] The function that will be used to generate cache keys for storeing SQL statements
    */
-  constructor(ns, sqlBasePth, cache, conn, db, dbs) {
+  constructor(ns, sqlBasePth, cache, conn, db, dbs, generateCacheKey) {
     const sqls = internal(this);
     sqls.at.ns = ns;
     sqls.at.numOfPreparedFuncs = 0;
@@ -277,6 +335,7 @@ class SQLS {
     sqls.at.dateFormatter = conn.dateFormatter;
     sqls.at.db = db;
     sqls.at.dbs = dbs;
+    sqls.at.generateCacheKey = generateCacheKey;
     if (sqls.at.subs) for (let key in sqls.at.subs) {
       sqls.at.subrxs.push({ from: new RegExp(key, 'g'), to: sqls.at.subs[key] }); // turn text value into global regexp
     }
@@ -300,15 +359,16 @@ class SQLS {
             pth = Path.resolve(pdir, files[fi]);
             stat = await Fs.promises.stat(pth);
             if (stat && stat.isDirectory()) {
-              nm = files[fi].replace(/[^0-9a-zA-Z]/g, '_');
-              proms.push(prepare(cont[nm] = {}, `${pnm ? `${pnm}_` : ''}${nm}`, pth));
+              nm = files[fi].replace(FUNC_NAME_DIR_REGEXP, FUNC_NAME_SEPARATOR);
+              proms.push(prepare(cont[nm] = {}, `${pnm ? `${pnm}${FUNC_NAME_SEPARATOR}` : ''}${nm}`, pth));
               continue;
             }
             if (!files[fi].endsWith('.sql')) continue;
-            nm = files[fi].replace(/[^0-9a-zA-Z\.]/g, '_');
+            nm = files[fi].replace(FUNC_NAME_FILE_REGEXP, FUNC_NAME_SEPARATOR);
             ns = nm.split('.');
             ext = ns.pop();
-            nm = `${sqls.at.conn.dialect}_${sqls.at.conn.name}_${pnm ? `${pnm}_` : ''}${ns.join('_')}`;
+            nm = `${sqls.at.conn.dialect}${FUNC_NAME_SEPARATOR}${sqls.at.conn.name}${FUNC_NAME_SEPARATOR}${
+              pnm ? `${pnm}${FUNC_NAME_SEPARATOR}` : ''}${ns.join(FUNC_NAME_SEPARATOR)}`;
             for (let ni = 0, nl = ns.length, so = cont; ni < nl; ++ni) {
               if (ns[ni] === 'beginTransaction') throw new Error(`SQL "${fpth}" cannot contain reserved "beginTransaction"`);
               so[ns[ni]] = so[ns[ni]] || (ni < nl - 1 ? {} : await sqls.this.prepared(nm, pth, ext));
@@ -328,6 +388,7 @@ class SQLS {
     if (!isPrepared || !sqls.at.initResult) {
       sqls.at.initResult = await sqls.at.dbs.init({ numOfPreparedFuncs: sqls.at.numOfPreparedFuncs });
     }
+    await sqls.this.setCache(sqls.at.cache);
     return sqls.at.initResult;
   }
 
@@ -337,7 +398,7 @@ class SQLS {
    * @param {String} name the name of the SQL (excluding the extension)
    * @param {String} fpth the path to the SQL file to execute
    * @param {String} ext the file extension that will be used
-   * @returns {SQLERPreparedFunction} an `async function` that executes SQL statement(s)
+   * @returns {typedefs.SQLERPreparedFunction} an `async function` that executes SQL statement(s)
    */
   async prepared(name, fpth, ext) {
     const sqls = internal(this);
@@ -351,24 +412,28 @@ class SQLS {
     // cache the SQL statement capture in order to accommodate dynamic file updates on expiration
     sqls.at.stms = sqls.at.stms || { methods: {} };
     sqls.at.stms.methods[name] = {};
-    if (sqls.at.cache) {
-      const id = `${MOD_KEY}:db:${name}:${ext}`;
-      sqls.at.stms.methods[name][ext] = async function cachedSql(opts, execFn) { // execute the SQL statement with cached statements
-        let sql;
-        const cached = await sqls.at.cache.get(id);
-        if (!cached || !cached.item) {
-          if (sqls.at.conn.logging) sqls.at.conn.logging(`Refreshing cached ${fpth} at ID ${id}`);
-          sql = await readSqlFile();
-          sqls.at.cache.set(id, sql); // no need to await set
-        } else sql = cached.item;
-        return await execFn(sql);
-      };
-    } else {
+    sqls.at.stms.methods[name][ext] = { sql: null, key: generateGUID() };
+    sqls.at.stms.methods[name][ext].cached = async function cachedSql(opts, execFn) { // execute the SQL statement with cached statements
+      const key = sqls.at.generateCacheKey(sqls.at.conn.dialect, sqls.at.conn.name, name, ext);
+      const cached = await sqls.at.cache.get(key);
+      if (!cached || !cached.item) {
+        if (sqls.at.conn.logging) sqls.at.conn.logging(`Refreshing cached ${fpth} at ID ${key}`);
+        this.sql = await readSqlFile();
+        sqls.at.cache.set(key, this.sql); // no need to await set
+      } else this.sql = cached.item;
+      return await execFn(this.sql);
+    };
+    sqls.at.stms.methods[name][ext].nocache = async function staticSql(opts, execFn) { // execute the SQL statement with static statements
+      if (!this.sql) {
+        if (sqls.at.conn.logging) sqls.at.conn.logging(`Setting static ${fpth} at "${name}"`);
+        this.sql = await readSqlFile();
+      }
+      return await execFn(this.sql);
+    };
+
+    if (!sqls.at.cache) {
       if (sqls.at.conn.logging) sqls.at.conn.logging(`Setting static ${fpth} at "${name}"`);
-      const sql = await readSqlFile();
-      sqls.at.stms.methods[name][ext] = async function staticSql(opts, execFn) { // execute the SQL statement with static statements
-        return await execFn(sql);
-      };
+      sqls.at.stms.methods[name][ext].sql = await readSqlFile();
     }
     sqls.at.numOfPreparedFuncs++;
 
@@ -386,7 +451,7 @@ class SQLS {
 
     /**
     * Sets/formats SQL parameters and executes an SQL statement
-    * @see SQLERPreparedFunction
+    * @see typedefs.SQLERPreparedFunction
     */
     return async function execSqlPublic(opts, frags, errorOpts) {
       const binds = {}, mopt = { binds, opts: frags }, type = (opts && opts.type && opts.type.toUpperCase()) || crud;
@@ -426,8 +491,48 @@ class SQLS {
         throw new Error(`SQL execution at "${fpth}" must include "opts.transactionId" when "opts.autoCommit = false" and` +
         ` "opts.prepareStatement = false". Try setting "const tx = await manager.${sqls.at.ns}.${sqls.at.conn.name}.beginTransaction(); opts.transactionId = tx.id"`);
       }
-      return await sqls.at.stms.methods[name][ext](mopt, sqls.this.genExecSqlFromFileFunction(name, fpth, xopts, frags, errorOpts));
+      return await sqls.at.stms.methods[name][ext][sqls.at.cache ? 'cached' : 'nocache'](mopt, sqls.this.genExecSqlFromFileFunction(name, fpth, xopts, frags, errorOpts));
     };
+  }
+
+  /**
+   * Sets the caching mechenism
+   * @param {typedefs.SQLERCache} [cache] the {@link typedefs.SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
+   * @param {Boolean} [isTransfer] Truthy when the passed `cache` is present and any existing SQL (either cached or non-cached) should be transferred to it (if any)
+   * @returns {Integer} The number of transferred cached SQL statements
+   */
+  async setCache(cache, isTransfer) {
+    const sqls = internal(this);
+    if (sqls.at.conn.logging) {
+      sqls.at.conn.logging(`Setting cache for base path ${sqls.at.basePath} from:`, sqls.at.cache, 'to:', cache);
+    }
+    const items = [];
+    if (!isTransfer || cache === sqls.at.cache) {
+      sqls.at.cache = cache;
+      return items.length;
+    }
+    let key, cached;
+    for (let name in sqls.at.stms.methods) {
+      for (let ext in sqls.at.stms.methods[name]) {
+        key = sqls.at.generateCacheKey(sqls.at.conn.dialect, sqls.at.conn.name, name, ext);
+        if (sqls.at.cache) {
+          cached = await sqls.at.cache.get(key);
+          if (cached && cached.item) {
+            sqls.at.stms.methods[name][ext].sql = cached.item;
+          }
+        }
+        if (cache) {
+          items.push({ rslt: cache.set(key, sqls.at.stms.methods[name][ext].sql), key });
+        }
+      }
+    }
+    sqls.at.cache = cache;
+    for (let item of items) {
+      item.rslt = await item.rslt;
+      if (sqls.at.conn.logging) sqls.at.conn.logging(`Transferred cached key ${item.key} to:`, cache);
+    }
+    if (sqls.at.conn.logging) sqls.at.conn.logging(`Transferred ${items.length} cached keys to:`, cache);
+    return items.length;
   }
 
   formatDate(bind, dfunc) {
@@ -454,7 +559,7 @@ class SQLS {
   }
 
   /**
-   * @returns {SQLERState} The current managed state of the {@link DBS}
+   * @returns {typedefs.SQLERState} The current managed state of the {@link DBS}
    */
   get state() {
     return internal(this).at.dbs.state;
@@ -498,8 +603,8 @@ class DBS {
   /**
    * Database service constructor
    * @constructs DBS
-   * @param {Dialect} dialect the database dialect implementation/executor to use
-   * @param {SQLERConnectionOptions} conn the connection options
+   * @param {typedefs.Dialect} dialect the database dialect implementation/executor to use
+   * @param {typedefs.SQLERConnectionOptions} conn the connection options
    */
   constructor(dialect, conn) {
     const dbs = internal(this);
@@ -522,8 +627,8 @@ class DBS {
 
   /**
    * Begins a transaction
-   * @param {SQLERTransactionOptions} [opts={}] The passed transaction options
-   * @returns {SQLERTransaction} The transaction that has been started
+   * @param {typedefs.SQLERTransactionOptions} [opts={}] The passed transaction options
+   * @returns {typedefs.SQLERTransaction} The transaction that has been started
    */
   async beginTransaction(opts) {
     const dbs = internal(this);
@@ -535,11 +640,11 @@ class DBS {
   * @param {String} name The name given to the SQL file
   * @param {String} fpth The originating file path where the SQL resides
   * @param {String} sql The SQL to execute with optional substitutions {@link DBS#frag}
-  * @param {SQLERExecOptions} opts The eectution options
+  * @param {typedefs.SQLERExecOptions} opts The eectution options
   * @param {String[]} frags The frament keys within the SQL that will be retained
-  * @param {(SQLERExecErrorOptions | Boolean)} [errorOpts] Truthy to return any errors thrown during execution rather than throwing them.
-  * Can also pass {@link SQLERExecErrorOptions} for more control over execution errors.
-  * @returns {SQLERExecResults} The execution results
+  * @param {(typedefs.SQLERExecErrorOptions | Boolean)} [errorOpts] Truthy to return any errors thrown during execution rather than throwing them.
+  * Can also pass {@link typedefs.SQLERExecErrorOptions} for more control over execution errors.
+  * @returns {typedefs.SQLERExecResults} The execution results
   */
   async exec(name, fpth, sql, opts, frags, errorOpts) {
     const dbs = internal(this);
@@ -548,12 +653,14 @@ class DBS {
     if (dbs.at.logging) {
       dbs.at.logging(`Executing SQL ${fpth} with options ${JSON.stringify(opts)}${frags ? ` framents used ${JSON.stringify(frags)}` : ''}`);
     }
+    /** @type {typedefs.SQLERExecResults} */
     let rslt;
     try {
       const meta = { name, path: fpth };
       rslt = await dbs.at.dialect.exec(sqlf, opts, frags, meta, errorOpts); // execute the prepared SQL statement
     } catch (err) {
       try {
+        /** @type {typedefs.SQLERExecOptions} */
         const eopts = JSON.parse(JSON.stringify(opts));
         eopts.binds = errorOpts && errorOpts.includeBindValues ? eopts.binds : Object.keys(opts.binds);
         if (dbs.at.errorLogging) {
@@ -595,14 +702,14 @@ class DBS {
   * - __Expansions__ - Expands _bind_ variables that contain an array of values when they appear in the SQL statement. For example, an SQL statement with a section that contains
   * `IN (:someParam)` and _binds_ of `{ someParam: [1,2,3] }` would become `IN (:someParam, :someParam1, :someParam2)` with _binds_ of `{ someParam: 1, someParam1: 2, SomeParam2: 3 }`
   * - __Dialects__ - Replaces SQL segments that contain an open `[[! myDialectName]]` and closing `[[!]]` with the SQL content that is between the opening and closing _dialect_ tags
-  * when the {@link SQLERConnectionOptions} contains the designated _dialect_ name (`myDialectName` in this case). For example, 
+  * when the {@link typedefs.SQLERConnectionOptions} contains the designated _dialect_ name (`myDialectName` in this case). For example, 
   * `[[! oracle]] SOME_COL = SUBSTR(SOME_COL, 1, 1) [[!]] [[! mssql]] SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1) [[!]]`
   * would become `SOME_COL = SUBSTR(SOME_COL, 1, 1)` when using an `oracle` dialect, `SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1)` when using an `mssql` dialect and omitted using any
   * other dialect.
   * - __Versions__ - Replaces SQL segments that contain an open `[[version = 1]]` and closing `[[version]]` with the SQL content that is between the opening and closing _version_ tags
-  * when the {@link SQLERConnectionOptions} contains a _version_ that satisfys the comparative operator for the version within the tag designator. For example,
-  * `[[version <= 1]] SOME_OLD_COL [[version]] [[version > 1]] SOME_NEW_COL [[version]]` would become `SOME_OLD_COL` using a {@link SQLERConnectionOptions} _version_ that is less than
-  * or equal to `1`, but woud become `SOME_NEW_COL` when the _version_ is greater than `1`.
+  * when the {@link typedefs.SQLERConnectionOptions} contains a _version_ that satisfys the comparative operator for the version within the tag designator. For example,
+  * `[[version <= 1]] SOME_OLD_COL [[version]] [[version > 1]] SOME_NEW_COL [[version]]` would become `SOME_OLD_COL` using a {@link typedefs.SQLERConnectionOptions} _version_ that is
+  * less than or equal to `1`, but woud become `SOME_NEW_COL` when the _version_ is greater than `1`.
   * - __Fragments__ - Replaces SQL segments that contain an open `[[? someKey]]` and closing `[[?]]` with the SQL content that is between the opening and closing _fragment_ tags when
   * the `keys` contain the designated fragment identifier. For example, `WHERE SOME_COL1 = 1 [[? someKey]] AND SOME_COL2 = 2 [[?]]` would become `WHERE SOME_COL1 = 1 AND SOME_COL2 = 2`
   * when `keys` contains `[ 'someKey' ]`. If `keys` does not contain `someKey`, the statement would just become `WHERE SOME_COL1 = 1`.
@@ -672,7 +779,7 @@ class DBS {
   }
 
   /**
-   * @returns {SQLERState} The managed state of the {@link Dialect}
+   * @returns {typedefs.SQLERState} The managed state of the {@link Dialect}
    */
   get state() {
     const dbs = internal(this);
@@ -712,7 +819,7 @@ function generateGUID(value, hyphenate = true) {
 }
 
 /**
- * @see SQLERInterpolateFunction
+ * @see typedefs.SQLERInterpolateFunction
  * @private
  */
 function interpolate(dest, source, interpolator, validator, onlyInterpolated, _vpths) {
@@ -760,7 +867,7 @@ function interpolate(dest, source, interpolator, validator, onlyInterpolated, _v
 }
 
 /**
- * @see SQLERPositionalBindsFunction
+ * @see typedefs.SQLERPositionalBindsFunction
  * @private
  */
 function positionalBinds(sql, bindsObject, bindsArray, placeholder = '?') {
@@ -774,8 +881,7 @@ function positionalBinds(sql, bindsObject, bindsArray, placeholder = '?') {
   });
 }
 
-/** @type {SQLERExports} */
-module.exports = Object.freeze({ Manager, Dialect });
+module.exports = Object.freeze({ Manager, Dialect, typedefs });
 
 // private mapping
 let map = new WeakMap();
@@ -788,327 +894,3 @@ let internal = function (object) {
     this: object
   };
 };
-
-/**
- * `sqler` exports
- * @typedef {Object} SQLERExports
- * @property {Manager} Manager The {@link Manager} class
- * @property {Dialect} Dialect The {@link Dialect} class
- */
-
-/**
- * The `cache` client responsible for regulating the frequency in which a SQL file is read by a {@link Manager}.
- * @typedef {Object} SQLERCache
- * @property {Function} start An `async function()` that starts caching. This could be a `noop` or could start any background processing and/or capture of cached keys (depending on the type of
- * implementation).
- * @property {Function} stop An `async function()` that stops caching. This could be a `noop` or could stop any background processing and/or capture of cached keys (depending on the type of
- * implementation).
- * @property {Function} get An `async function(key)` that gets a corresponding SQL statement from cache using the specified _key_ to uniquily identify the SQL source (typically generated by a {@link Manager}).
- * The returned _object_ will contain the following values when present (otherwise, returns _null_):
- * - `item` - The cached SQL statement
- * - `stored` - The timestamp indicating the time when the SQL statement was stored in cache
- * - `ttl` - The timestamp indicating the remaining time left before the SQL statement will be removed from cache
- * @property {Function} set An `async function(key sql, ttlOverride)` that sets a SQL statement in cache, overriding the _time-to-live__ (in milliseconds) that may have been set by a {@link Manager}.
- * @property {Function} drop An `async function(key)` that removes the specified key from cache
- * @example
- * // cache options can be different depending on the needs of the implementing cache
- * const cacheOpts = {
- *  "expiresIn": 60000
- * };
- * // simple interval cache for illustration purposes
- * const bank = { store: {}, handles: {} };
- * const cache = {
- *  start: async () => {
- *    let cached, calTtl;
- *    for (let key in bank.handles) {
- *      clearInterval(bank.handles[key]);
- *      cached = bank.store.hasOwnProperty(key) ? bank.store[key] : null;
- *      calTtl = !cached|| isNaN(cached.ttl) ? cacheOpts.expiresIn : cached.ttl;
- *      bank.handles[key] = setInterval(() => delete bank.store[key], calTtl);
- *    }
- *  },
- *  stop: async () => {
- *    for (let key in bank.handles) {
- *      clearInterval(bank.handles[key]);
- *    }
- *  },
- *  get: async key => {
- *    const cached = bank.store.hasOwnProperty(key) ? bank.store[key] : null;
- *    if (cached) cached.ttl = Date.now() - cached.stored;
- *    return Promise.resolve(cached ? JSON.parse(JSON.stringify(cached)) : cached);
- *  },
- *  set: async (key, val, ttl) => {
- *    if (bank.handles[key]) clearInterval(bank.handles[key]);
- *    const calTtl = !ttl || isNaN(ttl) ? cacheOpts.expiresIn : ttl;
- *    bank.store[key] = { item: val, stored: Date.now(), ttl: calTtl };
- *    bank.handles[key] = setInterval(sql => delete bank.store[key], calTtl);
- *    return Promise.resolve();
- *  },
- *  drop: async () => {
- *    if (bank.handles[key]) {
- *      clearInterval(bank.handles[key]);
- *      delete bank.handles[key];
- *    }
- *    if (bank.store[key]) delete bank.store[key];
- *  }
- * };
- * 
- * // manager configuration
- * const conf = {
- *  // other required conf options here
- *  "db": {
- *    "connections": [
- *      {
- *        // other required connection conf options here
- *      }
- *    ]
- *  }
- * };
- * 
- * const mgr = new Manager(conf, cache);
- * await mgr.init();
- * // use the manager to execute SQL files that will
- * // be refreshed/re-read every 60 seconds
- */
-
-/**
- * Private options for global {@link Manager} use
- * @typedef {Object} SQLERPrivateOptions
- * @property {String} [username] The username to connect to the database
- * @property {String} [password] The password to connect to the database
- * @property {String} [host] The host to connect to for the database
- * @property {String} [port] The port to connect to for the database (when not included in the host)
- * @property {String} [protocol] The protocol to use when connecting to the database
- * @property {String} [privatePath] The private path set by an originating {@link Manager} constructor (when not already set) that may be used by an implementing {@link Dialect} for private data use
- * (e.g. `TNS` files, etc.)
- */
-
-/**
- * Configuration options for {@link Manager} use
- * @typedef {Object} SQLERConfigurationOptions
- * @property {String} [mainPath] Root directory starting point to look for SQL files (defaults to `require.main` path or `process.cwd()`)
- * @property {String} [privatePath] Current working directory where generated files will be located (if any, defaults to `process.cwd()`)
- * @property {Boolean} [debug] Truthy to turn on debugging
- * @property {SQLERUniversalOptions} univ The {@link SQLERUniversalOptions}
- * @property {Object} db The _public_ facing database configuration
- * @property {Object} db.dialects An object that contains {@link Dialect} implementation details where each property name matches a dialect name and the value contains either the module class or a string
- * that points to a {@link Dialect} implementation for the given dialect (e.g. `{ dialects: { 'oracle': 'sqler-oracle' } }`). When using a directory path the dialect path will be prefixed with
- * `process.cwd()` before loading.
- * @property {SQLERConnectionOptions[]} db.connections The connections options that will be used.
- */
-
-/**
- * The universal configuration that, for security and sharing purposes, remains external to an application
- * @typedef {Object} SQLERUniversalOptions
- * @property {Object} db The database options that contain _private_ sensitive configuration. Each property should correspond to a {@link SQLERPrivateOptions} instance and the property name should
- * be linked to a {@link SQLERConnectionOptions} `id` within `conf.db.connections`. Each {@link SQLERPrivateOptions} instance will be used to connect to the underlying database
- * (e.g. `{ db: myConnId: { host: "someDbhost.example.com", username: "someUser", password: "somePass" } }`)
- */
-
-/**
-* Options for connections used by {@link Manager}
- * @typedef {Object} SQLERConnectionOptions
- * @property {String} id Identifies the connection within a {@link SQLERPrivateOptions}
- * @property {String} dialect The database dialect (e.g. mysql, mssql, oracle, etc.)
- * @property {String} name The name given to the database used as the property name on the {@link Manager} to access generated SQL functions (e.g. `name = 'example'` would result in a SQL function
- * connection container `manager.db.example`). The _name_ will also be used as the _cwd_ relative directory used when no dir is defined
- * @property {String} [dir=name] The alternative dir where `*.sql` files will be found relative to `mainPath` passed into a {@link Manager} constructor. The directory path will be used as the basis
- * for generating SQL statements from discovered SQL files. Each will be made accessible in the manager by name followed by an object for each name separated by period(s)
- * within the file name with the last entry as the executable {@link SQLERPreparedFunction}. For example, a connection named "conn1" and a SQL file named "user.team.details.sql" will be accessible within the manager
- * as "mgr.db.conn1.user.team.details()". But when `dir` is set to "myDir" the SQL files will be loaded from the "myDir" directory (relative to `mainPath`) instead of the default directory that matches the connection
- * name "conn1".
- * @property {Float} [version] A version that can be used for version substitutions within an SQL statement
- * @property {String} [service] The service name defined by the underlying database (may be required depending on the implementing {@link Dialect}
- * @property {Object} [binds] The global object that contains bind variable values that will be included in all SQL calls made under the connection for parameter `binds` if not overridden
- * by individual "binds" passed into the {@link SQLERPreparedFunction}
- * @property {Object} [substitutes] Key/value pairs that define global/static substitutions that will be made in prepared statements by replacing occurances of keys with corresponding values
- * @property {String} [host] The database host override for a value specified in {@link SQLERPrivateOptions}
- * @property {String} [port] The database port override for a value specified in {@link SQLERPrivateOptions}
- * @property {String} [protocol] The database protocol override for a value specified in {@link SQLERPrivateOptions}
- * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link SQLERPreparedFunction} calls. Set to a truthy value to
- * perform `date.toISOString()`. __Gets overridden by the same option set on {@link SQLERExecOptions}__.
- * @property {Object} [driverOptions] Options passed directly into the {@link Dialect} driver
- * @property {(Boolean | String[])} [log] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the log output. Explicity set to `false` to disable
- * connection _log_ level logging even if it is turned on via the {@link Manager}.
- * @property {(Boolean | String[])} [logError] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the error log output. Explicity set to `false` to disable
- * connection _error_ level logging even if it is turned on via the {@link Manager}.
- * @property {Object} [pool] The connection pool options (__overrides any `driverOptions` that may pertain the pool__)
- * @property {Integer} [pool.max] The maximum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
- * (__overrides any `driverOptions` that may pertain the pool max__)
- * @property {Integer} [pool.min] The minumum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
- * (__overrides any `driverOptions` that may pertain the pool min__)
- * @property {Integer} [pool.idle] The maximum time, in milliseconds, that a connection can be idle before being released (__overrides any `driverOptions` that may pertain the pool idle__)
- * @property {Integer} [pool.increment] The number of connections that are opened whenever a connection request exceeds the number of currently open connections.
- *  When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
- * (__overrides any `driverOptions` that may pertain the pool increment__)
- * @property {Integer} [pool.timeout] The number of milliseconds that a connection request should wait in the queue before the request is terminated
- * (__overrides any `driverOptions` that may pertain the pool timeout__)
- * @property {String} [pool.alias] __When supported__, the alias of this pool in the connection pool cache (__overrides any `driverOptions` that may pertain the pool alias__)
- */
-
-/**
- * Options that are passed to generated {@link SQLERPreparedFunction}.
- * __NOTE: Either `transaction.commit` or `trnasaction.rollback` must be invoked when `autoCommit` is _falsy_ and a valid `transactionId` is supplied to ensue underlying connections are
- * completed and closed.__
- * @typedef {Object} SQLERExecOptions
- * @property {String} [name] A name to assign to the execution.
- * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
- * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
- * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
- * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
- * until the returned {@link SQLERExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
- * @property {String} [transactionId] A transaction ID returned from a prior call to `const tx = await manager.db.myConnectionName.beginTransaction(); options.transactionId = tx.id` that will be used when
- * executing the {@link SQLERPreparedFunction}. The generated `transactionId` helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database
- * connections used by other transactions that may also be in progress. The `transactionId` is ignored when there is no transaction in progress with the specified `transactionId`.
- * @property {Boolean} [prepareStatement] Truthy to generate or use an existing prepared statement for the SQL being executed via the {@link SQLERPreparedFunction}.
- * Prepared statements _may_ help optimize SQL that is executed many times across the same connection with similar or different bind values.
- * __Care must be taken not to drain the connection pool since the connection remains open until the SQL executions have completed and `unprepare` has been called on the {@link SQLERExecResults}.__
- * returned from the {@link SQLERPreparedFunction} call.
- * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link SQLERPreparedFunction} calls. Set to a truthy value to
- * perform `date.toISOString()`. __Overrides the same option set on {@link SQLERConnectionOptions}__.
- * @property {Object} [driverOptions] Options that may override the {@link SQLERConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
- */
- // TODO : @property {String} [locale] The [BCP 47 language tag](https://tools.ietf.org/html/bcp47) locale that will be used for formatting dates contained in the `opts` bind variable values (when present)
-
-/**
- * Internally generated metadata that is passed into {@link Dialect.exec} by a {@link Manager} for determining SQL sources.
- * @typedef {Object} SQLERExecMeta
- * @property {String} name The composed name given to a given SQL file
- * @property {String} path The path to the SQL file
- */
-
-/**
- * Options for handling any errors that occur during execution.
- * @typedef {Object} SQLERExecErrorOptions
- * @property {Function} [handler] A `function(error)` that will handle any errors thrown. The errors should contain a `sqler` property containing
- * @property {Boolean} [includeBindValues] Truthy to include the bind parameter values `error.sqler`.
- * @property {Boolean} [returnErrors] Truthy to return any errors that may occur. Otherwise, throw any errors that may occur.
- */
-
-/**
- * Prepared functions are auto-generated `async` functions that execute an SQL statement from an SQL file source.
- * @async
- * @callback {Function} SQLERPreparedFunction
- * @param {SQLERExecOptions} [opts] The SQL execution options
- * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
- * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
- * @param {(SQLERExecErrorOptions | Boolean)} [errorOpts] Either the error handling options or a boolean flag indicating that any errors that occur during execution should be returned in
- * the {@link SQLERExecResults} rather then being thrown.
- * @returns {SQLERExecResults} The execution results
- */
-
-/**
- * Results returned from invoking a {@link SQLERPreparedFunction}.
- * @typedef {Object} SQLERExecResults
- * @property {Object[]} [rows] The execution array of model objects representing each row or `undefined` when executing a non-read SQL statement.
- * @property {Function} [unprepare] A no-argument _async_ function that unprepares an outstanding prepared statement. Will not be available when the {@link SQLERPreparedFunction} is called
- * when the specified `prepareStatement` is _falsy_ on the {@link SQLERExecOptions} passed into the {@link SQLERPreparedFunction}. When a prepared statement is used in conjunction with a
- * {@link SQLERTransaction} `transactionId` on the {@link SQLERExecOptions}, `unprepare` will be implicitly called when `transaction.commit` or `transaction.rollback` are called (of course,
- * `unprepare` can still be explicitly called as well).
- * __NOTE: A call to `unprepare` must be invoked when a `prepareStatement` is _truthy_ to ensue underlying statements and/or connections are completed and closed.__
- * @property {Error} [error] Any caught error that occurred when a {@link SQLERPreparedFunction} was invoked with the `errorOpts` flag set to a _truthy_ value.
- * @property {Object} raw The raw results from the execution (driver-specific execution results).
- */
-
-/**
- * Transaction that symbolizes a unit of work performed within a {@link Manager} connection.
- * @typedef {Object} SQLERTransaction
- * @property {String} id The unique identifier for the transaction.
- * @property {Function} commit A no-argument _async_ function that commits the outstanding transaction.
- * @property {Function} rollback A no-argument _async_ function that rollbacks the outstanding transaction.
- * @property {Object} state The state of the transaction
- * @property {Boolean} state.isCommitted True when the transaction has been committed.
- * @property {Boolean} state.isRolledback True when the transaction has been rolledback.
- * @property {Integer} state.pending The number of pending SQL statements executed within the scope of the given transaction.
- */
-
-/**
- * Options for a {@link SQLERTransaction} that can be passed into a `manager.connectionName.beginTransaction(transactionDriverOptions)` function.
- * @typedef {Object} SQLERTransactionOptions
- */
-
-/**
- * Options for operational methods on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.state}, {@link Manager.close}, etc.).
- * @typedef {Object} SQLEROperationOptions
- * @property {Object} [connections] An object that contains connection names as properties. Each optionally containing an object with `errorOpts` and/or `executeInSeries`
- * that will override any global options set directly on the {@link SQLEROperationOptions}. For example, `opts.connections.myConnection.executeInseries` would override
- * `opts.executeInSeries` for the connection named `myConnection`, but would use `opts.executeInSeries` for any other connections that ae not overridden.
- * @property {Boolean} [executeInSeries] Set to truthy to execute the operation in series, otherwise executes operation in parallel.
- * @property {(SQLERExecErrorOptions | Boolean)} [errorOpts] Set to truthy to return any errors. Otherise throw any errors as they are encountered. options can also be set instead.
- */
-
-/**
- * Results returned from invoking an operational method on a {@link Manager} (e.g. {@link Manager.init}, {@link Manager.state}, {@link Manager.close}, etc.).
- * @typedef {Object} SQLEROperationResults
- * @property {Object} result An object that contains a property name that matches each connection that was processed (the property value is the number of operations processed per connection).
- * @property {Error[]} errors Any errors that may have occurred on the operational methods. Should only be populated when {@link SQLEROperationOptions} are used with a truthy value set on
- * `errorOpts`. Each will contain meta properties set by [Asynchro](https://ugate.github.io/asynchro).
- */
-
-/**
- * Options that are used during initialization
- * @typedef {Object} SQLERInitOptions
- * @property {Integer} numOfPreparedFuncs The total number of {@link SQLERPreparedFunction}(s) registered on the {@link Dialect}
- */
-
-/**
- * The current state of the managed {@link Dialect}
- * @typedef {Object} SQLERState
- * @property {Integer} pending The number of transactions that are pending `commit` or `roolback` plus any prepared statements that are pending
- * `unprepare`.
- * @property {Object} [connections] The connection state
- * @property {Integer} [connections.count] The number of connections
- * @property {Integer} [connections.inUse] The number of connections that are in use
- */
-
-/**
- * A validation for validating interpolation used by a {@link SQLERInterpolateFunction}
- * @callback {Function} SQLERInterpolateValidationFunction
- * @param {String[]} srcPropNames Property path(s) to the value being validated (e.g. `source.my.path = 123` would equate to 
- * a invocation to `validator(['my','path'], 123)`).
- * @param {*} srcPropValue The value being validated for interpolation
- * @returns {Boolean} Flag indicating whether or not to include the interpolated property/value
- */
-
-/**
- * Interpolates values from a _source_ object to a _destination_ object.
- * When a value is a string surrounded by `${}`, it will be assumed to be a interpolated property that resides on _another_ property on the `source`
- * or an interpolated property on the `interpolator`.
- * For example `source.someProp = '${SOME_VALUE}'` will be interpreted as `dest.someProp = dest.SOME_VALUE` when the `interpolator` is omitted and
- * `dest.someProp = interpolator.SOME_VALUE` when an `interpolator` is specified.
- * __Typically only used by implementing {@link Dialect} constructors within a {@link SQLERTrack}.__
- * @callback {Function} SQLERInterpolateFunction
- * @param {Object} dest The destination where the sources will be set (also the interpolated source when `interpolator` is omitted).
- * @param {Object} source The source of the values to interpolate (e.g. {@link SQLERConnectionOptions}, {@link SQLERExecOptions}, etc.).
- * @param {Object} [interpolator=dest] An alternative source to use for extracting interpolated values from.
- * @param {SQLERInterpolateValidationFunction} [validator] A validation function for each property/value being interpolated to determine
- * if it will be interolated.
- * @param {Boolean} [onlyInterpolated] Truthy to indicate that the only values that will be set from the `source`/`interpolator` will be values that
- * have been interpolated. __NOTE: Truthy values will not prevent `source`/`interpolator` objects from getting set on `dest`, just non-interpoalted
- * property values will be skipped__ (i.e. property values that do not contain `${}` interpolation designations).
- * @returns {Object} The passed destination
- */
-
-/**
- * Converts a SQL statement that contains named bind parameters into a SQL statement that contains unnamed/positional bind parameters (using `?`).
- * Each bound parameter is pushed to the array in the position that corresponds to the position within the SQL statement.
- * @callback {Function} SQLERPositionalBindsFunction
- * @param {String} sql The SQL statement that contains the bind parameters
- * @param {Object} bindsObject An object that contains the bind parameters as property names/values
- * @param {Array} bindsArray The array that will be populated with the bind parameters
- * @param {(String | Function)} [placeholder=?] Either a string value that will be used for the postional placeholder or a `function(name, index)` that
- * returns a value that will be used as the positional placeholder.
- * @returns {String} The converted SQL statement
- * @throws {Error} Thrown when a bound parameter is not within the orgiginating SQL statement
- */
-
-/**
- * A tracking mechanism that is shared between all {@link Dialect} implementations for a given {@link Manager}. A track provides a means to share
- * data, etc. from one {@link Dialect} to another. Properties can also be _added_ by a {@link Dialect} for use in other {@link Dialect}s.
- * __Typically only used by implementing {@link Dialect} constructors.__
- * @typedef {Object} SQLERTrack
- * @property {SQLERInterpolateFunction} interpolate An interpolation function that can be used by {@link Dialect} implementations to interpolate
- * configuration option values from underlying drivers within a {@link Dialect} (immutable). The convenience of doing so negates the need for an
- * application that uses a {@link Manager} to import/require a database driver just to access driver constants, etc.
- * @property {SQLERPositionalBindsFunction} positionalBinds A function that will convert an SQL statement with named binds into positional binds
- */

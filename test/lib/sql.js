@@ -5,6 +5,9 @@ const { Labrat, LOGGER } = require('@ugate/labrat');
 const IntervalCache = require('../cache/interval-cache');
 const UtilOpts = require('../util/utility-options');
 const UtilSql = require('../util/utility-sql');
+const Fs = require('fs');
+const CACHE_READ_SQL_NAME = 'read.some.tables';
+const CACHE_READ_SQL_PATH = './test/db/read.some.tables.sql';
 // TODO : import { Labrat, LOGGER } from '@ugate/labrat';
 // TODO : import * as IntervalCache from '../cache/interval-cache.mjs';
 // TODO : import * as UtilOpts from '../util/utility-options.mjs';
@@ -43,7 +46,9 @@ class Tester {
       logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
     });
 
-    return UtilSql.testRead(test.mgr, connName);
+    const execOpts = UtilOpts.createExecOpts();
+    execOpts.dateFormatter = (date) => date; // noop date formatter
+    return UtilSql.testRead(test.mgr, connName, { execOpts });
   }
 
   static async readWithAddConnection() {
@@ -71,6 +76,70 @@ class Tester {
     addConn.name = `${addConn.name}2`;
     await test.mgr.addConnection(addConn, aconf.univ.db[oldAddConnId], test.cache, initOpts.logger);
     return UtilSql.testRead(test.mgr, addConn.name);
+  }
+
+  static async readWithSetCacheThrow() {
+    const cacheOpts = { expiresIn: 1 };
+    const cache = new IntervalCache(cacheOpts);
+
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
+    // missing cache should read SQL file on every execution
+    await UtilSql.initManager(test, conf, { cache: null, logger: test.mgrLogit });
+    await test.mgr.setCache(cache, false);
+
+    const orig = await Fs.promises.readFile(CACHE_READ_SQL_PATH, 'utf-8');
+    try {
+      // no SQL content should fail (see test-dialect exec) 
+      await Fs.promises.writeFile(CACHE_READ_SQL_PATH, '', 'utf-8');
+      await UtilSql.testRead(test.mgr, connName, {
+        cache,
+        cacheOpts,
+        prepFuncPaths: { read: CACHE_READ_SQL_NAME }
+      });
+    } catch (err) {
+      if (err instanceof UtilOpts.TEST_DIALECT.NoSqlError) {
+        throw err;
+      } else {
+        console.warn('Invalid error thrown for:', err);
+      }
+    } finally {
+      try {
+        await Fs.promises.writeFile(CACHE_READ_SQL_PATH, orig, 'utf-8');
+      } catch (err) {
+        console.error(error);
+      }
+      test.mgr.setCache(test.cache);
+    }
+  }
+
+  static async readWithSetCache() {
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
+    // missing cache should read SQL file on every execution
+    await UtilSql.initManager(test, conf, { cache: null, logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger });
+
+    const cacheOpts = { expiresIn: 100000 };
+    const cache = new IntervalCache(cacheOpts);
+    await test.mgr.setCache(cache, true);
+    // also test setting the cache to itself - should be a noop
+    await test.mgr.setCache(cache, true);
+
+    const orig = await Fs.promises.readFile(CACHE_READ_SQL_PATH, 'utf-8');
+    try {
+      await Fs.promises.writeFile(CACHE_READ_SQL_PATH, '', 'utf-8');
+      await UtilSql.testRead(test.mgr, connName, {
+        cache,
+        execOpts: UtilOpts.createExecOpts(),
+        cacheOpts: {/* don't wait for cache to expire */},
+        prepFuncPaths: { read: CACHE_READ_SQL_NAME }
+      });
+    } finally {
+      try {
+        await Fs.promises.writeFile(CACHE_READ_SQL_PATH, orig, 'utf-8');
+      } catch (err) {
+        console.error(error);
+      }
+      test.mgr.setCache(test.cache, true);
+    }
   }
 
   static async readErrorReturn() {
