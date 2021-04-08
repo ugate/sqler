@@ -177,8 +177,8 @@ class Manager {
    */
   static namedBindSequence(sql, count) {
     const rtn = new Array(count);
-    for (let i = 1; i <= count; i++) {
-      rtn[i] = sql.replace(typedefs.POS_BINDS_REGEXP, match => `${match}${i}`);
+    for (let i = 0; i < count; i++) {
+      rtn[i] = sql.replace(typedefs.POS_BINDS_REGEXP, match => `${match}${i + 1}`);
     }
     return rtn;
   }
