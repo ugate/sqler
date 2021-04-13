@@ -71,7 +71,8 @@ class Manager {
    * @param {(Function | Boolean)} [logging] the `function(dbNames)` that will return a name/dialect specific `function(obj1OrMsg [, obj2OrSubst1, ..., obj2OrSubstN]))` that will handle database logging.
    * Pass `true` to use the console. Omit to disable logging altogether.
    * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
-   * @returns {typedefs.SQLEROperationResults} The results
+   * @returns {typedefs.SQLEROperationResults} The results, each `result[connectionName]` containing the _truthy_ result from the dialect initialization for the given connection (or the errors when return
+   * errors flag is set)
    */
   async addConnection(conn, priv, cache, logging, returnErrors) {
     const mgr = internal(this);
@@ -91,7 +92,8 @@ class Manager {
   /**
    * Initializes the configured database connections
    * @param {Boolean} [returnErrors] Truthy to return errors, otherwise, any encountered errors will be thrown
-   * @returns {typedefs.SQLEROperationResults} The results
+   * @returns {typedefs.SQLEROperationResults} The results, each `result[connectionName]` containing the _truthy_ result from the dialect initialization for the given connection (or the errors when return
+   * errors flag is set)
    */
   async init(returnErrors) {
     const mgr = internal(this);
@@ -109,14 +111,23 @@ class Manager {
     return rslt;
   }
 
-   /**
+  /**
    * Composes the {@link typedefs.SQLERState} on either all the connections used by the manager or on the specified connection names.
    * @param {typedefs.SQLEROperationOptions} [opts] The {@link typedefs.SQLEROperationOptions} to use
    * @param {...String} [connNames] The connection names to perform the check on (defaults to all connections)  
-   * @returns {typedefs.SQLEROperationResults} The results
+   * @returns {typedefs.SQLEROperationResults} The results, each `result[connectionName]` containing the {@link typedefs.SQLERState} for the given connection
    */
   async state(opts, ...connNames) {
     return operation(internal(this), 'state', opts, connNames);
+  }
+
+  /**
+   * Gets the number of prepared SQL functions on either all the connections used by the manager or on the specified connection names.
+   * @param {...String} [connNames] The connection names to perform the check on (defaults to all connections)  
+   * @returns {typedefs.SQLEROperationResults} The results, each `result[connectionName]` containing the number of generated prepared SQL functions for the given connection
+   */
+  async preparedFunctionCount(...connNames) {
+    return operation(internal(this), 'numOfPreparedFuncs', null, connNames);
   }
  
   /**
@@ -128,7 +139,17 @@ class Manager {
   }
 
   /**
-   * Sets the caching mechanism that will be used that will determine the frequency of reading SQL source files
+   * Scans directories/subdirectories for SQL files and generates prepared functions on either all the connections used by the manager or on the specified connection names.
+   * @param {Boolean} [removeOrphans=true] Truthy to remove orphaned prepared functions that no longer have an SQL file associated with them
+   * @param {...String} connNames The connection names to scan for SQL files for when generating prepared functions
+   * @returns {typedefs.SQLEROperationResults} The results, each `result[connectionName]` containing the number of SQL prepared functions for the given connection
+   */
+   async scan(removeOrphans, ...connNames) {
+    return operation(internal(this), 'scan', null, connNames, removeOrphans !== false);
+  }
+
+  /**
+   * Sets the caching mechanism that will be used that will determine the frequency of reading SQL source files. Omit the connection names to set the cache on all connections used by the manager.
    * @param {typedefs.SQLERCache} [cache] the {@link typedefs.SQLERCache} __like__ instance that will handle the logevity of the SQL statement before the SQL statement is re-read from the SQL file
    * @param {Boolean} [isTransfer] Truthy when the passed `cache` is present and any existing SQL (either cached or non-cached) should be transferred to it (if any)
    * @param {...String} connNames The connection names to set the cache for
@@ -258,10 +279,10 @@ function addConnectionToManager(mgr, conn, index, cache, logging, priv) {
 }
 
 /**
- * Executes one or more {@link SQLS} functions
+ * Executes one or more functions that reside on an {@link SQLS} instance
  * @private
  * @param {Manager} mgr The _internal_/private {@link Manager} store
- * @param {String} funcName The async function name to call on each {@link SQLS} instance
+ * @param {String} funcName The async function name to call (or property name to get) on each {@link SQLS} instance 
  * @param {typedefs.SQLEROperationOptions} [opts] The {@link typedefs.SQLEROperationOptions} to use
  * @param {String[]} [connNames] The connection names to perform the opearion on (defaults to all connections)
  * @param {...any} [args] The arguments to pass into the function being called on the {@link SQLS} instance

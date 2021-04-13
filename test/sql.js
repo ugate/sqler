@@ -46,5 +46,6 @@ lab.experiment(plan, () => {
     expect, label: 'autoCommit = false, transaction.id = undefined' }, Tester.execOptsAutoCommitFalseTransactionIdMissing));
   lab.test(`${plan}: Prepared Statements`, { timeout: TEST_TKO }, Tester.execOptsPreparedStatements);
   lab.test(`${plan}: Interval Cache`, { timeout: TEST_TKO }, Tester.intervalCache);
+  lab.test(`${plan}: Scan SQL Files`, { timeout: TEST_TKO }, Tester.scan);
   lab.test(`${plan}: No Execution Options`, { timeout: TEST_TKO }, Tester.execOptsNone);
 });

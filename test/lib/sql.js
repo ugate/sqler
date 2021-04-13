@@ -8,6 +8,7 @@ const UtilSql = require('../util/utility-sql');
 const Fs = require('fs');
 const Path = require('path');
 const { expect } = require('@hapi/code');
+const { Manager, typedefs } = require('../../index');
 const CACHE_READ_SQL_NAME = 'read.some.tables';
 const CACHE_READ_SQL_PATH = './test/db/read.some.tables.sql';
 // TODO : import { Labrat, LOGGER } from '@ugate/labrat';
@@ -15,7 +16,13 @@ const CACHE_READ_SQL_PATH = './test/db/read.some.tables.sql';
 // TODO : import * as UtilOpts from '../util/utility-options.mjs';
 // TODO : import * as UtilSql from '../util/utility-sql.mjs';
 
-const test = { mgr: null, cache: null, mgrLogit: !!LOGGER.info };
+const test = {
+  /** @type {Manager} */
+  mgr: null,
+  /** @type {typedefs.SQLERCache} */
+  cache: null,
+  mgrLogit: !!LOGGER.info
+};
 
 // TODO : ESM uncomment the following line...
 // export
@@ -273,6 +280,38 @@ class Tester {
       test.error = err;
       throw err;
     }
+  }
+
+  static async scan() {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
+    const label = `Number of prepared SQL functions for connection "${connName}"`;
+    await UtilSql.initManager(test, conf);
+
+    const original = await test.mgr.preparedFunctionCount(connName);
+    expect(original, label).to.be.object();
+    expect(original.result[connName], label).to.be.greaterThan(0);
+
+    const testFile = Path.resolve('test', conn.dir, 'read.some.temp.test.sql');
+    await Fs.promises.writeFile(testFile, 'SELECT 1');
+
+    let added, removed;
+    try {
+      added = await test.mgr.scan();
+      await Fs.promises.unlink(testFile);
+      removed = await test.mgr.scan();
+    } catch (err) {
+      try {
+        Fs.unlinkSync(testFile);
+      } catch (err) {
+        console.error(err);
+      }
+      throw err;
+    }
+
+    expect(added, `${label} (after add)`).to.be.object();
+    expect(added.result[connName], `${label}: "${original.result[connName]}" (original) > "${added.result[connName]}" (after add)`).to.be.equal(original.result[connName] + 1);
+    expect(removed, `${label} (after remove)`).to.be.object();
+    expect(removed.result[connName], `${label}: "${original.result[connName]}" (original) == "${removed.result[connName]}" (after remove)`).to.equal(original.result[connName]);
   }
 
   static async execOptsNone() {
