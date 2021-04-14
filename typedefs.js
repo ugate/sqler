@@ -192,6 +192,7 @@ module.exports = exported;
  * returned from the {@link SQLERPreparedFunction} call.
  * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link SQLERPreparedFunction} calls. Set to a truthy value to
  * perform `date.toISOString()`. __Overrides the same option set on {@link SQLERConnectionOptions}__.
+ * @property {Integer} numOfPreparedFuncs The total number of {@link SQLERPreparedFunction}(s) that reside within the manager
  * @property {Object} [driverOptions] Options that may override the {@link SQLERConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
  * @memberof typedefs
  */
