@@ -1,6 +1,7 @@
 'use strict';
 
 // TODO : ESM comment the following lines...
+const typedefs = require('../../typedefs');
 const { format } = require('util');
 // TODO : import { format } from 'util';
 
@@ -49,11 +50,13 @@ class UtilOpts {
   }
 
   /**
-   * @param {Boolean} [exclExpansion] Truthy to exclude expansion `binds` 
-   * @returns {Object} The test execution options to pass into {@link Manager.execute}
+   * @param {Boolean} [exclExpansion] Truthy to exclude expansion `binds`
+   * @param {typedefs.SQLERExecOptions} [opts] The execution options to add to instead of create
+   * @returns {typedefs.SQLERExecOptions} The test execution options to pass into {@link Manager.execute}
    */
-  static createExecOpts(exclExpansion) {
-    const xopts = { binds: { someCol1: 1, someCol2: 2, someCol3: 3 } };
+  static createExecOpts(exclExpansion, opts) {
+    const xopts = opts || {}; 
+    xopts.binds = { someCol1: 1, someCol2: 2, someCol3: 3 };
     if (!exclExpansion) xopts.binds.expanedCol = [1, 2, 3];
     return xopts;
   }

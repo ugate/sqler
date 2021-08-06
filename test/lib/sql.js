@@ -219,6 +219,19 @@ class Tester {
     });
   }
 
+  static async readStream() {
+    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
+    conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
+    conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
+    await UtilSql.initManager(test, conf, {
+      logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
+    });
+
+    const execOpts = UtilOpts.createExecOpts(false, { stream: true });
+    execOpts.dateFormatter = (date) => date; // noop date formatter
+    return UtilSql.testRead(test.mgr, connName, { execOpts });
+  }
+
   static async readWithSubstitutionsVersionNegative1() {
     return UtilSql.testVersions(test, -1, [-1, 0, 3], 1, 2, 4);
   }
@@ -257,6 +270,15 @@ class Tester {
 
     const xopts = UtilOpts.createExecOpts();
     await UtilSql.testCUD(test.mgr, connName, conf, xopts, { prepare: true });
+  }
+
+  static async writeStream() {
+    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
+    await UtilSql.initManager(test, conf);
+
+    const xopts = UtilOpts.createExecOpts();
+    xopts.stream = true;
+    await UtilSql.testCUD(test.mgr, connName, conf, xopts);
   }
 
   static async intervalCache() {

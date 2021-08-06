@@ -1,5 +1,7 @@
 'use strict';
 
+const Stream = require('stream');
+
 const exported = Object.freeze({
   MOD_KEY: 'sqler', // module key used for the object namespace on errors and logging
   NS: 'db', // namespace on Manager where SQL functions will be added
@@ -180,6 +182,8 @@ module.exports = exported;
  * @property {String} [name] A name to assign to the execution.
  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
  * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
+ * @property {Boolean} [stream] Truthy to stream the execution. The resulting `rows` will contain either a [`stream.Readable[]`](https://nodejs.org/api/stream.html#stream_class_stream_readable) or a
+ * [`stream.Writable[]`](https://nodejs.org/api/stream.html#stream_class_stream_writable) (depending upon the `type`) instead of the default `Object[]` rows.
  * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
  * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
  * until the returned {@link SQLERExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
@@ -231,7 +235,9 @@ module.exports = exported;
 /**
  * Results returned from invoking a {@link SQLERPreparedFunction}.
  * @typedef {Object} SQLERExecResults
- * @property {Object[]} [rows] The execution array of model objects representing each row or `undefined` when executing a non-read SQL statement.
+ * @property {(Object[] | Stream.Readable[] | Stream.Writable[])} [rows] The execution array of model objects representing each row or `undefined` when executing a non-read SQL statement.
+ * When streaming the resulting `rows` will contain either a [`stream.Readable[]`](https://nodejs.org/api/stream.html#stream_class_stream_readable) or a
+ * [`stream.Writable[]`](https://nodejs.org/api/stream.html#stream_class_stream_writable) instead of the default `Object[]` rows.
  * @property {Function} [unprepare] A no-argument _async_ function that unprepares an outstanding prepared statement. Will not be available when the {@link SQLERPreparedFunction} is called
  * when the specified `prepareStatement` is _falsy_ on the {@link SQLERExecOptions} passed into the {@link SQLERPreparedFunction}. When a prepared statement is used in conjunction with a
  * {@link SQLERTransaction} `transactionId` on the {@link SQLERExecOptions}, `unprepare` will be implicitly called when `transaction.commit` or `transaction.rollback` are called (of course,

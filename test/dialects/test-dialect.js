@@ -2,7 +2,10 @@
 
 const { Manager, Dialect, typedefs } = require('../../index');
 const UtilOpts = require('../util/utility-options');
+
+const Stream = require('stream');
 const { expect } = require('@hapi/code');
+const { pipeline } = require('stream/promises');
 
 /**
  * Error raised when there is no SQL
@@ -136,25 +139,52 @@ class TestDialect extends Dialect {
 
       if (opts && opts.prepareStatement) prepare(dialect, meta.name, opts);
       if (!TestDialect.BYPASS_NEXT_EXEC_OPTS_CHECK) expectTransactionPreparedStatement(dialect, opts, meta, rslt);
-
+      
       // set rows
+      const isRead = opts.type === 'READ';
+      const isReadStream = opts.stream && isRead;
+      const isWriteStream = !isRead && !isReadStream && opts.stream;
+      // single record key overrides the record count
       const singleRecordKey = UtilOpts.driverOpt('singleRecordKey', opts, dialect.connConf), recordCount = UtilOpts.driverOpt('recordCount', opts, dialect.connConf);
-      let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
-      if (!cols) return rslt;
-      cols = cols[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
-      const rcrd = {};
-      let ci = 0;
-      for (let col of cols) {
-        rcrd[col.substr(col.lastIndexOf('.') + 1)] = ++ci;
-      }
-      // simple test output records (single record key overrides the record count)
-      if (singleRecordKey.source && sql.includes(singleRecordKey.value)) {
-        rslt.rows = [rcrd];
+      const rcrdCnt = (singleRecordKey.source && sql.includes(singleRecordKey.value) ? 1 : (recordCount.value || 2));
+      if (isWriteStream) {
+        rslt.test = rslt.test || {};
+        rslt.test.writeStreams = [];
+        rslt.rows = [
+          new Stream.Writable({
+            objectMode: true,
+            write: function(chunk, encoding, next) {
+              rslt.test.writeStreams.push(chunk);
+              next();
+            }
+          })
+        ];
         return rslt;
       }
-      rslt.rows = [];
-      for (let i = 0; i < (recordCount.value || 2); ++i) {
-      rslt.rows.push(rcrd);
+      // reads
+      let cols = sql.match(/SELECT([\s\S]*?)FROM/i);
+      cols = cols && cols[1].replace(/(\r\n|\n|\r)/gm, '').split(',');
+      const setColProps = (rcrd) => {
+        let ci = 0;
+        for (let col of cols) {
+          rcrd[col.substr(col.lastIndexOf('.') + 1)] = ++ci;
+        }
+        return rcrd;
+      };
+      if (isReadStream) {
+        const readables = new Array(rcrdCnt);
+        for (let i = 0; i < rcrdCnt; i++) {
+          readables[i] = setColProps({});
+        }
+        rslt.rows = [
+          new Stream.Readable.from(readables, { objectMode: true })
+        ];
+      } else { // normal reads
+        if (!cols) return rslt;
+        rslt.rows = rslt.rows || [];
+        for (let i = 0; i < rcrdCnt; ++i) {
+          rslt.rows.push(setColProps({}));
+        }
       }
     } finally {
       TestDialect.BYPASS_NEXT_EXEC_OPTS_CHECK = false;

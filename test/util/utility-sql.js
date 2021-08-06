@@ -2,12 +2,15 @@
 
 // TODO : ESM comment the following lines...
 const { Labrat, LOGGER } = require('@ugate/labrat');
-const { Manager, typedefs } = require('../../index');
+const { Manager } = require('../../index');
+const typedefs = require('../../typedefs');
 const TestDialect = require('../dialects/test-dialect');
 const UtilOpts = require('./utility-options');
 const Fs = require('fs');
 const Path = require('path');
 const { expect } = require('@hapi/code');
+const Stream = require('stream');
+const { pipeline } = require('stream/promises');
 // TODO : import { Labrat, LOGGER } from '@ugate/labrat';
 // TODO : import { Manager } from '../../index.mjs';
 // TODO : import * as TestDialect from '../dialects/test-dialect.mjs';
@@ -149,7 +152,10 @@ class UtilSql {
     const optsNoPrefix = prepFuncPaths.readNoPrefix ? JSON.parse(JSON.stringify(opts || {})) : null;
     if (optsNoPrefix) optsNoPrefix.type = 'READ';
     const performRead = async (label, noPrefix, opts, frags) => {
-      let readRslt, pfunc;
+      /** @type {typedefs.SQLERExecResults} */
+      let readRslt;
+      /** @type {typedefs.SQLERPreparedFunction} */
+      let pfunc;
       const pths = noPrefix ? prepFuncPaths.readNoPrefix.split('.') : prepFuncPaths.read.split('.');
       for (let ppth of pths) {
         if (pfunc) pfunc = pfunc[ppth];
@@ -181,8 +187,8 @@ class UtilSql {
         }
       } else {
         const rcdCntOpt = UtilOpts.driverOpt('recordCount', opts, connOpts);
-        expect(readRslt.rows, `${label} result rows`).to.be.array();
-        expect(readRslt.rows, `${label} result rows.length`).to.be.length((rcdCntOpt.source && rcdCntOpt.value) || 2);
+        const rcdCnt = (rcdCntOpt.source && rcdCntOpt.value) || 2;
+        await UtilSql.expectResults(label, Array.name, readRslt, opts.stream ? Stream.Readable.name : null, rcdCnt);
       }
       if (LOGGER.info) LOGGER.info(label, readRslt);
     };
@@ -314,17 +320,14 @@ class UtilSql {
     label = `CREATE mgr.db.${connName}.finance.create.annual.report() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.create.annual.report(xopts);
-    expect(rslt, `${label} result`).to.be.object();
-    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     label = `READ mgr.db.${connName}.finance.read.annual.report() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.read.annual.report(xopts);
-    expect(rslt, `${label} result`).to.be.object();
-    expect(rslt.rows, `${label} result rows`).to.be.array();
-    expect(rslt.rows, `${label} result rows.length`).to.be.length(2); // two records should be returned w/o order by
+    await UtilSql.expectResults(label, Array.name, rslt, xopts.stream ? Stream.Readable.name : null, 2); // two records should be returned w/o order by
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
     
@@ -333,38 +336,94 @@ class UtilSql {
     label = `UPDATE mgr.db.${connName}.finance.ap.update.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ap.update.audits(xopts);
-    expect(rslt, `${label} result`).to.be.object();
-    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     label = `DELETE mgr.db.${connName}.finance.ap.delete.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
-    expect(rslt, `${label} result`).to.be.object();
-    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     label = `UPDATE mgr.db.${connName}.finance.ar.update.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ar.update.audits(xopts);
-    expect(rslt, `${label} result`).to.be.object();
-    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     label = `DELETE mgr.db.${connName}.finance.ar.delete.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
-    expect(rslt, `${label} result`).to.be.object();
-    expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     if (!xopts) xopts.name = orignalName;
 
     if (!autoCommit) await tx.commit();
+  }
+
+  /**
+   * Aserts that a CRUD opration results are as expected
+   * @param {String} label An assertion label
+   * @param {String} type The type to check for (e.g. `undefined`, `Array.name`, etc.)
+   * @param {typedefs.SQLERExecResults} rslt
+   * @param {String} [streamName] A stream type to assert (e.g. `Stream.Readable.name` or `Stream.Writable.name`)
+   * @param {Integer} [length] The expected result row length
+   * @param {Object} [writeStreamBinds] When `streamName = Stream.Writable.name`, the _binds_ that should be expected
+   */
+  static async expectResults(label, type, rslt, streamName, length, writeStreamBinds) {
+    expect(rslt, `${label} result`).to.be.object();
+    if (type === Array.length) {
+      expect(rslt.rows, `${label} result rows`).to.be.array();
+    } else if (type === undefined) {
+      expect(rslt.rows, `${label} result rows`).to.be.undefined();
+    }
+    if (streamName === Stream.Readable.name) {
+      // const readsFromStreamAC = new AbortController();
+      // readsFromStreamAC.signal.onabort = () => {
+      //   throw new Error(`${label} result read stream rows aborted!`);
+      // };
+      // setTimeout(() => readsFromStreamAC.abort(), 60000);
+      expect(rslt.rows, `${label} result read stream rows`).to.be.array();
+      const readsFromStream = [];
+      for (let readStream of rslt.rows) {
+        expect(readStream,`${label} result read stream row`).to.be.instanceof(Stream.Readable);
+        for await (const chunk of readStream) {
+          readsFromStream.push(chunk);
+        }
+      }
+      if (length !== undefined) {
+        expect(readsFromStream, `${label} result read stream rows.length`).to.be.length(length);
+      } else {
+        expect(readsFromStream, `${label} result read stream rows not empty`).to.not.be.empty();
+      }
+    } else if (streamName === Stream.Writable.name) {
+      // NOTE : Writable streams require the test-dialect to return rslt.test.writeStreams
+      expect(rslt.test, `${label} result test object`).to.be.object();
+      expect(rslt.test.writeStreams, `${label} result test.writeStreams`).to.be.array();
+      expect(rslt.test.writeStreams, `${label} result test.writeStreams (initially empty)`).to.be.empty();
+      expect(rslt.rows, `${label} result write stream rows`).to.be.array();
+      for (let writeStream of rslt.rows) {
+        expect(writeStream,`${label} result write stream row`).to.be.instanceof(Stream.Writable);
+        await pipeline(new Stream.Readable.from(async function* reads() {
+          // for (let i = 0; i < rslt.rows.length; i++) {
+            yield writeStreamBinds;
+          // }
+        }()), writeStream);
+      }
+      if (length !== undefined) {
+        expect(rslt.test.writeStreams, `${label} result test.writeStreams.length`).to.be.length(length);
+        // console.log('rslt.test.writeStreams = ', JSON.stringify(rslt.test.writeStreams), ' = binds = ', JSON.stringify(writeStreamBinds));
+      } else {
+        expect(rslt.test.writeStreams, `${label} result test.writeStreams not empty`).to.not.be.empty();
+      }
+    } else if (type !== undefined && length !== undefined) {
+      expect(rslt.rows, `${label} result rows.length`).to.be.length(length);
+    }
   }
 
   /**
