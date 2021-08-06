@@ -177,7 +177,7 @@ class TestDialect extends Dialect {
           readables[i] = setColProps({});
         }
         rslt.rows = [
-          new Stream.Readable.from(readables, { objectMode: true })
+          Stream.Readable.from(readables, { objectMode: true })
         ];
       } else { // normal reads
         if (!cols) return rslt;

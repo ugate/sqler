@@ -409,7 +409,7 @@ class UtilSql {
       expect(rslt.rows, `${label} result write stream rows`).to.be.array();
       for (let writeStream of rslt.rows) {
         expect(writeStream,`${label} result write stream row`).to.be.instanceof(Stream.Writable);
-        await pipeline(new Stream.Readable.from(async function* reads() {
+        await pipeline(Stream.Readable.from(async function* reads() {
           // for (let i = 0; i < rslt.rows.length; i++) {
             yield writeStreamBinds;
           // }

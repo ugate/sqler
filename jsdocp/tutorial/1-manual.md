@@ -10,6 +10,7 @@ The [Manager](Manager.html) is the entry point for one or more databases/connect
   - [3️⃣ Dialect Substitutions](#ds)
   - [4️⃣ Version Susbstitutions](#vs)
   - [5️⃣ Raw Substitutions](#rs)
+- [💧 Read/Write Streams](#streams)
 - [🎬 Transactions](#tx)
 - [🍽️ Prepared Statements](#ps)
 - [🗄️ Caching SQL](#cache)
@@ -295,6 +296,48 @@ When the `sqler` managed connection configuration contained the previously defin
 SELECT ST.COME_COL
 FROM SOME_DB_TEST.SOME_TABLE ST
 ```
+
+#### 💧 Read/Write Streams <sub id="streams"></sub>:
+[Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` options](global.html#SQLERExecOptions):
+
+Example reads:
+```js
+// tell sqler to return stream.Readable
+const rslts = await mgr.db.read.something({ stream: true});
+// rows are one or more stream.Readable
+for (let readStream of rslts.rows) {
+  // aync iterate over the stream.Readable to capture the rows
+  for await (const row of readStream) {
+    console.log('My read row', row);
+  }
+}
+```
+
+Example writes:
+```js
+const Stream = require('stream');
+// node >= v16
+// const { pipeline } = require('stream/promises');
+// node < 16
+const Util = require('util');
+const pipeline = Util.promisfy(Stream.pipeline);
+
+// tell sqler to return stream.Writable
+const rslts = await mgr.db.update.something({ stream: true});
+// rows are one or more stream.Writable
+for (let writeStream of rslts.rows) {
+  await pipeline(
+    Stream.Readable.from(async function* reads() {
+      for (let i = 0; i < 10000 /* lets generates some records */; i++) {
+        yield { myField: i };
+      }
+    }()),
+    writeStream
+  );
+}
+```
+
+> NOTE : Read streams expect [`objectMode = true`](https://nodejs.org/api/stream.html#stream_readable_readableobjectmode). Write streams expect [`objectMode = true`](https://nodejs.org/api/stream.html#stream_writable_writableobjectmode).
 
 #### 🎬 Transactions <sub id="tx"></sub>:
 [Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `await manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](global.html#SQLERTransactionOptions) argument and returns a unique [Transaction](global.html#SQLERTransaction) with an ID that can be passed as the `transactionId` option in subsequent [Prepared Function](global.html#SQLERPreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Amoung other properties, each [Transaction](global.html#SQLERTransaction) contains the following functions used to finalize a transaction:
