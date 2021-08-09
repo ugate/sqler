@@ -14,7 +14,7 @@ const Stream = require('stream');
 // const { pipeline } = require('stream/promises');
 // node < 16 :
 const Util = require('util');
-const pipeline = Util.promisfy(Stream.pipeline);
+const pipeline = Util.promisify(Stream.pipeline);
 // TODO : import { Labrat, LOGGER } from '@ugate/labrat';
 // TODO : import { Manager } from '../../index.mjs';
 // TODO : import * as TestDialect from '../dialects/test-dialect.mjs';
