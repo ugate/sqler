@@ -298,7 +298,7 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
 #### 💧 Read/Write Streams <sub id="streams"></sub>:
-[Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` options](global.html#SQLERExecOptions):
+[Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` option](global.html#SQLERExecOptions):
 
 Example reads:
 ```js

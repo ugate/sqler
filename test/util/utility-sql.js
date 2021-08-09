@@ -10,7 +10,11 @@ const Fs = require('fs');
 const Path = require('path');
 const { expect } = require('@hapi/code');
 const Stream = require('stream');
-const { pipeline } = require('stream/promises');
+// node >= v16 :
+// const { pipeline } = require('stream/promises');
+// node < 16 :
+const Util = require('util');
+const pipeline = Util.promisfy(Stream.pipeline);
 // TODO : import { Labrat, LOGGER } from '@ugate/labrat';
 // TODO : import { Manager } from '../../index.mjs';
 // TODO : import * as TestDialect from '../dialects/test-dialect.mjs';

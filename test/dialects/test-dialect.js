@@ -5,7 +5,6 @@ const UtilOpts = require('../util/utility-options');
 
 const Stream = require('stream');
 const { expect } = require('@hapi/code');
-const { pipeline } = require('stream/promises');
 
 /**
  * Error raised when there is no SQL
