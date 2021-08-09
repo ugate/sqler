@@ -303,7 +303,7 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 Example reads:
 ```js
 // tell sqler to return stream.Readable
-const rslts = await mgr.db.read.something({ stream: true});
+const rslts = await mgr.db.read.something({ stream: true });
 // rows are one or more stream.Readable
 for (let readStream of rslts.rows) {
   // aync iterate over the stream.Readable to capture the rows
@@ -316,14 +316,14 @@ for (let readStream of rslts.rows) {
 Example writes:
 ```js
 const Stream = require('stream');
-// node >= v16
+// node >= v16 :
 // const { pipeline } = require('stream/promises');
-// node < 16
+// node < 16 :
 const Util = require('util');
 const pipeline = Util.promisfy(Stream.pipeline);
 
 // tell sqler to return stream.Writable
-const rslts = await mgr.db.update.something({ stream: true});
+const rslts = await mgr.db.update.something({ stream: true });
 // rows are one or more stream.Writable
 for (let writeStream of rslts.rows) {
   await pipeline(
