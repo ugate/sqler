@@ -298,12 +298,15 @@ FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
 #### 💧 Read/Write Streams <sub id="streams"></sub>:
-[Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` option](global.html#SQLERExecOptions):
+[Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` option](global.html#SQLERExecOptions). The value set on `execOpts.stream` will indicate to the underlying database dialect that the desired batch size for executions should match that of the `stream` value. Just keep in mind that there is a balance between the batch size stored in memory that accumulates until the `stream` threshold is met, and the total number of executions for all batches. So, it's a good practice to use smaller `stream` batch values to keep a smaller memory footprint. But, large enough that minimize round trips to the dialect backend.
+
+During write streaming, it's possible to capture the the written meta results for a given `stream` batch. Simply, listen for the `typedefs.EVENT_STREAM_WRITTEN_BATCH` event on the desired writable stream returned by the execution (see example below). The array of batch values should reflect the results of the written executions when they are supported by the dialect.
 
 Example reads:
 ```js
 // tell sqler to return stream.Readable
-const rslts = await mgr.db.read.something({ stream: true });
+// stream can be >= 0 to indicate streaming
+const rslts = await mgr.db.read.something({ stream: 0 });
 // rows are one or more stream.Readable
 for (let readStream of rslts.rows) {
   // aync iterate over the stream.Readable to capture the rows
@@ -315,6 +318,7 @@ for (let readStream of rslts.rows) {
 
 Example writes:
 ```js
+const typedefs = require('sqler/typedefs');
 const Stream = require('stream');
 // node >= v16 :
 // const { pipeline } = require('stream/promises');
@@ -323,9 +327,14 @@ const Util = require('util');
 const pipeline = Util.promisfy(Stream.pipeline);
 
 // tell sqler to return stream.Writable
-const rslts = await mgr.db.update.something({ stream: true });
+// stream can be >= 0 to indicate sreaming
+// with a count > 0, increments of that size will be emitted via event
+const rslts = await mgr.db.update.something({ stream: 100 });
 // rows are one or more stream.Writable
 for (let writeStream of rslts.rows) {
+  writeStream.on(typedefs.EVENT_STREAM_WRITTEN_BATCH, async (rsltsArray) => {
+    console.log('Every 100 batched results array:', rsltsArray);
+  });
   await pipeline(
     Stream.Readable.from(async function* reads() {
       for (let i = 0; i < 10000 /* lets generates some records */; i++) {

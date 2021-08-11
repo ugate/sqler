@@ -9,7 +9,8 @@ const exported = Object.freeze({
   POS_BINDS_REGEXP: /(?<!:):(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g, // regexp for capturing named bind parameter names within SQL
   FUNC_NAME_DIR_REGEXP: /[^0-9a-zA-Z]/g, // regexp for removing invalid chars from prepared function directory names
   FUNC_NAME_FILE_REGEXP: /[^0-9a-zA-Z\.]/g, // regexp for removing invalid chars from prepared function file names
-  FUNC_NAME_SEPARATOR: '_' // separator for prepared function names (also used as the dir/filename replacement)
+  FUNC_NAME_SEPARATOR: '_', // separator for prepared function names (also used as the dir/filename replacement)
+  EVENT_STREAM_WRITTEN_BATCH: 'sqler_stream_written_batch' // event name that is emitted when a stream has finished execution for a batch of writes
 });
 module.exports = exported;
 
@@ -160,15 +161,15 @@ module.exports = exported;
  * @property {(Boolean | String[])} [logError] When _logging_ is turned on for a given {@link Manager}, the specified tags will prefix the error log output. Explicity set to `false` to disable
  * connection _error_ level logging even if it is turned on via the {@link Manager}.
  * @property {Object} [pool] The connection pool options (__overrides any `driverOptions` that may pertain the pool__)
- * @property {Integer} [pool.max] The maximum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
+ * @property {Number} [pool.max] The maximum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
  * (__overrides any `driverOptions` that may pertain the pool max__)
- * @property {Integer} [pool.min] The minumum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
+ * @property {Number} [pool.min] The minumum number of connections in the pool. When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
  * (__overrides any `driverOptions` that may pertain the pool min__)
- * @property {Integer} [pool.idle] The maximum time, in milliseconds, that a connection can be idle before being released (__overrides any `driverOptions` that may pertain the pool idle__)
- * @property {Integer} [pool.increment] The number of connections that are opened whenever a connection request exceeds the number of currently open connections.
+ * @property {Number} [pool.idle] The maximum time, in milliseconds, that a connection can be idle before being released (__overrides any `driverOptions` that may pertain the pool idle__)
+ * @property {Number} [pool.increment] The number of connections that are opened whenever a connection request exceeds the number of currently open connections.
  *  When `pool.min` and `pool.max` are the same, `pool.increment` should typically be set to _zero_.
  * (__overrides any `driverOptions` that may pertain the pool increment__)
- * @property {Integer} [pool.timeout] The number of milliseconds that a connection request should wait in the queue before the request is terminated
+ * @property {Number} [pool.timeout] The number of milliseconds that a connection request should wait in the queue before the request is terminated
  * (__overrides any `driverOptions` that may pertain the pool timeout__)
  * @property {String} [pool.alias] __When supported__, the alias of this pool in the connection pool cache (__overrides any `driverOptions` that may pertain the pool alias__)
  * @memberof typedefs
@@ -182,8 +183,10 @@ module.exports = exported;
  * @property {String} [name] A name to assign to the execution.
  * @property {String} [type] The type of CRUD operation that is being executed (i.e. `CREATE`, `READ`, `UPDATE`, `DELETE`). __Mandatory only when the
  * generated/prepared SQL function was generated from a SQL file that was not prefixed with a valid CRUD type.__
- * @property {Boolean} [stream] Truthy to stream the execution. The resulting `rows` will contain either a [`stream.Readable[]`](https://nodejs.org/api/stream.html#stream_class_stream_readable) or a
- * [`stream.Writable[]`](https://nodejs.org/api/stream.html#stream_class_stream_writable) (depending upon the `type`) instead of the default `Object[]` rows.
+ * @property {Number} [stream] A value `stream >= 0`, indicates that the execution will be streamed (ideal for large reads/writes). The resulting `rows` will contain either a
+ * [`stream.Readable[]`](https://nodejs.org/api/stream.html#stream_class_stream_readable) or a [`stream.Writable[]`](https://nodejs.org/api/stream.html#stream_class_stream_writable)
+ * (depending upon the `type`) instead of the default `Object[]` rows. When supported by the dialect, streams will be __batched__ using the indicated stream count as the batch size (a value of `0` is the
+ * same as a value of `1`).
  * @property {Object} [binds={}] The key/value pair of binding parameters that will be bound in the SQL statement.
  * @property {Boolean} [autoCommit=true] Truthy to perform a commits the transaction at the end of the prepared function execution. __NOTE: When falsy the underlying connection will remain open
  * until the returned {@link SQLERExecResults} `commit` or `rollback` is called.__ [See AutoCommit](https://en.wikipedia.org/wiki/Autocommit) for more details.
@@ -196,7 +199,7 @@ module.exports = exported;
  * returned from the {@link SQLERPreparedFunction} call.
  * @property {(Function | Boolean)} [dateFormatter] A `function(date)` that will be used to format bound dates into string values for {@link SQLERPreparedFunction} calls. Set to a truthy value to
  * perform `date.toISOString()`. __Overrides the same option set on {@link SQLERConnectionOptions}__.
- * @property {Integer} numOfPreparedFuncs The total number of {@link SQLERPreparedFunction}(s) that reside within the manager
+ * @property {Number} numOfPreparedFuncs The total number of {@link SQLERPreparedFunction}(s) that reside within the manager
  * @property {Object} [driverOptions] Options that may override the {@link SQLERConnectionOptions} for `driverOptions` that may be passed into the {@link Manager} constructor
  * @memberof typedefs
  */
@@ -222,7 +225,7 @@ module.exports = exported;
 /**
  * Prepared functions are auto-generated `async` functions that execute an SQL statement from an SQL file source.
  * @async
- * @callback {Function} SQLERPreparedFunction
+ * @callback SQLERPreparedFunction
  * @param {SQLERExecOptions} [opts] The SQL execution options
  * @param {String[]} [frags] Consists of any fragment segment names present in the SQL being executed that will be included in the final SQL statement. Any fragments present
  * in the SQL source will be excluded from the final SQL statement when there is no matching fragment name.
@@ -257,7 +260,7 @@ module.exports = exported;
  * @property {Object} state The state of the transaction
  * @property {Boolean} state.isCommitted True when the transaction has been committed.
  * @property {Boolean} state.isRolledback True when the transaction has been rolledback.
- * @property {Integer} state.pending The number of pending SQL statements executed within the scope of the given transaction.
+ * @property {Number} state.pending The number of pending SQL statements executed within the scope of the given transaction.
  * @memberof typedefs
  */
 
@@ -290,24 +293,24 @@ module.exports = exported;
 /**
  * Options that are used during initialization
  * @typedef {Object} SQLERInitOptions
- * @property {Integer} numOfPreparedFuncs The total number of {@link SQLERPreparedFunction}(s) registered on the {@link Dialect}
+ * @property {Number} numOfPreparedFuncs The total number of {@link SQLERPreparedFunction}(s) registered on the {@link Dialect}
  * @memberof typedefs
  */
 
 /**
  * The current state of the managed {@link Dialect}
  * @typedef {Object} SQLERState
- * @property {Integer} pending The number of transactions that are pending `commit` or `roolback` plus any prepared statements that are pending
+ * @property {Number} pending The number of transactions that are pending `commit` or `roolback` plus any prepared statements that are pending
  * `unprepare`.
  * @property {Object} [connections] The connection state
- * @property {Integer} [connections.count] The number of connections
- * @property {Integer} [connections.inUse] The number of connections that are in use
+ * @property {Number} [connections.count] The number of connections
+ * @property {Number} [connections.inUse] The number of connections that are in use
  * @memberof typedefs
  */
 
 /**
  * A validation for validating interpolation used by a {@link SQLERInterpolateFunction}
- * @callback {Function} SQLERInterpolateValidationFunction
+ * @callback SQLERInterpolateValidationFunction
  * @param {String[]} srcPropNames Property path(s) to the value being validated (e.g. `source.my.path = 123` would equate to 
  * a invocation to `validator(['my','path'], 123)`).
  * @param {*} srcPropValue The value being validated for interpolation
@@ -322,7 +325,7 @@ module.exports = exported;
  * For example `source.someProp = '${SOME_VALUE}'` will be interpreted as `dest.someProp = dest.SOME_VALUE` when the `interpolator` is omitted and
  * `dest.someProp = interpolator.SOME_VALUE` when an `interpolator` is specified.
  * __Typically only used by implementing {@link Dialect} constructors within a {@link SQLERTrack}.__
- * @callback {Function} SQLERInterpolateFunction
+ * @callback SQLERInterpolateFunction
  * @param {Object} dest The destination where the sources will be set (also the interpolated source when `interpolator` is omitted).
  * @param {Object} source The source of the values to interpolate (e.g. {@link SQLERConnectionOptions}, {@link SQLERExecOptions}, etc.).
  * @param {Object} [interpolator=dest] An alternative source to use for extracting interpolated values from.
@@ -338,7 +341,7 @@ module.exports = exported;
 /**
  * Converts a SQL statement that contains named bind parameters into a SQL statement that contains unnamed/positional bind parameters (using `?`).
  * Each bound parameter is pushed to the array in the position that corresponds to the position within the SQL statement.
- * @callback {Function} SQLERPositionalBindsFunction
+ * @callback SQLERPositionalBindsFunction
  * @param {String} sql The SQL statement that contains the bind parameters
  * @param {Object} bindsObject An object that contains the bind parameters as property names/values
  * @param {Array} bindsArray The array that will be populated with the bind parameters
@@ -350,6 +353,25 @@ module.exports = exported;
  */
 
 /**
+ * Writes a batch of streamed objects for a particular dialect implementation and returns the raw results.
+ * @async
+ * @callback SQLERStreamWritter
+ * @param {Object[]} batch The batch of streamed objects based upon a predefined `stream` batch size in {@link SQLERExecOptions}.
+ * @returns {*} The _raw_ batch execution results from the dialect execution.
+ * @memberof typedefs
+ */
+
+/**
+ * Function that will generate a {@link Stream.Writable} that internally handles the specified {@link SQLERExecOptions} `stream` batch size and emits
+ * a batch event when the batch size threshold has been reached.
+ * @callback SQLERStreamWritable
+ * @param {SQLERExecOptions} opts The execution options
+ * @param {SQLERStreamWritter} writter The function that will process the batch write
+ * @returns {Stream.Writable} The writable stream that will handle the `sqler` internals
+ * @memberof typedefs
+ */
+
+/**
  * A tracking mechanism that is shared between all {@link Dialect} implementations for a given {@link Manager}. A track provides a means to share
  * data, etc. from one {@link Dialect} to another. Properties can also be _added_ by a {@link Dialect} for use in other {@link Dialect}s.
  * __Typically only used by implementing {@link Dialect} constructors.__
@@ -357,6 +379,7 @@ module.exports = exported;
  * @property {SQLERInterpolateFunction} interpolate An interpolation function that can be used by {@link Dialect} implementations to interpolate
  * configuration option values from underlying drivers within a {@link Dialect} (immutable). The convenience of doing so negates the need for an
  * application that uses a {@link Manager} to import/require a database driver just to access driver constants, etc.
- * @property {SQLERPositionalBindsFunction} positionalBinds A function that will convert an SQL statement with named binds into positional binds
+ * @property {SQLERPositionalBindsFunction} positionalBinds A function that will convert an SQL statement with named binds into positional binds.
+ * @property {SQLERStreamWritable} writable A function that will generate a writable stream for batching large number of write executions.
  * @memberof typedefs
  */

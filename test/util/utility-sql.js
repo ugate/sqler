@@ -192,7 +192,7 @@ class UtilSql {
       } else {
         const rcdCntOpt = UtilOpts.driverOpt('recordCount', opts, connOpts);
         const rcdCnt = (rcdCntOpt.source && rcdCntOpt.value) || 2;
-        await UtilSql.expectResults(label, Array.name, readRslt, opts.stream ? Stream.Readable.name : null, rcdCnt);
+        await UtilSql.expectResults(label, execOpts, Array.name, readRslt, Number.isInteger(opts.stream) && opts.stream >= 0 ? Stream.Readable.name : null, rcdCnt);
       }
       if (LOGGER.info) LOGGER.info(label, readRslt);
     };
@@ -320,18 +320,19 @@ class UtilSql {
     }
   
     const orignalName = xopts && xopts.name;
+    const isStream = xopts && Number.isInteger(xopts.stream) && xopts.stream >= 0;
 
     label = `CREATE mgr.db.${connName}.finance.create.annual.report() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.create.annual.report(xopts);
-    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
+    await UtilSql.expectResults(label, xopts, isStream ? Array.name : undefined, rslt, isStream ? Stream.Writable.name : null, 1);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     label = `READ mgr.db.${connName}.finance.read.annual.report() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.read.annual.report(xopts);
-    await UtilSql.expectResults(label, Array.name, rslt, xopts.stream ? Stream.Readable.name : null, 2); // two records should be returned w/o order by
+    await UtilSql.expectResults(label, xopts, Array.name, rslt, isStream ? Stream.Readable.name : null, 2); // two records should be returned w/o order by
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
     
@@ -340,28 +341,28 @@ class UtilSql {
     label = `UPDATE mgr.db.${connName}.finance.ap.update.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ap.update.audits(xopts);
-    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
+    await UtilSql.expectResults(label, xopts, isStream ? Array.name : undefined, rslt, isStream ? Stream.Writable.name : null, 1);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     label = `DELETE mgr.db.${connName}.finance.ap.delete.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ap.delete.audits(xopts);
-    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
+    await UtilSql.expectResults(label, xopts, isStream ? Array.name : undefined, rslt, isStream ? Stream.Writable.name : null, 1);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     label = `UPDATE mgr.db.${connName}.finance.ar.update.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ar.update.audits(xopts);
-    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
+    await UtilSql.expectResults(label, xopts, isStream ? Array.name : undefined, rslt, isStream ? Stream.Writable.name : null, 1);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
     label = `DELETE mgr.db.${connName}.finance.ar.delete.audits() [[${txLabel}]]`;
     if (!orignalName && xopts) xopts.name = label;
     rslt = await mgr.db[connName].finance.ar.delete.audits(xopts);
-    await UtilSql.expectResults(label, xopts.stream ? Array.name : undefined, rslt, xopts.stream ? Stream.Writable.name : null, 1, xopts.binds);
+    await UtilSql.expectResults(label, xopts, isStream ? Array.name : undefined, rslt, isStream ? Stream.Writable.name : null, 1);
     UtilSql.expectPreparedStatement(rslt, !xopts.prepareStatement, label);
     await UtilSql.testOperation('state', mgr, connName, updateTestState(testState, autoCommit), label);
 
@@ -373,13 +374,13 @@ class UtilSql {
   /**
    * Aserts that a CRUD opration results are as expected
    * @param {String} label An assertion label
+   * @param {typedefs.SQLERExecOptions} xopts The execution options
    * @param {String} type The type to check for (e.g. `undefined`, `Array.name`, etc.)
    * @param {typedefs.SQLERExecResults} rslt
    * @param {String} [streamName] A stream type to assert (e.g. `Stream.Readable.name` or `Stream.Writable.name`)
    * @param {Integer} [length] The expected result row length
-   * @param {Object} [writeStreamBinds] When `streamName = Stream.Writable.name`, the _binds_ that should be expected
    */
-  static async expectResults(label, type, rslt, streamName, length, writeStreamBinds) {
+  static async expectResults(label, xopts, type, rslt, streamName, length) {
     expect(rslt, `${label} result`).to.be.object();
     if (type === Array.length) {
       expect(rslt.rows, `${label} result rows`).to.be.array();
@@ -406,24 +407,30 @@ class UtilSql {
         expect(readsFromStream, `${label} result read stream rows not empty`).to.not.be.empty();
       }
     } else if (streamName === Stream.Writable.name) {
-      // NOTE : Writable streams require the test-dialect to return rslt.test.writeStreams
-      expect(rslt.test, `${label} result test object`).to.be.object();
-      expect(rslt.test.writeStreams, `${label} result test.writeStreams`).to.be.array();
-      expect(rslt.test.writeStreams, `${label} result test.writeStreams (initially empty)`).to.be.empty();
+      let batches;
       expect(rslt.rows, `${label} result write stream rows`).to.be.array();
       for (let writeStream of rslt.rows) {
         expect(writeStream,`${label} result write stream row`).to.be.instanceof(Stream.Writable);
+        // test-dialect simply supplies the original binds during event emissions
+        writeStream.on(typedefs.EVENT_STREAM_WRITTEN_BATCH, (batch) => {
+          const streamLabel = `${label} result "${typedefs.EVENT_STREAM_WRITTEN_BATCH}" batch event`;
+          expect(batch, streamLabel).to.be.array();
+          expect(batch, `${streamLabel} length`).to.be.length(xopts.stream || 1);
+          for (let binds of batch) {
+            expect(binds, `${streamLabel} binds`).to.equal(xopts.binds, { deepFunction: true });
+          }
+          batches = batches ? [ ...batches, ...batch ] : [ ...batch ];
+        });
         await pipeline(Stream.Readable.from(async function* reads() {
           // for (let i = 0; i < rslt.rows.length; i++) {
-            yield writeStreamBinds;
+            yield xopts.binds;
           // }
         }()), writeStream);
       }
       if (length !== undefined) {
-        expect(rslt.test.writeStreams, `${label} result test.writeStreams.length`).to.be.length(length);
-        // console.log('rslt.test.writeStreams = ', JSON.stringify(rslt.test.writeStreams), ' = binds = ', JSON.stringify(writeStreamBinds));
+        expect(batches, `${label} result streamed batches.length`).to.be.length(length);
       } else {
-        expect(rslt.test.writeStreams, `${label} result test.writeStreams not empty`).to.not.be.empty();
+        expect(batches, `${label} result streamed batches not empty`).to.not.be.empty();
       }
     } else if (type !== undefined && length !== undefined) {
       expect(rslt.rows, `${label} result rows.length`).to.be.length(length);

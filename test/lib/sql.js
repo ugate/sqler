@@ -227,7 +227,7 @@ class Tester {
       logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
     });
 
-    const execOpts = UtilOpts.createExecOpts(false, { stream: true });
+    const execOpts = UtilOpts.createExecOpts(false, { stream: 0 });
     execOpts.dateFormatter = (date) => date; // noop date formatter
     return UtilSql.testRead(test.mgr, connName, { execOpts });
   }
@@ -277,7 +277,7 @@ class Tester {
     await UtilSql.initManager(test, conf);
 
     const xopts = UtilOpts.createExecOpts();
-    xopts.stream = true;
+    xopts.stream = 0;
     await UtilSql.testCUD(test.mgr, connName, conf, xopts);
   }
 

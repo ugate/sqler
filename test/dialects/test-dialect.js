@@ -25,6 +25,7 @@ class TestDialect extends Dialect {
     this.transactions = new Map();
     this.preparedStatements = new Map();
     this.preparedStatementsInTransactions = new Map();
+    this.track = track;
 
     expect(priv, 'priv').to.be.object();
     expect(priv.host, 'priv.host').to.be.string();
@@ -141,23 +142,16 @@ class TestDialect extends Dialect {
       
       // set rows
       const isRead = opts.type === 'READ';
-      const isReadStream = opts.stream && isRead;
-      const isWriteStream = !isRead && !isReadStream && opts.stream;
+      const isReadStream = opts.stream >= 0 && isRead;
+      const isWriteStream = !isRead && !isReadStream && opts.stream >= 0;
       // single record key overrides the record count
       const singleRecordKey = UtilOpts.driverOpt('singleRecordKey', opts, dialect.connConf), recordCount = UtilOpts.driverOpt('recordCount', opts, dialect.connConf);
       const rcrdCnt = (singleRecordKey.source && sql.includes(singleRecordKey.value) ? 1 : (recordCount.value || 2));
       if (isWriteStream) {
-        rslt.test = rslt.test || {};
-        rslt.test.writeStreams = [];
-        rslt.rows = [
-          new Stream.Writable({
-            objectMode: true,
-            write: function(chunk, encoding, next) {
-              rslt.test.writeStreams.push(chunk);
-              next();
-            }
-          })
-        ];
+        const writable = this.track.writable(opts, async function bindsRelay(batch) {
+          return batch;
+        });
+        rslt.rows = [ writable ];
         return rslt;
       }
       // reads
@@ -252,6 +246,7 @@ function expectTrack(track) {
   expect(track, 'track').to.be.object();
   expectPositionalBinds(track);
   expectInterpolate(track);
+  expectWritable(track);
 }
 
 /**
@@ -336,6 +331,19 @@ function expectInterpolate(track) {
     }
   }
   expectImmutable('track', track, 'interpolate');
+}
+
+/**
+ * Expects a track to contain the implmented `writable` field
+ * @param {typedefs.SQLERTrack} track The track to expect
+ */
+function expectWritable(track) {
+  expect(track.writable, 'track.writable').to.be.function();
+  let batches;
+  const writable = track.writable({ stream: 0 }, async (batch) => batches = batches ? [ ...batches, ...batch ] : [ ...batch ]);
+  expect(writable, 'track.writable result').instanceOf(Stream.Writable);
+  // TODO : expect track.writable executions
+  expectImmutable('track', track, 'writable');
 }
 
 /**

@@ -37,6 +37,7 @@ class Manager {
     if (!Array.isArray(conf.db.connections) || !conf.db.connections.length) throw new Error('Database configuration.db.connections must contain at least one connection');
     const connCnt = conf.db.connections.length;
     const mgr = internal(this);
+    /** @type {typedefs.SQLERTrack} */
     mgr.at.track = {};
     Object.defineProperty(mgr.at.track, 'interpolate', {
       value: Utils.interpolate,
@@ -44,6 +45,10 @@ class Manager {
     });
     Object.defineProperty(mgr.at.track, 'positionalBinds', {
       value: Utils.positionalBinds,
+      writable: false
+    });
+    Object.defineProperty(mgr.at.track, 'writable', {
+      value: Utils.writable,
       writable: false
     });
     mgr.this[typedefs.NS] = {};
