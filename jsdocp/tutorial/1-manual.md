@@ -324,7 +324,7 @@ const Stream = require('stream');
 // const { pipeline } = require('stream/promises');
 // node < 16 :
 const Util = require('util');
-const pipeline = Util.promisfy(Stream.pipeline);
+const pipeline = Util.promisify(Stream.pipeline);
 
 // tell sqler to return stream.Writable
 // stream can be >= 0 to indicate sreaming
