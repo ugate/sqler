@@ -10,12 +10,12 @@ The [Manager](Manager.html) is the entry point for one or more databases/connect
   - [3️⃣ Dialect Substitutions](#ds)
   - [4️⃣ Version Susbstitutions](#vs)
   - [5️⃣ Raw Substitutions](#rs)
-- [💧 Read/Write Streams](#streams)
 - [🎬 Transactions](#tx)
 - [🍽️ Prepared Statements](#ps)
+- [💧 Read/Write Streams](#streams)
 - [🗄️ Caching SQL](#cache)
 
-#### ⚙️ Setup &amp; Configuration <sub id="conf"></sub>:
+#### ⚙️ Setup &amp; Configuration <ins id="conf"></ins>:
 There are two types of configuration, _public_ and _private_. Public configurations contain one or more `connections` that will be established during initialization and typically vary depending upon the environment being used (e.g. development, test, ci, production, etc.). See the [manager.connections in the database manager constructor](Manager.html) for a complete listing of public configuration options. Private or _universal_ (`univ`) configuration, on the other hand, is intended to carry sensitive information like connection credentials. Each public connection should contain a `conf.db.connections[].id` that matches a property name in the private configuration `conf.univ.db `. __Both public and private configurations are combined when passed into the [Manager](Manager.html), but shoud be loaded from separate sources__. The following example illustrates this using a matching `myId`:
 ```sql
 -- db/finance/read.ap.companies.sql
@@ -82,7 +82,7 @@ Each `conf.db.dialect` property should contain all of the [Dialect](Dialect.html
 
 > 💡 TIP: Thrown errors from SQL execution will contain a property called `sqler` that will contain more descriptive error details pertaining to the SQL error.
 
-#### 🗃️ <u>SQL Files</u> <sub id="sqlf"></sub>:
+#### 🗃️ <u>SQL Files</u> <ins id="sqlf"></ins>:
 Every SQL file used by `sqler` should be organized in a directory under the directory assigned to `conf.mainPath` (defaults to `process.main` or `process.cwd()`). Each subdirectory used should be _unique_ to an individual `conf.db.connections[].name` (default) or `conf.db.connections[].dir`. When the [Manager](Manager.html) is initialized (i.e. [Manager.init](Manager.html#init)) the directory is scanned for files with an `.sql` extension and generates an [Prepared Function](global.html#SQLERPreparedFunction) for each file that is found. Each [generated SQL function](global.html#SQLERPreparedFunction) will be accessible as a property path of the manager. For instance, a `mainPath` of `/some/sql/path` and a connection with a `conf.db.connections[].name` of `conn1` would look for SQL files under `/some/sql/path/conn1`. If `conf.db.connections[].dir` was set to `otherDir` then SQL files would be prepared from `some/sql/path/otherDir` instead. In either case the [generated prepared SQL function](global.html#SQLERPreparedFunction) would be accessible via `manager.db.conn1.read.something()`, assuming that `read.something.sql` resides in the forementioned directory path. To better visualize path computation, consider the following directory structure and the configuration from the previous example:
 
 ```
@@ -125,7 +125,7 @@ The order of precedence in which substitutions are made:
 1. __[Version Susbstitutions](#vs)__ - Set during [prepared function execution](global.html#SQLERPreparedFunction)
 1. __[Fragment Substitutions](#fs)__ - Set during [prepared function execution](global.html#SQLERPreparedFunction)
 
-#### 1️⃣ Expanded SQL Substitutions <sub id="es"></sub>:
+#### 1️⃣ Expanded SQL Substitutions <ins id="es"></ins>:
 Depending on the underlying dialect support, named parameters typically follow some form of syntactic grammar like `:someParam`, where `someParam` is a parameter passed in to the `sqler` [generated SQL function](global.html#SQLERPreparedFunction}) as the [bind variables](global.html#SQLERExecOptions). There may be instances where _any_ number of variables need to be substituded when an SQL function is executed, but the actual number of variables is unknown at the time the SQL script is written. This can be accomplished in `sqler` by simply adding a single variable to the SQL bind variables and passing them into the prepared function. For instance, passing the following [bind variables](global.html#SQLERExecOptions) JSON into the `sqler` [generated SQL function](global.html#SQLERPreparedFunction}):
 <br/><br/>__[bind variables](global.html#SQLERExecOptions):__
 ```json
@@ -185,7 +185,7 @@ WHERE UPPER(SOME_COL) = UPPER(:someParam) OR UPPER(SOME_COL) = UPPER(:someParam1
 
 The normal driver driven variable substitutions would then be handled/applied external to `sqler`.
 
-#### 2️⃣ Fragment Substitutions <sub id="fs"></sub>:
+#### 2️⃣ Fragment Substitutions <ins id="fs"></ins>:
 The second type of replacement involves SQL script segments that are fragmented by use case. An example would be where only a portion of the SQL script will be included when `frags` is passed into the [generated SQL function](global.html#SQLERPreparedFunction}) that matches a key found in the SQL script that's surrounded by an open (e.g. `[[? someKey]]`) and closing (i.e. `[[?]]`) fragment definition. For instance if `frags` is passed into a managed SQL function that contains `['someKey']` for a SQL script:
 ```sql
 SELECT SOME_COL
@@ -209,7 +209,7 @@ WHERE SOME_COL = 'test'
 
 > __NOTE: Fragment substitutions cannot be nested__
 
-#### 3️⃣ Dialect Substitutions <sub id="ds"></sub>:
+#### 3️⃣ Dialect Substitutions <ins id="ds"></ins>:
 A third type of replacement is dialect specific and allows for SQL files that, for the most part are ANSI compliant, but may have slight deviations in syntax that's specific to an individual database vendor. SQL files can coexist between database vendors, but segments of the SQL script will only be included when executed under a database within a defined dialect. An example would be the use of `SUBSTR` in Oracle versus the ANSI* use of `SUBSTRING`. A SQL file may contain:
 ```sql
 SELECT SOME_COL
@@ -239,7 +239,7 @@ SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1)
 
 > __NOTE: Dialect substitutions cannot be nested__
 
-#### 4️⃣ Version Susbstitutions <sub id="vs"></sub>:
+#### 4️⃣ Version Susbstitutions <ins id="vs"></ins>:
 Sometimes programs connect to DBs that are shared accross one or more applications. Some portions of a program may need to execute SQL scripts that are similar in nature, but have some versioning discrepancies between database instances. Say we have a database instance for an up-and-coming version that has some modifications made to it's structure, but is not enough to warrent two separate copies of the same SQL script file. It may make more sense to maintain one copy of a SQL file and account for the discrepancies within the SQL file. We can do so by encapsulating the SQL segment by surrounding it with an opening `[[version = 1]]` and closing `[[version]]` key (valid version quantifiers can be `=`, `<`, `>`, `<=`, `>=` or `<>`). So, if there were a SQL file that contained:
 ```sql
 SELECT
@@ -266,7 +266,7 @@ FROM SOME_TABLE
 
 > __NOTE: Version substitutions cannot be nested__
 
-#### 5️⃣ Raw Susbstitutions <sub id="rs"></sub>:
+#### 5️⃣ Raw Susbstitutions <ins id="rs"></ins>:
 There are some occasions where substitutions need to be made directly on the SQL unconditionally. One such case would be environmental conditions that may warrant the use of raw substitutions. Lets consider a scenario where a SQL file contains a [schema](https://en.wikipedia.org/wiki/Database_schema) that is differnt for a _production_ environment than it is in a _test_ environment since they occupy the same [tablespace](https://en.wikipedia.org/wiki/Tablespace). Assuming the SQL is referencing a schema that is not the the default schema where it can be ommitted from the SQL altogether, there would be some challanges to overcome to achieve consistecy in a single SQL file. The subsequent example illustrates how this can be accomplished via the [Manager constructor `conf.db.connections[].substitutes`](Manager.html):
 
 __Test environment configuration:__
@@ -297,58 +297,7 @@ SELECT ST.COME_COL
 FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
-#### 💧 Read/Write Streams <sub id="streams"></sub>:
-[Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` option](global.html#SQLERExecOptions). The value set on `execOpts.stream` will indicate to the underlying database dialect that the desired batch size for executions should match that of the `stream` value. Just keep in mind that there is a balance between the batch size stored in memory that accumulates until the `stream` threshold is met, and the total number of executions for all batches. So, it's a good practice to use smaller `stream` batch values to keep a smaller memory footprint. But, large enough that minimize round trips to the dialect backend.
-
-During write streaming, it's possible to capture the the written meta results for a given `stream` batch. Simply, listen for the `typedefs.EVENT_STREAM_WRITTEN_BATCH` event on the desired writable stream returned by the execution (see example below). The array of batch values should reflect the results of the written executions when they are supported by the dialect.
-
-Example reads:
-```js
-// tell sqler to return stream.Readable
-// stream can be >= 0 to indicate streaming
-const rslts = await mgr.db.read.something({ stream: 0 });
-// rows are one or more stream.Readable
-for (let readStream of rslts.rows) {
-  // aync iterate over the stream.Readable to capture the rows
-  for await (const row of readStream) {
-    console.log('My read row', row);
-  }
-}
-```
-
-Example writes:
-```js
-const typedefs = require('sqler/typedefs');
-const Stream = require('stream');
-// node >= v16 :
-// const { pipeline } = require('stream/promises');
-// node < 16 :
-const Util = require('util');
-const pipeline = Util.promisify(Stream.pipeline);
-
-// tell sqler to return stream.Writable
-// stream can be >= 0 to indicate sreaming
-// with a count > 0, increments of that size will be emitted via event
-const rslts = await mgr.db.update.something({ stream: 100 });
-// rows are one or more stream.Writable
-for (let writeStream of rslts.rows) {
-  writeStream.on(typedefs.EVENT_STREAM_WRITTEN_BATCH, async (rsltsArray) => {
-    console.log('Every 100 batched results array:', rsltsArray);
-  });
-  await pipeline(
-    Stream.Readable.from(async function* reads() {
-      for (let i = 0; i < 10000 /* lets generates some records */; i++) {
-        yield { myField: i };
-      }
-    }()),
-    writeStream
-  );
-}
-```
-
-> NOTE : Read streams expect [`objectMode = true`](https://nodejs.org/api/stream.html#stream_readable_readableobjectmode). Write streams expect [`objectMode = true`](https://nodejs.org/api/stream.html#stream_writable_writableobjectmode).
-
-#### 🎬 Transactions <sub id="tx"></sub>:
+#### 🎬 Transactions <ins id="tx"></ins>:
 [Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](Dialect.html#beginTransaction) and are accessible via `await manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](global.html#SQLERTransactionOptions) argument and returns a unique [Transaction](global.html#SQLERTransaction) with an ID that can be passed as the `transactionId` option in subsequent [Prepared Function](global.html#SQLERPreparedFunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Amoung other properties, each [Transaction](global.html#SQLERTransaction) contains the following functions used to finalize a transaction:
 
 - `commit` - Commits any pending changes from one or more previously invoked SQL script
@@ -524,7 +473,7 @@ try {
 ```
 > __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and [`autoCommit = false` option](global.html#SQLERExecOptions) is set within a transaction since the underlying connection is typically left open until one of those functions are invoked. Not doing so could quickly starve available connections! It's also equally important not to have more transactions in progress than what is available in the connection pool that is being used by the underlying dialect.__
 
-#### 🍽️ Prepared Statements <sub id="ps"></sub>
+#### 🍽️ Prepared Statements <ins id="ps"></ins>
 [Prepared statements](https://en.wikipedia.org/wiki/Prepared_statement) __may__ optimize SQL execution when invoking the same SQL script multiple times. When bind parameters are used, different values can also be passed into the [prepared function](global.html#SQLERPreparedFunction).
 
 In `sqler`, prepared statements are handled internally via a chosen [Dialect](Dialect.html) vendor implementation. Only the [`prepareStatement = true` flag](global.html#SQLERExecOptions) needs to be set to indicate the underlying SQL script should be executed within a __dedicated request and/or connection__ from the pool. Once all of the SQL invokations are complete a call to `unprepare` from the [execution result](global.html#SQLERExecResults) will ensure the statement/connection is closed.
@@ -626,7 +575,135 @@ try {
 
 > __It's imperative that `unprepare` (or `commit`/`rollback` when using a [transaction](#tx)) is called when using [`prepareStatement = true` is set](global.html#SQLERExecOptions) since the underlying connection is typically left open until the `unprepare` function is invoked. Not doing so could quickly starve available connections! It's also equally important not to have more __active__ prepared statements in progress than what is available in the connection pool that is being used by the underlying dialect.__
 
-#### 🗄️ Caching SQL <sub id="cache"></sub>:
+#### 💧 Read/Write Streams <ins id="streams"></ins>:
+[Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` option](global.html#SQLERExecOptions). The value set on `execOpts.stream` will indicate to the underlying database dialect that the desired batch size for executions should match that of the `stream` value. Just keep in mind that there is a balance between the batch size stored in memory that accumulates until the `stream` threshold is met, and the total number of executions for all batches. So, it's a good practice to use smaller `stream` batch values to keep a smaller memory footprint. But, large enough that minimize round trips to the dialect backend.
+
+During write streaming, it's possible to capture the the written meta results for a given `stream` batch. Simply, listen for the `typedefs.EVENT_STREAM_WRITTEN_BATCH` event on the desired writable stream returned by the execution (see example below). The array of batch values should reflect the results of the written executions when they are supported by the dialect.
+
+Example reads:
+```js
+// tell sqler to return stream.Readable
+// stream can be >= 0 to indicate streaming
+const rslts = await mgr.db.myconn.read.something({ stream: 0 });
+// rows are one or more stream.Readable
+for (let readStream of rslts.rows) {
+  // aync iterate over the stream.Readable to capture the rows
+  for await (const row of readStream) {
+    console.log('My read row', row);
+  }
+}
+```
+
+Example writes:
+```js
+const typedefs = require('sqler/typedefs');
+const Stream = require('stream');
+// node >= v16 :
+// const { pipeline } = require('stream/promises');
+// node < 16 :
+const Util = require('util');
+const pipeline = Util.promisify(Stream.pipeline);
+
+// tell sqler to return stream.Writable
+// stream can be >= 0 to indicate sreaming
+// with a count > 0, increments of that size will be emitted via event
+const rslts = await mgr.db.myconn.update.something({ stream: 100 });
+// rows are one or more stream.Writable
+for (let writeStream of rslts.rows) {
+  // not required, but we can listen to when batches have been written
+  writeStream.on(typedefs.EVENT_STREAM_WRITTEN_BATCH, async (rsltsArray) => {
+    console.log('Every 100 batched results array:', rsltsArray);
+  });
+  await pipeline(
+    Stream.Readable.from(async function* reads() {
+      for (let i = 0; i < 10000 /* lets generates some records */; i++) {
+        yield { myField: i };
+      }
+    }()),
+    writeStream
+  );
+}
+```
+
+Streams can also be used in conjunction with [prepared statements](#ps) __and/or__ [transactions](#tx). 
+```js
+const typedefs = require('sqler/typedefs');
+const Stream = require('stream');
+// node >= v16 :
+// const { pipeline } = require('stream/promises');
+// node < 16 :
+const Util = require('util');
+const pipeline = Util.promisify(Stream.pipeline);
+
+
+let tx;
+try {
+  // start a transaction
+  tx = await mgr.db.myconn.beginTransaction();
+
+  // transaction, prepared statement and write stream options
+  const execOpts = {
+    stream: 100, // stream batch count is for streaming, not the transaction!
+    autoCommit: false, // transaction will be committed manually
+    transactionId: tx.id, // use the started transaction
+    prepareStatemnt: true // generate a prepared statement
+  };
+
+  const rslts = await mgr.db.myconn.update.something(execOpts);
+  // rows are one or more stream.Writable
+  for (let writeStream of rslts.rows) {
+    // not required, but we can listen to when has been prepared
+    writeStream.on(typedefs.EVENT_STREAM_STATEMENT_PREPARED, async () => {
+      console.log('Prepared statement has been prepared');
+    });
+    // not required, but we can listen to when has been unprepared
+    writeStream.on(typedefs.EVENT_STREAM_STATEMENT_UNPREPARED, async () => {
+      console.log('Prepared statement has been unprepared');
+    });
+    // not required, but we can listen to when batches have been written
+    writeStream.on(typedefs.EVENT_STREAM_WRITTEN_BATCH, async (rsltsArray) => {
+      console.log('Every 100 batched results array:', rsltsArray);
+    });
+    await pipeline(
+      Stream.Readable.from(async function* reads() {
+        for (let i = 0; i < 10000 /* lets generates some records */; i++) {
+          yield { myField: i };
+        }
+      }()),
+      // example transform that adds a timestamp to every record to be written
+      async function* transformStringify(chunksAsync) {
+        for await (const chunk of chunksAsync) {
+          chunk.myDate = new Date();
+          yield chunk;
+        }
+      },
+      writeStream
+    );
+  }
+
+  // other executions can be performed within the same transaction
+  const coProm2 = mgr.db.myconn.create.something({
+    autoCommit: false, // transaction will be committed manually
+    transactionId: tx.id, // use the same transaction
+    binds: { id: 'some_id' }
+  });
+
+  // use the transaction to commit the changes
+  // (commit will implicitly invoke unprepare)
+  await tx.commit();
+} catch (err) {
+  if (tx) {
+    // use the transaction to commit the changes
+    // (rollback will implicitly invoke unprepare)
+    await tx.rollback();
+  }
+  throw err;
+}
+```
+
+> NOTE : Read streams expect [`objectMode = true`](https://nodejs.org/api/stream.html#stream_readable_readableobjectmode). Write streams expect [`objectMode = true`](https://nodejs.org/api/stream.html#stream_writable_writableobjectmode).
+
+#### 🗄️ Caching SQL <ins id="cache"></ins>:
 By default all SQL files are read once during [Manager.init](Manager.html#init), but there are other options for controlling the frequency of the SQL file reads by passing a [cache container (see example)](global.html#SQLERCache) into the [Manager constructor](Manager.html#Manager) or by calling [Manager.setCache](Manager.html#setCache).
 
 Since `sqler` expects SQL files to be defined prior to [initialization](Manager.html#init), there are several techniques that can be used to produce and maintain evolving SQL statements:

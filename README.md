@@ -28,8 +28,8 @@ For more details check out the tutorials and API docs!
 - [Tutorials](https://ugate.github.io/sqler/tutorial-1-manual.html)
 - [API Docs](https://ugate.github.io/sqler/module-sqler-Manager.html)
 
-#### Usage <sub id="usage"></sub>:
-In order to use `sqler` a simple implementation of [Dialect](https://ugate.github.io/sqler/Dialect.html) should be supplied. There are a few that have already been written for a few enteprise level applications that make use of `sqler`<sub id="dialects"></sub>:
+#### Usage <ins id="usage"></ins>:
+In order to use `sqler` a simple implementation of [Dialect](https://ugate.github.io/sqler/Dialect.html) should be supplied. There are a few that have already been written for a few enteprise level applications that make use of `sqler`<ins id="dialects"></ins>:
 
 - [SQL Server - `sqler-mssql`](https://ugate.github.io/sqler-mssql)
 - [Oracle - `sqler-oracle`](https://ugate.github.io/sqler-oracle)
@@ -37,7 +37,7 @@ In order to use `sqler` a simple implementation of [Dialect](https://ugate.githu
 - [PostgreSQL - `sqler-postgres`](https://ugate.github.io/sqler-postgres)
 - [ODBC - `sqler-odbc`](https://ugate.github.io/sqler-odbc)
 
-Example Read<sub id="exampleread"></sub>:
+Example Read<ins id="exampleread"></ins>:
 ```sql
 -- db/finance/read.ap.companies.sql
 SELECT CO.COMPANY AS "company", CO.R_NAME AS "name", CO.PAY_GROUP AS "payGroup", CO.TAX_ACCOUNT AS "taxAccount", CO.TAX_ACCT_UNIT AS "taxAcctUnit",
@@ -93,7 +93,7 @@ process.on('SIGINT', async function sigintDB() {
 });
 ```
 
-Example Write (with implicit transaction)<sub id="examplewrite1"></sub>:
+Example Write (with implicit transaction)<ins id="examplewrite1"></ins>:
 ```sql
 -- db/finance/create.ap.companies.sql
 INSERT INTO APCOMPANY (COMPANY, R_NAME, PAY_GROUP, TAX_ACCOUNT, TAX_ACCT_UNIT)
@@ -117,7 +117,7 @@ const rslts = await mgr.db.fin.create.ap.company({
 });
 ```
 
-Example Write (with explicit transaction)<sub id="examplewrite2"></sub>:
+Example Write (with explicit transaction)<ins id="examplewrite2"></ins>:
 ```sql
 -- db/finance/create.ap.companies.sql
 INSERT INTO APCOMPANY (COMPANY, R_NAME, PAY_GROUP, TAX_ACCOUNT, TAX_ACCT_UNIT)

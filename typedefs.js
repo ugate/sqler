@@ -3,14 +3,49 @@
 const Stream = require('stream');
 
 const exported = Object.freeze({
-  MOD_KEY: 'sqler', // module key used for the object namespace on errors and logging
-  NS: 'db', // namespace on Manager where SQL functions will be added
+  /**
+   * Module key used for the object namespace on errors and logging
+   */
+  MOD_KEY: 'sqler',
+  /**
+   * Namespace on a `Manager` where SQL functions will be added
+   */
+  NS: 'db',
+  /**
+   * Valid CRUD operation names
+   */
   CRUD_TYPES: Object.freeze(['CREATE', 'READ', 'UPDATE', 'DELETE']),
-  POS_BINDS_REGEXP: /(?<!:):(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g, // regexp for capturing named bind parameter names within SQL
-  FUNC_NAME_DIR_REGEXP: /[^0-9a-zA-Z]/g, // regexp for removing invalid chars from prepared function directory names
-  FUNC_NAME_FILE_REGEXP: /[^0-9a-zA-Z\.]/g, // regexp for removing invalid chars from prepared function file names
-  FUNC_NAME_SEPARATOR: '_', // separator for prepared function names (also used as the dir/filename replacement)
-  EVENT_STREAM_WRITTEN_BATCH: 'sqler_stream_written_batch' // event name that is emitted when a stream has finished execution for a batch of writes
+  /**
+   * `RegExp` for capturing named bind parameter names within SQL
+   */
+  POS_BINDS_REGEXP: /(?<!:):(\w+)(?=([^'\\]*(\\.|'([^'\\]*\\.)*[^'\\]*'))*[^']*$)/g,
+  /**
+   * `RegExp` for removing invalid chars from prepared function directory names
+   */
+  FUNC_NAME_DIR_REGEXP: /[^0-9a-zA-Z]/g,
+  /**
+   * `RegExp` for removing invalid chars from prepared function file names
+   */
+  FUNC_NAME_FILE_REGEXP: /[^0-9a-zA-Z\.]/g,
+  /**
+   * Separator for prepared function names (also used as the dir/filename replacement)
+   */
+  FUNC_NAME_SEPARATOR: '_',
+  /** 
+   * Event name that is emitted when a stream has prepared a statement.
+   * Listeners will receive a single argument that contains the {@link SQLERExecResults}.
+   */
+  EVENT_STREAM_STATEMENT_PREPARED: 'sqler_stream_statement_prepared',
+  /** 
+   * Event name that is emitted when a stream has unprepared a statement.
+   * Listeners will receive a single argument that contains the {@link SQLERExecResults}.
+   */
+  EVENT_STREAM_STATEMENT_UPREPARED: 'sqler_stream_statement_unprepared',
+  /**
+   * Event name that is emitted when a stream has finished execution for a series of writes included in a batch.
+   * Listeners will receive a single `Object[]` argument that contains the _raw_ results returned by each of the dialect SQL write executions.  
+   */
+  EVENT_STREAM_WRITTEN_BATCH: 'sqler_stream_written_batch'
 });
 module.exports = exported;
 
