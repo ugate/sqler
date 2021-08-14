@@ -447,6 +447,7 @@ module.exports = exported;
  * @property {SQLERPositionalBindsFunction} positionalBinds A function that will convert an SQL statement with named binds into positional binds.
  * @property {SQLERBindExpansionFunction} bindExpansions A function that takes an SQL statement with named binds and expands the bind variables
  * into an array of values when they appear in the SQL statement
+ * @property {SQLERStreamReadableProcessor} readable A function that uses a specified readable stream for batching large number of read executions.
  * @property {SQLERStreamWritable} writable A function that will generate a writable stream for batching large number of write executions.
  * @memberof typedefs
  */
