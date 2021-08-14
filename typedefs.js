@@ -42,10 +42,10 @@ const exported = Object.freeze({
    */
   EVENT_STREAM_STATEMENT_UPREPARED: 'sqler_stream_statement_unprepared',
   /**
-   * Event name that is emitted when a stream has finished execution for a series of writes included in a batch.
-   * Listeners will receive a single `Object[]` argument that contains the _raw_ results returned by each of the dialect SQL write executions.  
+   * Event name that is emitted when a stream has finished execution for a series of reads or writes included in a batch.
+   * Listeners will receive a single `Object[]` argument that contains the _raw_ results returned by each of the dialect SQL read or write executions.  
    */
-  EVENT_STREAM_WRITTEN_BATCH: 'sqler_stream_written_batch'
+  EVENT_STREAM_BATCH: 'sqler_stream_batch'
 });
 module.exports = exported;
 
@@ -388,11 +388,41 @@ module.exports = exported;
  */
 
 /**
+ * Expands _bind_ variables that contain an array of values when they appear in the SQL statement. For example, an SQL statement with a section that contains
+ * `IN (:someParam)` and _binds_ of `{ someParam: [1,2,3] }` would become `IN (:someParam, :someParam1, :someParam2)` with _binds_ of `{ someParam: 1, someParam1: 2, SomeParam2: 3 }`
+ * @callback SQLERBindExpansionFunction
+ * @param {String} sql The SQL to defragement
+ * @param {Object} [binds] An object that contains the SQL parameterized `binds` that will be used for parameterized array composition
+ * @returns {String} The defragmented SQL
+ * @memberof typedefs
+ */
+
+/**
+ * Processes a read batch of streamed objects for a particular dialect implementation.
+ * @async
+ * @callback SQLERStreamReader
+ * @param {Object[]} batch The batch of streamed objects based upon a predefined `stream` batch size in {@link SQLERExecOptions}.
+ * @returns {*} A value that will be emitted on a readable stream.
+ * @memberof typedefs
+ */
+
+/**
  * Writes a batch of streamed objects for a particular dialect implementation and returns the raw results.
  * @async
  * @callback SQLERStreamWritter
  * @param {Object[]} batch The batch of streamed objects based upon a predefined `stream` batch size in {@link SQLERExecOptions}.
- * @returns {*} The _raw_ batch execution results from the dialect execution.
+ * @returns {*} The _raw_ batch execution results from the dialect execution and will be emitted on a writable stream.
+ * @memberof typedefs
+ */
+
+/**
+ * Function that internally handles the specified {@link SQLERExecOptions} `stream` batch size and emits a batch event when the batch size
+ * threshold has been reached on a specified [`stream.Readable`](https://nodejs.org/api/stream.html#stream_class_stream_readable).
+ * @callback SQLERStreamReadableProcessor
+ * @param {SQLERExecOptions} opts The execution options
+ * @param {Stream.Readable} readStream The readable stream that will produce the SQL results
+ * @param {SQLERStreamReader} [reader] The function that will process the batch read
+ * @returns {Stream.Readable} The readable stream that was passed
  * @memberof typedefs
  */
 
@@ -415,6 +445,8 @@ module.exports = exported;
  * configuration option values from underlying drivers within a {@link Dialect} (immutable). The convenience of doing so negates the need for an
  * application that uses a {@link Manager} to import/require a database driver just to access driver constants, etc.
  * @property {SQLERPositionalBindsFunction} positionalBinds A function that will convert an SQL statement with named binds into positional binds.
+ * @property {SQLERBindExpansionFunction} bindExpansions A function that takes an SQL statement with named binds and expands the bind variables
+ * into an array of values when they appear in the SQL statement
  * @property {SQLERStreamWritable} writable A function that will generate a writable stream for batching large number of write executions.
  * @memberof typedefs
  */

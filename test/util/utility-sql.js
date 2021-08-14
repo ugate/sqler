@@ -387,50 +387,51 @@ class UtilSql {
     } else if (type === undefined) {
       expect(rslt.rows, `${label} result rows`).to.be.undefined();
     }
-    if (streamName === Stream.Readable.name) {
+    if (streamName === Stream.Readable.name || streamName === Stream.Writable.name) {
       // const readsFromStreamAC = new AbortController();
       // readsFromStreamAC.signal.onabort = () => {
       //   throw new Error(`${label} result read stream rows aborted!`);
       // };
       // setTimeout(() => readsFromStreamAC.abort(), 60000);
-      expect(rslt.rows, `${label} result read stream rows`).to.be.array();
-      const readsFromStream = [];
-      for (let readStream of rslt.rows) {
-        expect(readStream,`${label} result read stream row`).to.be.instanceof(Stream.Readable);
-        for await (const chunk of readStream) {
-          readsFromStream.push(chunk);
-        }
-      }
-      if (length !== undefined) {
-        expect(readsFromStream, `${label} result read stream rows.length`).to.be.length(length);
-      } else {
-        expect(readsFromStream, `${label} result read stream rows not empty`).to.not.be.empty();
-      }
-    } else if (streamName === Stream.Writable.name) {
-      let batches;
-      expect(rslt.rows, `${label} result write stream rows`).to.be.array();
-      for (let writeStream of rslt.rows) {
-        expect(writeStream,`${label} result write stream row`).to.be.instanceof(Stream.Writable);
-        // test-dialect simply supplies the original binds during event emissions
-        writeStream.on(typedefs.EVENT_STREAM_WRITTEN_BATCH, (batch) => {
-          const streamLabel = `${label} result "${typedefs.EVENT_STREAM_WRITTEN_BATCH}" batch event`;
+      let batches, streamLabel;
+      expect(rslt.rows, `${label} result ${streamName} stream rows`).to.be.array();
+      for (let stream of rslt.rows) {
+        expect(stream, `${label} result ${streamName} stream row`).to.be.instanceof(
+          streamName === Stream.Readable.name ? Stream.Readable : Stream.Writable);
+        streamLabel = null;
+        stream.on(typedefs.EVENT_STREAM_BATCH, (batch) => {
+          streamLabel = `${label} result ${streamName} "${typedefs.EVENT_STREAM_BATCH}" batch event`;
           expect(batch, streamLabel).to.be.array();
           expect(batch, `${streamLabel} length`).to.be.length(xopts.stream || 1);
-          for (let binds of batch) {
-            expect(binds, `${streamLabel} binds`).to.equal(xopts.binds, { deepFunction: true });
+          if (streamName === Stream.Writable.name) {
+            // test-dialect simply supplies the original binds during event emissions
+            for (let binds of batch) {
+              expect(binds, `${streamLabel} binds`).to.equal(xopts.binds, { deepFunction: true });
+            }
           }
           batches = batches ? [ ...batches, ...batch ] : [ ...batch ];
         });
-        await pipeline(Stream.Readable.from(async function* reads() {
-          // for (let i = 0; i < rslt.rows.length; i++) {
-            yield xopts.binds;
-          // }
-        }()), writeStream);
+        if (streamName === Stream.Readable.name) {
+          await pipeline(stream, new Stream.Writable({
+            objectMode: true,
+            write: (chunk, encoding, next) => {
+              next(); // consume
+            }
+          }));
+        } else {
+          await pipeline(Stream.Readable.from(async function* reads() {
+            // for (let i = 0; i < rslt.rows.length; i++) {
+              yield xopts.binds;
+            // }
+          }()), stream);
+        }
+        // check that the batch event was actually called
+        expect(streamLabel, `${label} result ${streamName} batch event called?`).to.not.be.null();
       }
       if (length !== undefined) {
-        expect(batches, `${label} result streamed batches.length`).to.be.length(length);
+        expect(batches, `${label} result ${streamName} streamed batches.length`).to.be.length(length);
       } else {
-        expect(batches, `${label} result streamed batches not empty`).to.not.be.empty();
+        expect(batches, `${label} result ${streamName} streamed batches not empty`).to.not.be.empty();
       }
     } else if (type !== undefined && length !== undefined) {
       expect(rslt.rows, `${label} result rows.length`).to.be.length(length);

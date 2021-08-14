@@ -169,9 +169,8 @@ class TestDialect extends Dialect {
         for (let i = 0; i < rcrdCnt; i++) {
           readables[i] = setColProps({});
         }
-        rslt.rows = [
-          Stream.Readable.from(readables, { objectMode: true })
-        ];
+        const readable = this.track.readable(opts, Stream.Readable.from(readables, { objectMode: true }));
+        rslt.rows = [ readable ];
       } else { // normal reads
         if (!cols) return rslt;
         rslt.rows = rslt.rows || [];
@@ -246,7 +245,7 @@ function expectTrack(track) {
   expect(track, 'track').to.be.object();
   expectPositionalBinds(track);
   expectInterpolate(track);
-  expectWritable(track);
+  expectStream(track);
 }
 
 /**
@@ -334,12 +333,19 @@ function expectInterpolate(track) {
 }
 
 /**
- * Expects a track to contain the implmented `writable` field
+ * Expects a track to contain the implmented `readable` and `writable` fields
  * @param {typedefs.SQLERTrack} track The track to expect
  */
-function expectWritable(track) {
-  expect(track.writable, 'track.writable').to.be.function();
+function expectStream(track) {
+  expect(track.readable, 'track.readable').to.be.function();
   let batches;
+  const readable = track.readable({ stream: 0 }, Stream.Readable.from([{test: 1}]), async (batch) => batches = batches ? [ ...batches, ...batch ] : [ ...batch ]);
+  expect(readable, 'track.readable result').instanceOf(Stream.Readable);
+  // TODO : expect track.readable executions
+  expectImmutable('track', track, 'readable');
+
+  expect(track.writable, 'track.writable').to.be.function();
+  batches = null;
   const writable = track.writable({ stream: 0 }, async (batch) => batches = batches ? [ ...batches, ...batch ] : [ ...batch ]);
   expect(writable, 'track.writable result').instanceOf(Stream.Writable);
   // TODO : expect track.writable executions

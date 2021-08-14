@@ -47,6 +47,14 @@ class Manager {
       value: Utils.positionalBinds,
       writable: false
     });
+    Object.defineProperty(mgr.at.track, 'bindExpansions', {
+      value: Utils.bindExpansions,
+      writable: false
+    });
+    Object.defineProperty(mgr.at.track, 'readable', {
+      value: Utils.readable,
+      writable: false
+    });
     Object.defineProperty(mgr.at.track, 'writable', {
       value: Utils.writable,
       writable: false

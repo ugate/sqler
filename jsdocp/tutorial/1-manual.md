@@ -578,7 +578,7 @@ try {
 #### 💧 Read/Write Streams <ins id="streams"></ins>:
 [Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` option](global.html#SQLERExecOptions). The value set on `execOpts.stream` will indicate to the underlying database dialect that the desired batch size for executions should match that of the `stream` value. Just keep in mind that there is a balance between the batch size stored in memory that accumulates until the `stream` threshold is met, and the total number of executions for all batches. So, it's a good practice to use smaller `stream` batch values to keep a smaller memory footprint. But, large enough that minimize round trips to the dialect backend.
 
-During write streaming, it's possible to capture the the written meta results for a given `stream` batch. Simply, listen for the `typedefs.EVENT_STREAM_WRITTEN_BATCH` event on the desired writable stream returned by the execution (see example below). The array of batch values should reflect the results of the written executions when they are supported by the dialect.
+During read or write streaming, it's possible to capture the the data that is being read or written for a given `stream` batch. Simply, listen for the `typedefs.EVENT_STREAM_BATCH` event on the desired readable or writable stream returned by the execution (see example below). The array of batch values should reflect either the read records or results of the written executions (e.g. like _rows affected_).
 
 Example reads:
 ```js
