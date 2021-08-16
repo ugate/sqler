@@ -578,15 +578,24 @@ try {
 #### 💧 Read/Write Streams <ins id="streams"></ins>:
 [Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` option](global.html#SQLERExecOptions). The value set on `execOpts.stream` will indicate to the underlying database dialect that the desired batch size for executions should match that of the `stream` value. Just keep in mind that there is a balance between the batch size stored in memory that accumulates until the `stream` threshold is met, and the total number of executions for all batches. So, it's a good practice to use smaller `stream` batch values to keep a smaller memory footprint. But, large enough that minimize round trips to the dialect backend.
 
-During read or write streaming, it's possible to capture the the data that is being read or written for a given `stream` batch. Simply, listen for the `typedefs.EVENT_STREAM_BATCH` event on the desired readable or writable stream returned by the execution (see example below). The array of batch values should reflect either the read records or results of the written executions (e.g. like _rows affected_).
+During read or write streaming, it's possible to capture the the data that is being read or written for a given `stream` batch. Simply, listen for the `typedefs.EVENT_STREAM_BATCH` event on the desired readable or writable stream returned by the execution (see example below). The array of batch values should reflect either the read records or results of the written executions (e.g. like _rows affected_). In addition to the read and write events for the stream and dialect driver (if any), there are a few additional `sqler` specific events that are _typically_ emitted:
+- __`typedefs.EVENT_STREAM_BATCH`__ - Emitted for each batch of read data `Object[]` for a `stream.Readable` or write binds `Object[]` for a `stream.Writable`.
+- __`typedefs.EVENT_STREAM_RELEASE`__ - Emitted when a read or write stream has released or closed it's connection.
 
 Example reads:
 ```js
+const typedefs = require('sqler/typedefs');
+
 // tell sqler to return stream.Readable
 // stream can be >= 0 to indicate streaming
 const rslts = await mgr.db.myconn.read.something({ stream: 0 });
 // rows are one or more stream.Readable
 for (let readStream of rslts.rows) {
+  // not required, but we can listen to when the connection for the stream
+  // has been release or closed
+  readStream.on(typedefs.EVENT_STREAM_RELEASE, () => {
+    console.log('My read stream connection has been released');
+  });
   // aync iterate over the stream.Readable to capture the rows
   for await (const row of readStream) {
     console.log('My read row', row);
@@ -610,9 +619,14 @@ const pipeline = Util.promisify(Stream.pipeline);
 const rslts = await mgr.db.myconn.update.something({ stream: 100 });
 // rows are one or more stream.Writable
 for (let writeStream of rslts.rows) {
+  // not required, but we can listen to when the connection for the stream
+  // has been release or closed
+  writeStream.on(typedefs.EVENT_STREAM_RELEASE, () => {
+    console.log('My write stream connection has been released');
+  });
   // not required, but we can listen to when batches have been written
-  writeStream.on(typedefs.EVENT_STREAM_WRITTEN_BATCH, async (rsltsArray) => {
-    console.log('Every 100 batched results array:', rsltsArray);
+  writeStream.on(typedefs.EVENT_STREAM_WRITTEN_BATCH, async (bindsArray) => {
+    console.log('Every 100 batched results array:', bindsArray);
   });
   await pipeline(
     Stream.Readable.from(async function* reads() {

@@ -45,7 +45,12 @@ const exported = Object.freeze({
    * Event name that is emitted when a stream has finished execution for a series of reads or writes included in a batch.
    * Listeners will receive a single `Object[]` argument that contains the _raw_ results returned by each of the dialect SQL read or write executions.  
    */
-  EVENT_STREAM_BATCH: 'sqler_stream_batch'
+  EVENT_STREAM_BATCH: 'sqler_stream_batch',
+  /**
+   * Event name that is emitted when a stream has released or closed the connection used by the read or write stream (__managed by individual dialect implementations__).
+   * Listeners will __not__ receive any arguments.  
+   */
+  EVENT_STREAM_RELEASE: 'sqler_stream_release'
 });
 module.exports = exported;
 
