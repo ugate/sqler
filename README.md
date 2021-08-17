@@ -26,7 +26,7 @@ Skip the ORM and simplify your SQL execution plans using plain 💯% SQL systax.
 For more details check out the tutorials and API docs!
 
 - [Tutorials](https://ugate.github.io/sqler/tutorial-1-manual.html)
-- [API Docs](https://ugate.github.io/sqler/module-sqler-Manager.html)
+- [API Docs](https://ugate.github.io/sqler/Manager.html)
 
 #### Usage <ins id="usage"></ins>:
 In order to use `sqler` a simple implementation of [Dialect](https://ugate.github.io/sqler/Dialect.html) should be supplied. There are a few that have already been written for a few enteprise level applications that make use of `sqler`<ins id="dialects"></ins>:
