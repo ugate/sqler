@@ -1,6 +1,7 @@
 'use strict';
 
-const { Manager, Dialect, typedefs } = require('../../index');
+const typedefs = require('../../typedefs');
+const { Manager, Dialect } = require('../../index');
 const UtilOpts = require('../util/utility-options');
 
 const Stream = require('stream');
@@ -78,31 +79,37 @@ class TestDialect extends Dialect {
    * @inheritdoc
    */
   async beginTransaction(txId, opts) {
+    /** @type {typedefs.SQLERTransaction} */
     let tx;
     if (!this.transactions.has(txId)) {
       const dialect = this;
+      const release = async function() {
+        const pss = dialect.preparedStatementsInTransactions.get(tx.id);
+        if (pss) {
+          for (let ps of pss) {
+            dialect.preparedStatements.delete(ps.id);
+          }
+        }
+        dialect.transactions.delete(tx.id);
+        tx.state.isReleased = true;
+      };
       tx = {
         id: txId,
-        commit: async function() {
-          const pss = dialect.preparedStatementsInTransactions.get(this.id);
-          if (pss) {
-            for (let ps of pss) {
-              dialect.preparedStatements.delete(ps.id);
-            }
-          }
-          dialect.transactions.delete(this.id);
+        commit: async function(isRelease) {
+          if (this.state.isReleased) return;
+          this.state.committed++;
+          if (isRelease) await release();
         },
-        rollback: async function() {
-          const pss = dialect.preparedStatementsInTransactions.get(this.id);
-          if (pss) {
-            for (let ps of pss) {
-              dialect.preparedStatements.delete(ps.id);
-            }
-          }
-          dialect.transactions.delete(this.id);
+        rollback: async function(isRelease) {
+          if (this.state.isReleased) return;
+          this.state.rolledback++;
+          if (isRelease) await release();
         },
         state: {
-          pending: 0
+          committed: 0,
+          rolledback: 0,
+          pending: 0,
+          isReleased: false
         }
       };
       this.transactions.set(tx.id, tx);

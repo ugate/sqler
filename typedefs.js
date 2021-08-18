@@ -65,6 +65,7 @@ const exported = Object.freeze({
 module.exports = exported;
 
 /**
+ * Global type definitions used by `sqler`
  * @namespace typedefs
  */
 
@@ -302,15 +303,34 @@ module.exports = exported;
  */
 
 /**
+ * Function that commits an outstanding transaction.
+ * @callback SQLERTransactionCommit
+ * @param {Boolean} [isRelease] When truthy, releases the connection back to the connection pool after a _commit_ has been performed.
+ * It's essential that connections be released back into the connection pool to ensure that there are enough available connections for other independent executions that use the same pool.
+ * @async
+ * @memberof typedefs
+ */
+
+/**
+ * Function that rolls back an outstanding transaction.
+ * @callback SQLERTransactionRollback
+ * @param {Boolean} [isRelease] When truthy, releases the connection back to the connection pool after a _rollback_ has been performed.
+ * It's essential that connections be released back into the connection pool to ensure that there are enough available connections for other independent executions that use the same pool.
+ * @async
+ * @memberof typedefs
+ */
+
+/**
  * Transaction that symbolizes a unit of work performed within a {@link Manager} connection.
  * @typedef {Object} SQLERTransaction
  * @property {String} id The unique identifier for the transaction.
- * @property {Function} commit A no-argument _async_ function that commits the outstanding transaction.
- * @property {Function} rollback A no-argument _async_ function that rollbacks the outstanding transaction.
+ * @property {SQLERTransactionCommit} commit Rolls back the outstanding transaction.
+ * @property {SQLERTransactionRollback} rollback Commits the outstanding transaction.
  * @property {Object} state The state of the transaction
- * @property {Boolean} state.isCommitted True when the transaction has been committed.
- * @property {Boolean} state.isRolledback True when the transaction has been rolledback.
- * @property {Number} state.pending The number of pending SQL statements executed within the scope of the given transaction.
+ * @property {Number} state.committed True when the transaction has been committed.
+ * @property {Number} state.rolledback True when the transaction has been rolledback.
+ * @property {Number} state.pending The number of pending SQL statements executed within the scope of the given transaction that have not been committed or rolledback.
+ * @property {Boolean} state.isReleased Truthy when the transaction has been released.
  * @memberof typedefs
  */
 
