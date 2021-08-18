@@ -1,6 +1,6 @@
 {
   "name": "sqler",
-  "version": "8.1.1",
+  "version": "9.0.0",
   "description": "Turn SQL files into executable functions",
   "main": "index.js",
   "scripts": {
