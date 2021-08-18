@@ -47,6 +47,16 @@ const exported = Object.freeze({
    */
   EVENT_STREAM_BATCH: 'sqler_stream_batch',
   /**
+   * Event name that is emitted when a stream has committed a transaction.
+   * Listeners will receive a single `String` argument that contains the transaction ID returned by each of the dialect SQL read or write executions.  
+   */
+  EVENT_STREAM_COMMIT: 'sqler_stream_commit',
+  /**
+   * Event name that is emitted when a stream has rolled back a transaction.
+   * Listeners will receive a single `String` argument that contains the transaction ID returned by each of the dialect SQL read or write executions.  
+   */
+  EVENT_STREAM_ROLLBACK: 'sqler_stream_rollback',
+  /**
    * Event name that is emitted when a stream has released or closed the connection used by the read or write stream (__managed by individual dialect implementations__).
    * Listeners will __not__ receive any arguments.  
    */
