@@ -1,61 +1,44 @@
 'use strict';
-
+const { test, before, after, beforeEach, afterEach } = require('node:test');
+const assert = require('node:assert/strict');
 const Tester = require('./lib/options');
-const { Labrat } = require('@ugate/labrat');
-const { expect } = require('@hapi/code');
-const Lab = require('@hapi/lab');
-const lab = Lab.script();
-exports.lab = lab;
-// ESM uncomment the following lines...
-// TODO : import * as Tester from './lib/options.mjs';
-// TODO : import { expect } from '@hapi/code';
-// TODO : import { Labrat } from '@ugate/labrat';
-// TODO : import * as Lab from '@hapi/lab';
-// TODO : export * as lab from lab;
-
-const plan = `Options`;
-
-// node test/lib/options.js -NODE_ENV=test
-
-// "node_modules/.bin/lab" test/options.js -v
-// "node_modules/.bin/lab" test/options.js -vi 1
-
-lab.experiment(plan, () => {
-
-  if (Tester.before) lab.before(Tester.before);
-  if (Tester.after) lab.after(Tester.after);
-  if (Tester.beforeEach) lab.beforeEach(Tester.beforeEach);
-  if (Tester.afterEach) lab.afterEach(Tester.afterEach);
-
-  lab.test(`${plan}: Missing Configuration (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'conf' }, Tester.valConfMissing));
-  lab.test(`${plan}: Null Universe (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'univ = null' }, Tester.valUnivNull));
-  lab.test(`${plan}: Null Universe DB (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'univ.db = null' }, Tester.valUnivDbNull));
-  lab.test(`${plan}: Empty Universe DB (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'univ.db = {}' }, Tester.valUnivDbEmpty));
-  lab.test(`${plan}: Null Host (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'host = null' }, Tester.valHostNull));
-  lab.test(`${plan}: Null DB (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'db = null' }, Tester.valDbNull));
-  lab.test(`${plan}: Null Dialects (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'dialects = null' }, Tester.valDialectsNull));
-  lab.test(`${plan}: Empty Dialects (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'dialects = []' }, Tester.valDialectsEmpty));
-  lab.test(`${plan}: Custom Loggers`, Tester.valLoggers);
-  lab.test(`${plan}: Null Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections = null' }, Tester.valConnectionsNull));
-  lab.test(`${plan}: Empty Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections = []' }, Tester.valConnectionsEmpty));
-  lab.test(`${plan}: Missing ID Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections[].id = null' }, Tester.valConnectionsIdMissing));
-  lab.test(`${plan}: Missing Name Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections[].name = null' }, Tester.valConnectionsNameMissing));
-  lab.test(`${plan}: Missing Dir Connections`, Tester.valConnectionsDirMissing);
-  lab.test(`${plan}: Missing Dialect Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections[].dialect = null' }, Tester.valConnectionsDialectMissing));
-  lab.test(`${plan}: Invalid Dialect Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'typeof connections[].dialect !== "string"' }, Tester.valConnectionsDialectinvalid));
-  lab.test(`${plan}: Mismatch Dialect Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'univ.db[connections[].id] = undefined' }, Tester.valConnectionsDialectMismatch));
-  lab.test(`${plan}: External Dialect Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections[].dialect = <some external module id>' }, Tester.valConnectionsDialectImportExternal));
-  lab.test(`${plan}: Duplicate Connections (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections duplicate' }, Tester.valConnectionsIdDuplicate));
-  lab.test(`${plan}: Connections Substitutes`, Tester.valConnectionsSubstitutes);
-  lab.test(`${plan}: Connections Binds`, Tester.valConnectionsBinds);
-  lab.test(`${plan}: Missing Connections Driver Options`, Tester.valConnectionsDriverOptionsMissing);
-  lab.test(`${plan}: Connections Log None`, Tester.valConnectionsLogNone);
-  lab.test(`${plan}: Connections Log Custom Tags`, Tester.valConnectionsLogTags);
-  lab.test(`${plan}: Connections Log Custom Tags (with custom logger)`, Tester.valConnectionsLogTagsWithCustomLogger);
-  lab.test(`${plan}: Nonexistent Main Path (Error)`, Labrat.expectFailure(['onUnhandledRejection', 'onUncaughtException'], { expect, label: 'mainPath' }, Tester.valNonexistentMainPath));
-  lab.test(`${plan}: Empty DB In Main Path`, Tester.valMainPathEmpty);
-  lab.test(`${plan}: Custom Private Path`, Tester.valPrivatePath);
-  lab.test(`${plan}: Init Error Return`, Tester.valInitErrorReturn);
-  lab.test(`${plan}: Reinitialize Manager (Error)`, Labrat.expectFailure('onUnhandledRejection', { expect, label: 'connections duplicate' }, Tester.valReinit));
-  lab.test(`${plan}: Debug`, Tester.valDebug);
-});
+async function expectFailure(fn) {
+ await assert.rejects(async () => {
+  await Promise.resolve().then(() => fn());
+ });
+}
+if (Tester.before) before(Tester.before);
+if (Tester.after) after(Tester.after);
+if (Tester.beforeEach) beforeEach(Tester.beforeEach);
+if (Tester.afterEach) afterEach(Tester.afterEach);
+test('Options: Missing Configuration (Error)', async () => { await expectFailure(Tester.valConfMissing); });
+test('Options: Null Universe (Error)', async () => { await expectFailure(Tester.valUnivNull); });
+test('Options: Null Universe DB (Error)', async () => { await expectFailure(Tester.valUnivDbNull); });
+test('Options: Empty Universe DB (Error)', async () => { await expectFailure(Tester.valUnivDbEmpty); });
+test('Options: Null Host (Error)', async () => { await expectFailure(Tester.valHostNull); });
+test('Options: Null DB (Error)', async () => { await expectFailure(Tester.valDbNull); });
+test('Options: Null Dialects (Error)', async () => { await expectFailure(Tester.valDialectsNull); });
+test('Options: Empty Dialects (Error)', async () => { await expectFailure(Tester.valDialectsEmpty); });
+test('Options: Custom Loggers', async () => { await Tester.valLoggers(); });
+test('Options: Null Connections (Error)', async () => { await expectFailure(Tester.valConnectionsNull); });
+test('Options: Empty Connections (Error)', async () => { await expectFailure(Tester.valConnectionsEmpty); });
+test('Options: Missing ID Connections (Error)', async () => { await expectFailure(Tester.valConnectionsIdMissing); });
+test('Options: Missing Name Connections (Error)', async () => { await expectFailure(Tester.valConnectionsNameMissing); });
+test('Options: Missing Dir Connections', async () => { await Tester.valConnectionsDirMissing(); });
+test('Options: Missing Dialect Connections (Error)', async () => { await expectFailure(Tester.valConnectionsDialectMissing); });
+test('Options: Invalid Dialect Connections (Error)', async () => { await expectFailure(Tester.valConnectionsDialectinvalid); });
+test('Options: Mismatch Dialect Connections (Error)', async () => { await expectFailure(Tester.valConnectionsDialectMismatch); });
+test('Options: External Dialect Connections (Error)', async () => { await expectFailure(Tester.valConnectionsDialectImportExternal); });
+test('Options: Duplicate Connections (Error)', async () => { await expectFailure(Tester.valConnectionsIdDuplicate); });
+test('Options: Connections Substitutes', async () => { await Tester.valConnectionsSubstitutes(); });
+test('Options: Connections Binds', async () => { await Tester.valConnectionsBinds(); });
+test('Options: Missing Connections Driver Options', async () => { await Tester.valConnectionsDriverOptionsMissing(); });
+test('Options: Connections Log None', async () => { await Tester.valConnectionsLogNone(); });
+test('Options: Connections Log Custom Tags', async () => { await Tester.valConnectionsLogTags(); });
+test('Options: Connections Log Custom Tags (with custom logger)', async () => { await Tester.valConnectionsLogTagsWithCustomLogger(); });
+test('Options: Nonexistent Main Path (Error)', async () => { await expectFailure(Tester.valNonexistentMainPath); });
+test('Options: Empty DB In Main Path', async () => { await Tester.valMainPathEmpty(); });
+test('Options: Custom Private Path', async () => { await Tester.valPrivatePath(); });
+test('Options: Init Error Return', async () => { await Tester.valInitErrorReturn(); });
+test('Options: Reinitialize Manager (Error)', async () => { await expectFailure(Tester.valReinit); });
+test('Options: Debug', async () => { await Tester.valDebug(); });

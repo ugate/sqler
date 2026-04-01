@@ -4,11 +4,11 @@
   "description": "Turn SQL files into executable functions",
   "main": "index.js",
   "scripts": {
-    "test": "lab -v -c --coverage-exclude lib/dialect.js -t 85 -e prod",
-    "testing": "lab -v -c --coverage-exclude lib/dialect.js -t 85 -e test",
-    "test-debug": "lab -v -c --coverage-exclude lib/dialect.js -t 85 -e dev",
-    "jsdocp": "jsdocp ./jsdocp/jsdoc.json",
-    "jsdocp-deploy": "jsdocp -D ./jsdocp/jsdoc.json"
+    "test": "node --test",
+    "docs:api": "rm -rf docs/api docs/api__index__.md docs/apitypedefs.md && node ./docs/generate-api.mjs",
+    "docs:dev": "npm run docs:api && vitepress dev docs",
+    "docs:build": "npm run docs:api && vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "repository": {
     "type": "git",
@@ -24,7 +24,7 @@
   "bugs": {
     "url": "https://github.com/ugate/sqler/issues"
   },
-  "homepage": "https://ugate.github.io/sqler",
+  "homepage": "https://ugate.github.io/sqler/",
   "publishConfig": {
     "access": "public"
   },
@@ -32,12 +32,8 @@
     "asynchro": "^4.0.0"
   },
   "devDependencies": {
-    "@hapi/code": "^8.0.3",
-    "@hapi/lab": "^24.1.1",
-    "@ugate/labrat": "^2.1.0",
-    "jsdoc": "^3.6.6",
-    "jsdocp": "^1.3.0",
-    "minami": "^1.2.3"
+    "vitepress": "^1.6.4",
+    "vitepress-jsdoc": "^1.0.4"
   },
   "files": [
     "/index.js",

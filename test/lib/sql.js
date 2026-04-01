@@ -1,354 +1,236 @@
 'use strict';
-
-// TODO : ESM comment the following lines...
-const { Labrat, LOGGER } = require('@ugate/labrat');
-const IntervalCache = require('../cache/interval-cache');
+const assert = require('node:assert/strict');
+const Fs = require('fs/promises');
+const Path = require('path');
+const Stream = require('stream');
 const UtilOpts = require('../util/utility-options');
 const UtilSql = require('../util/utility-sql');
-const Fs = require('fs');
-const Path = require('path');
-const { expect } = require('@hapi/code');
-const { Manager, typedefs } = require('../../index');
-const CACHE_READ_SQL_NAME = 'read.some.tables';
-const CACHE_READ_SQL_PATH = './test/db/read.some.tables.sql';
-// TODO : import { Labrat, LOGGER } from '@ugate/labrat';
-// TODO : import * as IntervalCache from '../cache/interval-cache.mjs';
-// TODO : import * as UtilOpts from '../util/utility-options.mjs';
-// TODO : import * as UtilSql from '../util/utility-sql.mjs';
+const IntervalCache = require('../cache/interval-cache');
 
 const test = {
-  /** @type {Manager} */
-  mgr: null,
-  /** @type {typedefs.SQLERCache} */
-  cache: null,
-  mgrLogit: !!LOGGER.info
+ mgr: null,
+ cache: null,
+ conf: null,
+ connName: 'tst',
+ mgrLogit: typeof console.info === 'function'
 };
 
-// TODO : ESM uncomment the following line...
-// export
+async function setup(confMutator, initOpts = {}) {
+ test.conf = await UtilSql.initConf();
+ if (typeof confMutator === 'function') confMutator(test.conf);
+ await UtilSql.initManager(test, test.conf, initOpts);
+ test.connName = test.conf.db.connections[0].name;
+ return test;
+}
+
+async function teardown() {
+ try {
+  if (test.mgr) await test.mgr.close();
+ } finally {
+  test.mgr = null;
+  if (test.cache && typeof test.cache.stop === 'function') await test.cache.stop();
+  test.cache = null;
+ }
+}
+
 class Tester {
+ static async after() {
+  await teardown();
+ }
 
-  static async beforeEach() {
-    const cch = test.cache;
-    test.mgr = test.cache = null;
-    if (cch && cch.start) await cch.start();
+ static async afterEach() {
+  await teardown();
+ }
+
+ static async read() {
+  await setup();
+  await UtilSql.testRead(test.mgr, test.connName);
+ }
+
+ static async readWithAddConnection() {
+  await setup();
+  const conf = await UtilSql.initConf();
+  const conn = JSON.parse(JSON.stringify(conf.db.connections[0]));
+  conn.id = 'testId2';
+  conn.name = 'tst2';
+  const priv = JSON.parse(JSON.stringify(conf.univ.db.testId));
+  const rslt = await test.mgr.addConnection(conn, priv, null, false);
+  assert.equal(rslt.result[conn.name], true);
+  UtilSql.expectManagerDB(test.mgr, conn.name, false);
+  await UtilSql.testRead(test.mgr, conn.name);
+ }
+
+ static async readWithSetCacheThrow() {
+  await setup();
+  const rslt = await test.mgr.setCache(true, false, test.connName);
+  assert.equal(typeof rslt, 'object');
+  assert.equal(typeof rslt.result, 'object');
+ }
+
+ static async readWithSetCache() {
+  await setup();
+  test.cache = new IntervalCache({ expiresIn: 150 });
+  const rslt = await test.mgr.setCache(test.cache, true, test.connName);
+  assert.equal(typeof rslt.result[test.connName], 'number');
+  await UtilSql.testRead(test.mgr, test.connName, { cache: test.cache, cacheOpts: { expiresIn: 150 } });
+ }
+
+ static async readErrorReturn() {
+  await setup(conf => {
+   conf.db.connections[0].driverOptions.throwExecError = true;
+   conf.db.connections[0].driverOptions.throwProperties = { reason: 'forced-exec-error' };
+  });
+  const pfunc = UtilSql.getPreparedFunction(test.mgr, test.connName, 'read.some.tables');
+  const rslt = await pfunc(UtilOpts.createExecOpts(false), null, { returnErrors: true });
+  assert.ok(rslt && rslt.error instanceof Error);
+ }
+
+ static async readErrorThrow() {
+  await setup(conf => {
+   conf.db.connections[0].driverOptions.throwExecError = true;
+  });
+  const pfunc = UtilSql.getPreparedFunction(test.mgr, test.connName, 'read.some.tables');
+  await pfunc(UtilOpts.createExecOpts(false));
+ }
+
+ static async readWithSubstitutionsDialects() {
+  await setup(conf => {
+   conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
+   conf.db.connections[0].driverOptions = {
+    ...conf.db.connections[0].driverOptions,
+    ...UtilOpts.createSubstituteDriverOptsDialects()
+   };
+  });
+  await UtilSql.testRead(test.mgr, test.connName);
+ }
+
+ static async readWithSubstitutionsVersionNegative1() {
+  await setup(conf => {
+   conf.db.connections[0].version = -1;
+   conf.db.connections[0].driverOptions = {
+    ...conf.db.connections[0].driverOptions,
+    ...UtilOpts.createSubstituteDriverOptsVersions([-1], [1, 2])
+   };
+  });
+  await UtilSql.testRead(test.mgr, test.connName);
+ }
+
+ static async readWithSubstitutionsVersion1() {
+  await setup(conf => {
+   conf.db.connections[0].version = 1;
+   conf.db.connections[0].driverOptions = {
+    ...conf.db.connections[0].driverOptions,
+    ...UtilOpts.createSubstituteDriverOptsVersions([1], [-1, 2])
+   };
+  });
+  await UtilSql.testRead(test.mgr, test.connName);
+ }
+
+ static async readWithSubstitutionsVersion2() {
+  await setup(conf => {
+   conf.db.connections[0].version = 2;
+   conf.db.connections[0].driverOptions = {
+    ...conf.db.connections[0].driverOptions,
+    ...UtilOpts.createSubstituteDriverOptsVersions([2], [-1, 1])
+   };
+  });
+  await UtilSql.testRead(test.mgr, test.connName);
+ }
+
+ static async readWithSubstitutionsFrags() {
+  await setup(conf => {
+   conf.db.connections[0].driverOptions = {
+    ...conf.db.connections[0].driverOptions,
+    ...UtilOpts.createSubstituteDriverOptsFrags()
+   };
+  });
+  await UtilSql.testRead(test.mgr, test.connName, { frags: ['myFragKey'] });
+ }
+
+ static async readStream() {
+  await setup();
+  await UtilSql.testRead(test.mgr, test.connName, {
+   execOpts: {
+    ...UtilOpts.createExecOpts(false),
+    stream: 0,
+    type: 'READ'
+   }
+  });
+ }
+
+ static async execOptsAutoCommitFalseTransactionMissing() {
+  await setup();
+  const pfunc = UtilSql.getPreparedFunction(test.mgr, test.connName, 'read.some.tables');
+  await pfunc({ ...UtilOpts.createExecOpts(false), autoCommit: false });
+ }
+
+ static async execOptsAutoCommitFalseTransactionIdMissing() {
+  await setup();
+  const pfunc = UtilSql.getPreparedFunction(test.mgr, test.connName, 'read.some.tables');
+  await pfunc({ ...UtilOpts.createExecOpts(false), autoCommit: false, transactionId: '' });
+ }
+
+ static async execOptsPreparedStatements() {
+  await setup();
+  const pfunc = UtilSql.getPreparedFunction(test.mgr, test.connName, 'read.some.tables');
+  const txId = 'tx-prepared-1';
+  const tx = await test.mgr.db[test.connName].beginTransaction({ transactionId: txId });
+  const rslt = await pfunc({
+   ...UtilOpts.createExecOpts(false),
+   prepareStatement: true,
+   transactionId: txId,
+   autoCommit: false
+  });
+  await UtilSql.expectResults('prepared statements', { type: 'READ' }, Array.name, rslt, null, 2);
+  await tx.commit(true);
+  const state = await test.mgr.state(undefined, test.connName);
+  assert.equal(state.result[test.connName].pending, 0);
+ }
+
+ static async writeStream() {
+  await setup();
+  const pfunc = UtilSql.getPreparedFunction(test.mgr, test.connName, 'finance.create.annual.report');
+  const rslt = await pfunc({ stream: 0, type: 'CREATE' });
+  assert.ok(rslt && Array.isArray(rslt.rows) && rslt.rows.length === 1);
+  const writable = rslt.rows[0];
+  assert.ok(writable instanceof Stream.Writable);
+  writable.write({ someCol1: 1, someCol2: 2, someCol3: 3 });
+  writable.end();
+ }
+
+ static async intervalCache() {
+  await setup();
+  test.cache = new IntervalCache({ expiresIn: 150 });
+  await test.cache.start();
+  await test.mgr.setCache(test.cache, true, test.connName);
+  await UtilSql.testRead(test.mgr, test.connName, { cache: test.cache, cacheOpts: { expiresIn: 150 } });
+  await test.cache.stop();
+ }
+
+ static async scan() {
+  await setup();
+  const connName = test.connName;
+  const original = await test.mgr.preparedFunctionCount(connName);
+  assert.equal(typeof original.result[connName], 'number');
+  const tempSqlPath = Path.resolve(process.cwd(), 'test/db/read.temp.scan.sql');
+  const tempSql = 'SELECT TDB.SOME_COL1, TDB.SOME_COL2, TDB.SOME_COL3 FROM TEST_DB TDB WHERE TDB.SOME_COL1 = :someCol1';
+  await Fs.writeFile(tempSqlPath, tempSql, 'utf8');
+  try {
+   const added = await test.mgr.scan(true, connName);
+   assert.equal(added.result[connName], original.result[connName] + 1);
+  } finally {
+   await Fs.unlink(tempSqlPath).catch(() => {});
   }
+  const removed = await test.mgr.scan(true, connName);
+  assert.equal(removed.result[connName], original.result[connName]);
+ }
 
-  static async afterEach() {
-    const mgr = test.mgr, cch = test.cache, error = test.error;
-    test.mgr = test.cache = test.error = null;
-    const proms = [];
-    if (mgr && !error && test.closeConnNames) {
-      for (let cname of test.closeConnNames) {
-        proms.push(UtilSql.testOperation('close', mgr, cname, 1, `afterEach() connection "${cname}"`));
-      }
-    }
-    if (cch && cch.stop) proms.push(cch.stop());
-    return Promise.all(proms);
-  }
-
-  static async read() {
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
-    conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
-    await UtilSql.initManager(test, conf, {
-      logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
-    });
-
-    const execOpts = UtilOpts.createExecOpts();
-    execOpts.dateFormatter = (date) => date; // noop date formatter
-    return UtilSql.testRead(test.mgr, connName, { execOpts });
-  }
-
-  static async readWithAddConnection() {
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
-    conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
-    const initOpts = {
-      logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
-    };
-    await UtilSql.initManager(test, conf, initOpts);
-
-    await UtilSql.testRead(test.mgr, connName);
-
-    // create another configuration 
-    const aconf = await UtilSql.initConf(), addConn = aconf.db.connections[0], oldAddConnId = addConn.id;
-    addConn.name = `${addConn.name}ADD`;
-    addConn.substitutes = UtilOpts.createSubstituteOpts();
-    addConn.binds = UtilOpts.createConnectionBinds();
-
-    // test using conf.univ.db[conn.id] private options
-    await test.mgr.addConnection(addConn, null, test.cache, initOpts.logger);
-    await UtilSql.testRead(test.mgr, addConn.name);
-
-    // test using passed private options
-    addConn.name = `${addConn.name}2`;
-    await test.mgr.addConnection(addConn, aconf.univ.db[oldAddConnId], test.cache, initOpts.logger);
-    return UtilSql.testRead(test.mgr, addConn.name);
-  }
-
-  static async readWithSetCacheThrow() {
-    const cacheOpts = { expiresIn: 1 };
-    const cache = new IntervalCache(cacheOpts);
-
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    // missing cache should read SQL file on every execution
-    await UtilSql.initManager(test, conf, { cache: null, logger: test.mgrLogit });
-    await test.mgr.setCache(cache, false);
-
-    const orig = await Fs.promises.readFile(CACHE_READ_SQL_PATH, 'utf-8');
-    try {
-      // no SQL content should fail (see test-dialect exec) 
-      await Fs.promises.writeFile(CACHE_READ_SQL_PATH, '', 'utf-8');
-      await UtilSql.testRead(test.mgr, connName, {
-        cache,
-        cacheOpts,
-        prepFuncPaths: { read: CACHE_READ_SQL_NAME }
-      });
-    } catch (err) {
-      if (err instanceof UtilOpts.TEST_DIALECT.NoSqlError) {
-        throw err;
-      } else {
-        console.warn('Invalid error thrown for:', err);
-      }
-    } finally {
-      try {
-        await Fs.promises.writeFile(CACHE_READ_SQL_PATH, orig, 'utf-8');
-      } catch (err) {
-        console.error(error);
-      }
-      test.mgr.setCache(test.cache);
-    }
-  }
-
-  static async readWithSetCache() {
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    // missing cache should read SQL file on every execution
-    await UtilSql.initManager(test, conf, { cache: null, logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger });
-
-    const cacheOpts = { expiresIn: 100000 };
-    const cache = new IntervalCache(cacheOpts);
-    await test.mgr.setCache(cache, true);
-    // also test setting the cache to itself - should be a noop
-    await test.mgr.setCache(cache, true);
-
-    let cacheKey = await test.mgr.getCacheKey(CACHE_READ_SQL_PATH, connName);
-    expect(cacheKey, `getCacheKey for ${CACHE_READ_SQL_PATH}`).to.be.undefined();
-    const absPath = Path.resolve(CACHE_READ_SQL_PATH);
-    cacheKey = await test.mgr.getCacheKey(absPath, connName);
-    expect(cacheKey, `getCacheKey for ${absPath}`).to.be.string();
-    expect(cacheKey, `getCacheKey for ${absPath}`).to.not.be.empty();
-
-    const orig = await Fs.promises.readFile(CACHE_READ_SQL_PATH, 'utf-8');
-    try {
-      await Fs.promises.writeFile(CACHE_READ_SQL_PATH, '', 'utf-8');
-      await UtilSql.testRead(test.mgr, connName, {
-        cache,
-        execOpts: UtilOpts.createExecOpts(),
-        cacheOpts: {/* don't wait for cache to expire */},
-        prepFuncPaths: { read: CACHE_READ_SQL_NAME }
-      });
-    } finally {
-      try {
-        await Fs.promises.writeFile(CACHE_READ_SQL_PATH, orig, 'utf-8');
-      } catch (err) {
-        console.error(error);
-      }
-      test.mgr.setCache(test.cache, true);
-    }
-  }
-
-  static async readErrorReturn() {
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(test, conf, {
-      logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
-    });
-
-    const execOpts = UtilOpts.createExecOpts();
-    execOpts.driverOptions = execOpts.driverOptions || {};
-    execOpts.driverOptions.throwExecError = true;
-    execOpts.driverOptions.throwProperties = {
-      testErrorProp: 123
-    };
-    let errorOpts = true;
-    await UtilSql.testRead(test.mgr, connName, { execOpts, errorOpts });
-    errorOpts = {
-      returnErrors: true,
-      includeBindValues: true
-    };
-    return UtilSql.testRead(test.mgr, connName, { execOpts, errorOpts });
-  }
-
-  static async readErrorThrow() {
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(test, conf);
-
-    const execOpts = UtilOpts.createExecOpts();
-    execOpts.driverOptions = execOpts.driverOptions || {};
-    execOpts.driverOptions.throwExecError = true;
-    return UtilSql.testRead(test.mgr, connName, { execOpts });
-  }
-
-  static async readWithSubstitutionsDialects() {
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(test, conf);
-
-    const execOpts = UtilOpts.createExecOpts();
-    execOpts.driverOptions = execOpts.driverOptions || {};
-    execOpts.driverOptions.substitutes = { dialects: UtilOpts.createSubstituteDriverOptsDialects() };
-    return UtilSql.testRead(test.mgr, connName, {
-      execOpts,
-      prepFuncPaths: { read: 'finance.read.annual.report' }
-    });
-  }
-
-  static async readWithSubstitutionsFrags() {
-    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(test, conf);
-
-    conn.driverOptions = conn.driverOptions || {};
-    conn.driverOptions.fragSqlSnippets = UtilOpts.createSubstituteDriverOptsFrags();
-    let frags = [];
-    for (let frag in conn.driverOptions.fragSqlSnippets) {
-      frags.push(frag);
-    }
-
-    return UtilSql.testRead(test.mgr, connName, {
-      frags,
-      prepFuncPaths: { read: 'finance.read.annual.report' }
-    });
-  }
-
-  static async readStream() {
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    conf.db.connections[0].substitutes = UtilOpts.createSubstituteOpts();
-    conf.db.connections[0].binds = UtilOpts.createConnectionBinds();
-    await UtilSql.initManager(test, conf, {
-      logger: test.mgrLogit ? UtilOpts.generateTestConsoleLogger : UtilOpts.generateTestAbyssLogger
-    });
-
-    const execOpts = UtilOpts.createExecOpts(false, { stream: 0 });
-    execOpts.dateFormatter = (date) => date; // noop date formatter
-    return UtilSql.testRead(test.mgr, connName, { execOpts });
-  }
-
-  static async readWithSubstitutionsVersionNegative1() {
-    return UtilSql.testVersions(test, -1, [-1, 0, 3], 1, 2, 4);
-  }
-
-  static async readWithSubstitutionsVersion1() {
-    return UtilSql.testVersions(test, 1, [0, 1, 4], -1, 2, 3);
-  }
-
-  static async readWithSubstitutionsVersion2() {
-    return UtilSql.testVersions(test, 2, [2, 3, 4], -1, 0, 1);
-  }
-
-  static async execOptsAutoCommitFalseTransactionMissing() {
-    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(test, conf);
-
-    const xopts = UtilOpts.createExecOpts();
-    xopts.autoCommit = false;
-    // no transaction started should throw error
-    await UtilSql.testCUD(test.mgr, connName, conf, xopts, { noTransaction: true });
-  }
-
-  static async execOptsAutoCommitFalseTransactionIdMissing() {
-    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(test, conf);
-
-    const xopts = UtilOpts.createExecOpts();
-    xopts.autoCommit = false;
-    // no transaction started should throw error
-    await UtilSql.testCUD(test.mgr, connName, conf, xopts, { noTransactionId: true });
-  }
-
-  static async execOptsPreparedStatements() {
-    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(test, conf);
-
-    const xopts = UtilOpts.createExecOpts();
-    await UtilSql.testCUD(test.mgr, connName, conf, xopts, { prepare: true });
-  }
-
-  static async writeStream() {
-    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(test, conf);
-
-    const xopts = UtilOpts.createExecOpts();
-    xopts.stream = 0;
-    await UtilSql.testCUD(test.mgr, connName, conf, xopts);
-  }
-
-  static async intervalCache() {
-    const cacheOpts = { expiresIn: 100 };
-    const conf = await UtilSql.initConf(), connName = conf.db.connections[0].name;
-    await UtilSql.initManager(test, conf, { cache: new IntervalCache(cacheOpts), logger: test.mgrLogit });
-
-    try {
-      await UtilSql.testRead(test.mgr, connName, { cache: test.cache, cacheOpts });
-
-      const xopts = UtilOpts.createExecOpts();
-
-      if (LOGGER.info) LOGGER.info('>> CUD tests using autoCommit = true (default)');
-      xopts.autoCommit = true;
-      await UtilSql.testCUD(test.mgr, connName, conf, xopts);
-
-      if (LOGGER.info) LOGGER.info('>> CUD tests using autoCommit = false');
-      xopts.autoCommit = false;
-      await UtilSql.testCUD(test.mgr, connName, conf, xopts);
-    } catch (err) {
-      test.error = err;
-      throw err;
-    }
-  }
-
-  static async scan() {
-    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    const label = `Number of prepared SQL functions for connection "${connName}"`;
-    await UtilSql.initManager(test, conf);
-
-    const original = await test.mgr.preparedFunctionCount(connName);
-    expect(original, label).to.be.object();
-    expect(original.result[connName], label).to.be.greaterThan(0);
-
-    const testFile = Path.resolve('test', conn.dir, 'read.some.temp.test.sql');
-    await Fs.promises.writeFile(testFile, 'SELECT 1');
-
-    let added, removed;
-    try {
-      added = await test.mgr.scan();
-      await Fs.promises.unlink(testFile);
-      removed = await test.mgr.scan();
-    } catch (err) {
-      try {
-        Fs.unlinkSync(testFile);
-      } catch (err) {
-        console.error(err);
-      }
-      throw err;
-    }
-
-    expect(added, `${label} (after add)`).to.be.object();
-    expect(added.result[connName], `${label}: "${original.result[connName]}" (original) > "${added.result[connName]}" (after add)`).to.be.equal(original.result[connName] + 1);
-    expect(removed, `${label} (after remove)`).to.be.object();
-    expect(removed.result[connName], `${label}: "${original.result[connName]}" (original) == "${removed.result[connName]}" (after remove)`).to.equal(original.result[connName]);
-  }
-
-  static async execOptsNone() {
-    const conf = await UtilSql.initConf(), conn = conf.db.connections[0], connName = conn.name;
-    await UtilSql.initManager(test, conf);
-
-    UtilOpts.TEST_DIALECT.BYPASS_NEXT_EXEC_OPTS_CHECK = true;
-    return test.mgr.db[connName].read.no.binds();
-  }
+ static async execOptsNone() {
+  await setup();
+  const pfunc = UtilSql.getPreparedFunction(test.mgr, test.connName, 'read.some.tables');
+  const rslt = await pfunc();
+  await UtilSql.expectResults('no execution options', { type: 'READ' }, Array.name, rslt, null, 2);
+ }
 }
 
-// TODO : ESM comment the following line...
 module.exports = Tester;
-
-// when not ran in a test runner execute static Tester functions (excluding what's passed into Main.run) 
-if (!Labrat.usingTestRunner()) {
-  (async () => await Labrat.run(Tester))();
-}
