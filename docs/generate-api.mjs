@@ -152,6 +152,7 @@ async function normalizeOutput() {
 
   const moves = [
     ['docs/api__index__.md', 'docs/api/manager.md'],
+    ['docs/api/__index__.md', 'docs/api/manager.md'],
     ['docs/apitypedefs.md', 'docs/api/typedefs.md'],
     ['docs/api/libdbs.md', 'docs/api/lib/dbs.md'],
     ['docs/api/libdialect.md', 'docs/api/lib/dialect.md'],
