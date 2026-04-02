@@ -28,7 +28,8 @@ export default defineConfig({
     items: [
      { text: 'Overview', link: '/' },
      { text: 'Getting Started', link: '/guide/getting-started' },
-     { text: 'Manual', link: '/guide/manual' }
+     { text: 'Manual', link: '/guide/manual' },
+     { text: 'Manager', link: '/api/manager' }
     ]
    },
    {
