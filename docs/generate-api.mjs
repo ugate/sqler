@@ -135,6 +135,7 @@ async function writeApiIndex() {
     '',
     'Generated API pages:',
     '',
+    '- [manager](/api/manager)',
     '- [typedefs](/api/typedefs)',
     '- [lib/dbs](/api/lib/dbs)',
     '- [lib/dialect](/api/lib/dialect)',
@@ -150,7 +151,7 @@ async function normalizeOutput() {
   await ensureDir(path.join(apiDir, 'lib'));
 
   const moves = [
-    ['docs/api__index__.md', 'docs/api/index.md'],
+    ['docs/api__index__.md', 'docs/api/manager.md'],
     ['docs/apitypedefs.md', 'docs/api/typedefs.md'],
     ['docs/api/libdbs.md', 'docs/api/lib/dbs.md'],
     ['docs/api/libdialect.md', 'docs/api/lib/dialect.md'],
