@@ -5,6 +5,9 @@ hero:
   name: sqler
   text: SQL-first execution plans for Node.js
   tagline: Skip the ORM and generate executable functions directly from SQL files.
+  image:
+    src: /android-chrome-192x192.png
+    alt: sqler
   actions:
     - theme: brand
       text: Getting Started
