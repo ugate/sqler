@@ -586,7 +586,7 @@ During read or write streaming, it's possible to capture the the data that is be
 
 Example reads:
 ```js
-const typedefs = require('sqler/typedefs');
+const typedefs = require('sqle../api/typedefs');
 
 // tell sqler to return stream.Readable
 // stream can be >= 0 to indicate streaming
@@ -607,7 +607,7 @@ for (let readStream of rslts.rows) {
 
 Example writes:
 ```js
-const typedefs = require('sqler/typedefs');
+const typedefs = require('sqle../api/typedefs');
 const Stream = require('stream');
 // node >= v16 :
 // const { pipeline } = require('stream/promises');
@@ -643,7 +643,7 @@ for (let writeStream of rslts.rows) {
 
 Streams can also be used in conjunction with [prepared statements](#ps) __and/or__ [transactions](#tx). 
 ```js
-const typedefs = require('sqler/typedefs');
+const typedefs = require('sqle../api/typedefs');
 const Stream = require('stream');
 // node >= v16 :
 // const { pipeline } = require('stream/promises');
