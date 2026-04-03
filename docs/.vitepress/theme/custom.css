@@ -23,14 +23,17 @@
 
 .VPHomeHero .image-bg {
   position: absolute;
-  inset: 18% 16%;
+  inset: 24% 22%;
   z-index: 0;
   border-radius: 999px;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(249, 115, 22, 0.52) 0%, rgba(249, 115, 22, 0.26) 38%, rgba(249, 115, 22, 0.10) 62%, transparent 78%);
-  filter: blur(38px);
+  background: radial-gradient(circle at 50% 50%,
+   rgba(255, 184, 77, 0.34) 0%,
+   rgba(249, 115, 22, 0.22) 38%,
+   rgba(249, 115, 22, 0.08) 62%,
+    transparent 76%);
+  filter: blur(34px);
   opacity: 0.95;
-  transform: scale(1.15);
+  transform: scale(1.08);
 }
 
 .VPHomeHero .image-src {
@@ -43,12 +46,10 @@
   box-shadow: none !important;
 }
 
-.VPHomeHero .image::before {
-  content: "";
-  position: absolute;
-  inset: 8% -2% 8% -2%;
-  z-index: 0;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(251, 146, 60, 0.18) 0%, rgba(249, 115, 22, 0.10) 45%, transparent 72%);
-  filter: blur(70px);
+.VPHomeHero .image-src img {
+  display: block;
+  background: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 10px 22px rgba(249, 115, 22, 0.14));
 }
