@@ -32,6 +32,9 @@ features:
   - icon: ⚡
     title: Transactions and streaming
     details: Use explicit or implicit transactions plus read and write streaming for large workloads.
+  - icon: 🪐
+    title: Drop-in dialects
+    details: Vendor specific syntax is abstracted away the API and into SQL where it belongs. Pre-built dialects already provided for SQL Server, Oracle, MariaDB/MySQL, PostgreSQL, ODBC and many more.
 ---
 
 # sqler {#details}
