@@ -19,37 +19,61 @@
 
 .VPHomeHero .image-container {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .VPHomeHero .image-bg {
   position: absolute;
-  inset: 24% 22%;
+  left: 50%;
+  top: 50%;
+  width: 260px;
+  height: 260px;
+  transform: translate(-50%, -50%);
   z-index: 0;
+  pointer-events: none;
   border-radius: 999px;
-  background: radial-gradient(circle at 50% 50%,
-   rgba(255, 184, 77, 0.34) 0%,
-   rgba(249, 115, 22, 0.22) 38%,
-   rgba(249, 115, 22, 0.08) 62%,
-    transparent 76%);
-  filter: blur(34px);
-  opacity: 0.95;
-  transform: scale(1.08);
+  background:
+    radial-gradient(circle,
+      rgba(255, 170, 60, 0.28) 0%,
+      rgba(249, 115, 22, 0.18) 32%,
+      rgba(249, 115, 22, 0.08) 54%,
+      transparent 72%);
+  filter: blur(42px);
+  opacity: 1;
 }
 
 .VPHomeHero .image-src {
   position: relative;
   z-index: 1;
   display: block;
+  width: 220px;
+  max-width: 220px;
+  height: auto;
   background: transparent !important;
-  border-radius: 0 !important;
   padding: 0 !important;
+  border-radius: 0 !important;
   box-shadow: none !important;
 }
 
 .VPHomeHero .image-src img {
   display: block;
+  width: 100%;
+  height: auto;
   background: transparent !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  filter: drop-shadow(0 10px 22px rgba(249, 115, 22, 0.14));
+}
+
+@media (max-width: 960px) {
+  .VPHomeHero .image-bg {
+    width: 220px;
+    height: 220px;
+  }
+
+  .VPHomeHero .image-src {
+    width: 180px;
+    max-width: 180px;
+  }
 }
