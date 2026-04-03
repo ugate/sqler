@@ -38,11 +38,11 @@ features:
 
 `sqler` is a Node.js manager for RDBMS systems that autogenerates and manages SQL execution functions from underlying 💯% SQL systax within statement files.
 
-## Features:
+## Features {#fatures}
 
 - [Autogeneration of object paths and prepared statement functions](/guide/manual) that coincide with SQL file paths
 - Debugging options that allow for near real time updates to [SQL files](/guide/manual#sqlf) without restarting an application
-- [Expanded SQL substitutions](/guide/manual#es), [fragment substitutions](/guide/manual#fs), [dialect specific substitutions](https://ugate.github.io/sqler/manual#ds) and [version specific substitutions](/guide/manual#vs)
+- [Expanded SQL substitutions](/guide/manual#es), [fragment substitutions](/guide/manual#fs), [dialect specific substitutions](/guide/manual#ds) and [version specific substitutions](/guide/manual#vs)
 - [Simplified transaction management](/guide/manual#tx)
 - [Simplified prepared statement management](/guide/manual#ps)
 - [Fast read and write streaming support for __large reads/writes__](/guide/manual#streams)
