@@ -21,6 +21,6 @@
   --vp-home-hero-image-filter: drop-shadow(5px 5px 5px #222222) blur(68px);
 }
 
-.VPHomeHero .image-src img {
+.VPHomeHero .image-src {
   filter: drop-shadow(5px 5px 5px #222222);
 }
