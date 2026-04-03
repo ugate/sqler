@@ -5,16 +5,9 @@
   --vp-c-brand-soft: rgba(249, 115, 22, 0.14);
   /* --vp-home-hero-name-color: #f97316; */
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: -webkit-linear-gradient(
-    120deg,
-    #ffb347 30%,
-    #f97316
-  );
-  --vp-home-hero-image-background-image: linear-gradient(
-    -45deg,
-    #ffb347 50%,
-    #f97316 50%
-  );
+  --vp-home-hero-name-background: -webkit-linear-gradient(120deg, #bd34fe 30%, #41d1ff);
+  --vp-home-hero-image-background-image: linear-gradient(-45deg, #bd34fe 50%, #47caff 50%);
+  --vp-home-hero-image-filter: blur(68px);
 }
 .dark {
   --vp-c-brand-1: #fb923c;
@@ -23,26 +16,7 @@
   --vp-c-brand-soft: rgba(251, 146, 60, 0.16);
   /* --vp-home-hero-name-color: #fb923c; */
   --vp-home-hero-name-color: transparent;
-  --vp-home-hero-name-background: -webkit-linear-gradient(
-    120deg,
-    #ffcc73 30%,
-    #fb8c00
-  );
-  --vp-home-hero-image-background-image: linear-gradient(
-    -45deg,
-    #ffb347 50%,
-    #ea580c 50%
-  );
-}
-
-.VPHomeHero .name {
-  background: var(--vp-home-hero-name-background);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: var(--vp-home-hero-name-color);
-}
-
-.VPHomeHero .image-bg {
-  opacity: 0.7;
-  filter: blur(68px);
+  --vp-home-hero-name-background: -webkit-linear-gradient(120deg, #bd34fe 30%, #41d1ff);
+  --vp-home-hero-image-background-image: linear-gradient(-45deg, #bd34fe 50%, #47caff 50%);
+  --vp-home-hero-image-filter: blur(68px);
 }
