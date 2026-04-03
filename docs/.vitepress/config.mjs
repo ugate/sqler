@@ -9,10 +9,10 @@ export default defineConfig({
  head: [
   ['link', { rel: 'icon', type: 'image/png', href: '/sqler/favicon-32x32.png' }]
  ],
- ignoreDeadLinks: [
-  /^\/?api\/.*$/,
-  /^\.\/(SQLER|Dialect|Manager|Stream\.)/
- ],
+//  ignoreDeadLinks: [
+//   /^\/?api\/.*$/,
+//   /^\.\/(SQLER|Dialect|Manager|Stream\.)/
+//  ],
  themeConfig: {
   logo: '/favicon-32x32.png',
   siteTitle: 'sqler',
