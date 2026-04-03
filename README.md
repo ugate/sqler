@@ -3,9 +3,6 @@
 # ![](https://raw.githubusercontent.com/ugate/sqler/master/jsdocp/static/favicon-32x32.png) `sqler`
 
 [![npm version](https://badgen.net/npm/v/sqler?color=orange&icon=npm)](https://www.npmjs.com/package/sqler)
-[![Build Status](https://badgen.net/travis/ugate/sqler?icon=travis)](https://travis-ci.com/ugate/sqler)
-[![Dependency Status](https://badgen.net/david/dep/ugate/sqler)](https://david-dm.org/ugate/sqler)
-[![Dev Dependency Status](https://badgen.net/david/dev/ugate/sqler)](https://david-dm.org/ugate/sqler?type=dev)
 
 </b>
 
@@ -14,22 +11,22 @@
 Skip the ORM and simplify your SQL execution plans using plain 💯% SQL systax.<br/>
 `sqler` is a Node.js manager for [RDBMS](https://en.wikipedia.org/wiki/Relational_database) systems that autogenerates/manages SQL execution functions from underlying SQL statement files. Features include:
 
-- [Autogeneration of object paths and prepared statement functions](https://ugate.github.io/sqler/tutorial-1-manual.html) that coincide with SQL file paths
-- Debugging options that allow for near real time updates to [SQL files](https://ugate.github.io/sqler/tutorial-1-manual.html#sqlf) without restarting an application
-- [Expanded SQL substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#es), [fragment substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#fs), [dialect specific substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#ds) and [version specific substitutions](https://ugate.github.io/sqler/tutorial-1-manual.html#vs)
-- [Simplified transaction management](https://ugate.github.io/sqler/tutorial-1-manual.html#tx)
-- [Simplified prepared statement management](https://ugate.github.io/sqler/tutorial-1-manual.html#ps)
-- [Fast read and write streaming support for __large reads/writes__](https://ugate.github.io/sqler/tutorial-1-manual.html#streams)
+- [Autogeneration of object paths and prepared statement functions](https://ugate.github.io/sqler/guide/manual) that coincide with SQL file paths
+- Debugging options that allow for near real time updates to [SQL files](https://ugate.github.io/sqler/manual#sqlf) without restarting an application
+- [Expanded SQL substitutions](https://ugate.github.io/sqler/manual#es), [fragment substitutions](https://ugate.github.io/sqler/manual#fs), [dialect specific substitutions](https://ugate.github.io/sqler/manual#ds) and [version specific substitutions](https://ugate.github.io/sqler/manual#vs)
+- [Simplified transaction management](https://ugate.github.io/sqler/manual#tx)
+- [Simplified prepared statement management](https://ugate.github.io/sqler/manual#ps)
+- [Fast read and write streaming support for __large reads/writes__](https://ugate.github.io/sqler/manual#streams)
 - Using SQL vs ORM/API solutions minimizes overhead and maximizes optimal utilization of SQL syntax and DBA interaction and reduces over-fetching that is commonly assocaited with ORM
 - Unlike strict ORM/API based solutions, models are generated on the fly- lending itself to a more function centric design
 
 For more details check out the tutorials and API docs!
 
-- [Tutorials](https://ugate.github.io/sqler/tutorial-1-manual.html)
-- [API Docs](https://ugate.github.io/sqler/Manager.html)
+- [Tutorials](https://ugate.github.io/sqler/manual)
+- [API Docs](https://ugate.github.io/sqler/api/manager)
 
 #### Usage <ins id="usage"></ins>:
-In order to use `sqler` a simple implementation of [Dialect](https://ugate.github.io/sqler/Dialect.html) should be supplied. There are a few that have already been written for a few enteprise level applications that make use of `sqler`<ins id="dialects"></ins>:
+In order to use `sqler` a simple implementation of [Dialect](https://ugate.github.io/sqler/api/lib/dialect) should be supplied. There are a few that have already been written for a few enteprise level applications that make use of `sqler`<ins id="dialects"></ins>:
 
 - [SQL Server - `sqler-mssql`](https://ugate.github.io/sqler-mssql)
 - [Oracle - `sqler-oracle`](https://ugate.github.io/sqler-oracle)

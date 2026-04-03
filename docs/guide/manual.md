@@ -8,14 +8,14 @@ The [Manager](Manager.html) is the entry point for one or more databases/connect
   - [1️⃣ Expanded SQL Substitutions](#es)
   - [2️⃣ Fragment Substitutions](#fs)
   - [3️⃣ Dialect Substitutions](#ds)
-  - [4️⃣ Version Susbstitutions](#vs)
+  - [4️⃣ Version Substitutions](#vs)
   - [5️⃣ Raw Substitutions](#rs)
 - [🎬 Transactions](#tx)
 - [🍽️ Prepared Statements](#ps)
 - [💧 Read/Write Streams](#streams)
 - [🗄️ Caching SQL](#cache)
 
-#### ⚙️ Setup &amp; Configuration <ins id="conf"></ins>:
+#### ⚙️ Setup &amp; Configuration {#conf}
 There are two types of configuration, _public_ and _private_. Public configurations contain one or more `connections` that will be established during initialization and typically vary depending upon the environment being used (e.g. development, test, ci, production, etc.). See the [manager.connections in the database manager constructor](Manager.html) for a complete listing of public configuration options. Private or _universal_ (`univ`) configuration, on the other hand, is intended to carry sensitive information like connection credentials. Each public connection should contain a `conf.db.connections[].id` that matches a property name in the private configuration `conf.univ.db `. __Both public and private configurations are combined when passed into the [Manager](Manager.html), but shoud be loaded from separate sources__. The following example illustrates this using a matching `myId`:
 ```sql
 -- db/finance/read.ap.companies.sql
@@ -82,7 +82,7 @@ Each `conf.db.dialect` property should contain all of the [Dialect](../api/lib/d
 
 > 💡 TIP: Thrown errors from SQL execution will contain a property called `sqler` that will contain more descriptive error details pertaining to the SQL error.
 
-#### 🗃️ <u>SQL Files</u> <ins id="sqlf"></ins>:
+#### 🗃️ <u>SQL Files</u> {#sqlf}
 Every SQL file used by `sqler` should be organized in a directory under the directory assigned to `conf.mainPath` (defaults to `process.main` or `process.cwd()`). Each subdirectory used should be _unique_ to an individual `conf.db.connections[].name` (default) or `conf.db.connections[].dir`. When the [Manager](Manager.html) is initialized (i.e. [Manager.init](../api/lib/dbs)) the directory is scanned for files with an `.sql` extension and generates an [Prepared Function](../api/typedefs#typedefs-sqlerpreparedfunction) for each file that is found. Each [generated SQL function](../api/typedefs#typedefs-sqlerpreparedfunction) will be accessible as a property path of the manager. For instance, a `mainPath` of `/some/sql/path` and a connection with a `conf.db.connections[].name` of `conn1` would look for SQL files under `/some/sql/path/conn1`. If `conf.db.connections[].dir` was set to `otherDir` then SQL files would be prepared from `some/sql/path/otherDir` instead. In either case the [generated prepared SQL function](../api/typedefs#typedefs-sqlerpreparedfunction) would be accessible via `manager.db.conn1.read.something()`, assuming that `read.something.sql` resides in the forementioned directory path. To better visualize path computation, consider the following directory structure and the configuration from the previous example:
 
 ```
@@ -122,10 +122,10 @@ The order of precedence in which substitutions are made:
 1. __[Raw Substitutions](#rs)__ - Set when an SQL file is read/cached
 1. __[Expanded SQL Substitutions](#es)__ - Set during [prepared function execution](../api/typedefs#typedefs-sqlerpreparedfunction)
 1. __[Dialect Substitutions](#ds)__ - Set during [prepared function execution](../api/typedefs#typedefs-sqlerpreparedfunction)
-1. __[Version Susbstitutions](#vs)__ - Set during [prepared function execution](../api/typedefs#typedefs-sqlerpreparedfunction)
+1. __[Version Substitutions](#vs)__ - Set during [prepared function execution](../api/typedefs#typedefs-sqlerpreparedfunction)
 1. __[Fragment Substitutions](#fs)__ - Set during [prepared function execution](../api/typedefs#typedefs-sqlerpreparedfunction)
 
-#### 1️⃣ Expanded SQL Substitutions <ins id="es"></ins>:
+#### 1️⃣ Expanded SQL Substitutions {#es}
 Depending on the underlying dialect support, named parameters typically follow some form of syntactic grammar like `:someParam`, where `someParam` is a parameter passed in to the `sqler` [generated SQL function](../api/typedefs#typedefs-sqlerpreparedfunction}) as the [bind variables](../api/typedefs#typedefs-sqlerexecoptions). There may be instances where _any_ number of variables need to be substituded when an SQL function is executed, but the actual number of variables is unknown at the time the SQL script is written. This can be accomplished in `sqler` by simply adding a single variable to the SQL bind variables and passing them into the prepared function. For instance, passing the following [bind variables](../api/typedefs#typedefs-sqlerexecoptions) JSON into the `sqler` [generated SQL function](../api/typedefs#typedefs-sqlerpreparedfunction}):
 <br/><br/>__[bind variables](../api/typedefs#typedefs-sqlerexecoptions):__
 ```json
@@ -185,7 +185,7 @@ WHERE UPPER(SOME_COL) = UPPER(:someParam) OR UPPER(SOME_COL) = UPPER(:someParam1
 
 The normal driver driven variable substitutions would then be handled/applied external to `sqler`.
 
-#### 2️⃣ Fragment Substitutions <ins id="fs"></ins>:
+#### 2️⃣ Fragment Substitutions {#fs}
 The second type of replacement involves SQL script segments that are fragmented by use case. An example would be where only a portion of the SQL script will be included when `frags` is passed into the [generated SQL function](../api/typedefs#typedefs-sqlerpreparedfunction}) that matches a key found in the SQL script that's surrounded by an open (e.g. `[[? someKey]]`) and closing (i.e. `[[?]]`) fragment definition. For instance if `frags` is passed into a managed SQL function that contains `['someKey']` for a SQL script:
 ```sql
 SELECT SOME_COL
@@ -209,7 +209,7 @@ WHERE SOME_COL = 'test'
 
 > __NOTE: Fragment substitutions cannot be nested__
 
-#### 3️⃣ Dialect Substitutions <ins id="ds"></ins>:
+#### 3️⃣ Dialect Substitutions {#ds}
 A third type of replacement is dialect specific and allows for SQL files that, for the most part are ANSI compliant, but may have slight deviations in syntax that's specific to an individual database vendor. SQL files can coexist between database vendors, but segments of the SQL script will only be included when executed under a database within a defined dialect. An example would be the use of `SUBSTR` in Oracle versus the ANSI* use of `SUBSTRING`. A SQL file may contain:
 ```sql
 SELECT SOME_COL
@@ -239,7 +239,7 @@ SOME_COL = SUBSTRING(SOME_COL FROM 1 FOR 1)
 
 > __NOTE: Dialect substitutions cannot be nested__
 
-#### 4️⃣ Version Susbstitutions <ins id="vs"></ins>:
+#### 4️⃣ Version Substitutions {#vs}
 Sometimes programs connect to DBs that are shared accross one or more applications. Some portions of a program may need to execute SQL scripts that are similar in nature, but have some versioning discrepancies between database instances. Say we have a database instance for an up-and-coming version that has some modifications made to it's structure, but is not enough to warrent two separate copies of the same SQL script file. It may make more sense to maintain one copy of a SQL file and account for the discrepancies within the SQL file. We can do so by encapsulating the SQL segment by surrounding it with an opening `[[version = 1]]` and closing `[[version]]` key (valid version quantifiers can be `=`, `<`, `>`, `<=`, `>=` or `<>`). So, if there were a SQL file that contained:
 ```sql
 SELECT
@@ -266,7 +266,7 @@ FROM SOME_TABLE
 
 > __NOTE: Version substitutions cannot be nested__
 
-#### 5️⃣ Raw Susbstitutions <ins id="rs"></ins>:
+#### 5️⃣ Raw Substitutions {#rs}
 There are some occasions where substitutions need to be made directly on the SQL unconditionally. One such case would be environmental conditions that may warrant the use of raw substitutions. Lets consider a scenario where a SQL file contains a [schema](https://en.wikipedia.org/wiki/Database_schema) that is differnt for a _production_ environment than it is in a _test_ environment since they occupy the same [tablespace](https://en.wikipedia.org/wiki/Tablespace). Assuming the SQL is referencing a schema that is not the the default schema where it can be ommitted from the SQL altogether, there would be some challanges to overcome to achieve consistecy in a single SQL file. The subsequent example illustrates how this can be accomplished via the [Manager constructor `conf.db.connections[].substitutes`](Manager.html):
 
 __Test environment configuration:__
@@ -297,7 +297,7 @@ SELECT ST.COME_COL
 FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
-#### 🎬 Transactions <ins id="tx"></ins>:
+#### 🎬 Transactions {#tx}
 [Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](../api/lib/dialect#beginTransaction) and are accessible via `await manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](/api/typedefs#.SQLERTransactionOptions) argument and returns a unique [Transaction](/api/typedefs#.SQLERTransaction) with an ID that can be passed as the `transactionId` option in subsequent [Prepared Function](../api/typedefs#typedefs-sqlerpreparedfunction) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Amoung other properties, each [Transaction](/api/typedefs#.SQLERTransaction) contains the following functions used to finalize a transaction:
 
 - [`commit`](/api/typedefs#.SQLERTransactionCommit) - Commits any pending changes from one or more previously invoked SQL script (pass `true` to release the connection back into the pool indicating that the transaction is complete)
@@ -473,7 +473,7 @@ try {
 ```
 > __It's imperative that `commit` or `rollback` be called when using `beginTransaction()` and [`autoCommit = false` option](../api/typedefs#typedefs-sqlerexecoptions) is set within a transaction since the underlying connection is typically left open until one of those functions are invoked. Not doing so could quickly starve available connections! It's also equally important not to have more transactions in progress than what is available in the connection pool that is being used by the underlying dialect.__
 
-#### 🍽️ Prepared Statements <ins id="ps"></ins>
+#### 🍽️ Prepared Statements {#ps}
 [Prepared statements](https://en.wikipedia.org/wiki/Prepared_statement) __may__ optimize SQL execution when invoking the same SQL script multiple times. When bind parameters are used, different values can also be passed into the [prepared function](../api/typedefs#typedefs-sqlerpreparedfunction).
 
 In `sqler`, prepared statements are handled internally via a chosen [Dialect](../api/lib/dialect) vendor implementation. Only the [`prepareStatement = true` flag](../api/typedefs#typedefs-sqlerexecoptions) needs to be set to indicate the underlying SQL script should be executed within a __dedicated request and/or connection__ from the pool. Once all of the SQL invokations are complete a call to `unprepare` from the [execution result](/api/typedefs#.SQLERExecResults) will ensure the statement/connection is closed.
@@ -575,7 +575,7 @@ try {
 
 > __It's imperative that `unprepare` (or `commit`/`rollback` when using a [transaction](#tx)) is called when using [`prepareStatement = true` is set](../api/typedefs#typedefs-sqlerexecoptions) since the underlying connection is typically left open until the `unprepare` function is invoked. Not doing so could quickly starve available connections! It's also equally important not to have more __active__ prepared statements in progress than what is available in the connection pool that is being used by the underlying dialect.__
 
-#### 💧 Read/Write Streams <ins id="streams"></ins>:
+#### 💧 Read/Write Streams {#streams}
 [Streaming](https://nodejs.org/api/stream.html) is a useful technique for reading/writting a large number of records and is very similar to normal reads/writes using the [`stream` option](../api/typedefs#typedefs-sqlerexecoptions). The value set on `execOpts.stream` will indicate to the underlying database dialect that the desired batch size for executions should match that of the `stream` value. Just keep in mind that there is a balance between the batch size stored in memory that accumulates until the `stream` threshold is met, and the total number of executions for all batches. So, it's a good practice to use smaller `stream` batch values to keep a smaller memory footprint. But, large enough that minimize round trips to the dialect backend.
 
 During read or write streaming, it's possible to capture the the data that is being read or written for a given `stream` batch. Simply, listen for the `typedefs.EVENT_STREAM_BATCH` event on the desired readable or writable stream returned by the execution (see example below). The array of batch values should reflect either the read records or results of the written executions (e.g. like _rows affected_). In addition to the read and write events for the stream and dialect driver (if any), there are a few additional `sqler` specific events that are _typically_ emitted:
@@ -719,7 +719,7 @@ try {
 
 > NOTE : Read streams expect [`objectMode = true`](https://nodejs.org/api/stream.html#stream_readable_readableobjectmode). Write streams expect [`objectMode = true`](https://nodejs.org/api/stream.html#stream_writable_writableobjectmode).
 
-#### 🗄️ Caching SQL <ins id="cache"></ins>:
+#### 🗄️ Caching SQL {#cache}
 By default all SQL files are read once during [Manager.init](../api/lib/dbs), but there are other options for controlling the frequency of the SQL file reads by passing a [cache container (see example)](/api/typedefs#.SQLERCache) into the [Manager constructor](Manager.html#Manager) or by calling [Manager.setCache](Manager.html#setCache).
 
 Since `sqler` expects SQL files to be defined prior to [initialization](../api/lib/dbs), there are several techniques that can be used to produce and maintain evolving SQL statements:
