@@ -23,40 +23,32 @@
 
 .VPHomeHero .image-bg {
   position: absolute;
-  inset: 8% 10%;
+  inset: 18% 16%;
   z-index: 0;
-  border-radius: 28px;
+  border-radius: 999px;
   background:
-    radial-gradient(circle at 30% 30%, rgba(251, 146, 60, 0.95), transparent 42%),
-    radial-gradient(circle at 70% 35%, rgba(249, 115, 22, 0.85), transparent 38%),
-    radial-gradient(circle at 50% 75%, rgba(234, 88, 12, 0.70), transparent 42%),
-    linear-gradient(135deg, rgba(255, 196, 110, 0.28), rgba(249, 115, 22, 0.16));
-  filter: blur(36px);
+    radial-gradient(circle at 50% 50%, rgba(249, 115, 22, 0.52) 0%, rgba(249, 115, 22, 0.26) 38%, rgba(249, 115, 22, 0.10) 62%, transparent 78%);
+  filter: blur(38px);
   opacity: 0.95;
-  transform: translateZ(0);
+  transform: scale(1.15);
 }
 
 .VPHomeHero .image-src {
   position: relative;
   z-index: 1;
-  border-radius: 24px;
-  padding: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.20), rgba(255,255,255,0.06));
-  box-shadow:
-    0 24px 60px rgba(234, 88, 12, 0.28),
-    0 8px 24px rgba(0, 0, 0, 0.18);
+  display: block;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
 }
 
-.dark .VPHomeHero .image-bg {
-  background:
-    radial-gradient(circle at 30% 30%, rgba(251, 146, 60, 0.95), transparent 42%),
-    radial-gradient(circle at 70% 35%, rgba(249, 115, 22, 0.82), transparent 38%),
-    radial-gradient(circle at 50% 75%, rgba(194, 65, 12, 0.75), transparent 42%),
-    linear-gradient(135deg, rgba(255, 196, 110, 0.20), rgba(249, 115, 22, 0.12));
-  filter: blur(42px);
-  opacity: 0.92;
-}
-
-.dark .VPHomeHero .image-src {
-  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+.VPHomeHero .image::before {
+  content: "";
+  position: absolute;
+  inset: 8% -2% 8% -2%;
+  z-index: 0;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(251, 146, 60, 0.18) 0%, rgba(249, 115, 22, 0.10) 45%, transparent 72%);
+  filter: blur(70px);
 }
