@@ -34,11 +34,9 @@ features:
     details: Use explicit or implicit transactions plus read and write streaming for large workloads.
 ---
 
-# sqler
+# sqler {#details}
 
 `sqler` is a Node.js manager for RDBMS systems that autogenerates and manages SQL execution functions from underlying 💯% SQL systax within statement files.
-
-## Features {#fatures}
 
 - [Autogeneration of object paths and prepared statement functions](/guide/manual) that coincide with SQL file paths
 - Debugging options that allow for near real time updates to [SQL files](/guide/manual#sqlf) without restarting an application
@@ -47,4 +45,4 @@ features:
 - [Simplified prepared statement management](/guide/manual#ps)
 - [Fast read and write streaming support for __large reads/writes__](/guide/manual#streams)
 - Using SQL vs ORM/API solutions minimizes overhead and maximizes optimal utilization of SQL syntax and DBA interaction and reduces over-fetching that is commonly assocaited with ORM
-- Unlike strict ORM/API based solutions, models are generated on the fly- lending itself to a more function centric design
+- Unlike strict ORM/API based solutions, models are generated on the fly- lending itself to a more flexible function-centric design
