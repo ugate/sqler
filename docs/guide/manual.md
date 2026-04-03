@@ -297,7 +297,7 @@ SELECT ST.COME_COL
 FROM SOME_DB_TEST.SOME_TABLE ST
 ```
 
-#### 🎬 Transactions {#tx}
+#### ⚡ Transactions {#tx}
 [Transactions](https://en.wikipedia.org/wiki/Database_transaction) are managed by [Dialect.beginTransaction](/api/lib/dialect#dialect-begintransaction-txid-opts-⇒-typedefs-sqlertransactionn) and are accessible via `await manager.db[myConnectionName].beginTransaction()`. Each call to `beginTransaction` accepts an _optional_ [Transaction Options](/api/typedefs#typedefs-sqlertransactionoptions-object) argument and returns a unique [Transaction](/api/typedefs#typedefs-sqlertransaction-object) with an ID that can be passed as the `transactionId` option in subsequent [Prepared Function](/api/typedefs#typedefs-sqlerpreparedfunction-⇒-sqlerexecresults) calls. Generated transaction IDs helps to isolate executions to a single open connection in order to prevent inadvertently making changes on database connections used by other transactions that may also be in progress. Amoung other properties, each [Transaction](/api/typedefs#typedefs-sqlertransaction-object) contains the following functions used to finalize a transaction:
 
 - [`commit`](/api/typedefs#typedefs-sqlertransactioncommit-function) - Commits any pending changes from one or more previously invoked SQL script (pass `true` to release the connection back into the pool indicating that the transaction is complete)

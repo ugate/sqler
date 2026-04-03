@@ -23,11 +23,14 @@ hero:
       link: https://github.com/ugate/sqler
 
 features:
-  - title: File-based SQL execution
+  - icon: 🗃️
+    title: File-based SQL execution
     details: Generate object paths and execution functions directly from your SQL file layout.
-  - title: Dialect-aware substitutions
+  - icon: 💬
+    title: Dialect-aware substitutions
     details: Support dialect, version, fragment, and expansion substitutions without an ORM layer.
-  - title: Transactions and streaming
+  - icon: ⚡
+    title: Transactions and streaming
     details: Use explicit or implicit transactions plus read and write streaming for large workloads.
 ---
 
