@@ -13,72 +13,19 @@
   --vp-home-hero-name-color: #fb923c;
 }
 
-/* docs/.vitepress/theme/custom.css */
-
-/* kill the default drifting background layer */
+/* only change the glow colors */
 .VPHomeHero .image-bg {
-  display: none !important;
+  background-image:
+    radial-gradient(circle at center,
+      rgba(255, 185, 75, 0.28) 0%,
+      rgba(249, 115, 22, 0.20) 32%,
+      rgba(249, 115, 22, 0.10) 52%,
+      transparent 72%);
+  filter: blur(72px);
+  opacity: 1;
 }
 
-/* keep the image container neutral */
-.VPHomeHero .image,
-.VPHomeHero .image-container {
-  position: relative;
-}
-
-/* anchor everything to the real image wrapper */
-.VPHomeHero .image-src {
-  position: relative;
-  z-index: 1;
-  display: inline-block;
-  width: 220px;
-  max-width: 220px;
-  background: transparent !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-
-/* the glow now follows the logo exactly */
-.VPHomeHero .image-src::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 240px;
-  height: 240px;
-  transform: translate(-50%, -50%);
-  border-radius: 999px;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle,
-      rgba(255, 180, 70, 0.28) 0%,
-      rgba(249, 115, 22, 0.18) 35%,
-      rgba(249, 115, 22, 0.08) 58%,
-      transparent 74%);
-  filter: blur(34px);
-}
-
-/* actual logo */
+/* optional: a little lift on the logo itself */
 .VPHomeHero .image-src img {
-  display: block;
-  width: 100%;
-  height: auto;
-  background: transparent !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  filter: drop-shadow(0 10px 20px rgba(249, 115, 22, 0.10));
-}
-
-@media (max-width: 960px) {
-  .VPHomeHero .image-src {
-    width: 180px;
-    max-width: 180px;
-  }
-
-  .VPHomeHero .image-src::before {
-    width: 200px;
-    height: 200px;
-  }
+  filter: drop-shadow(0 10px 22px rgba(249, 115, 22, 0.10));
 }
