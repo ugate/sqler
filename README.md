@@ -13,6 +13,13 @@ For more details check out the tutorials and API docs!
 - [API Docs](https://ugate.github.io/sqler/guide/manager)
 
 
+## Dev
+
+```sh
+git clone https://github.com/ugate/sqler.git
+```
+
+
 ## Local docs workflow
 
 ```bash
